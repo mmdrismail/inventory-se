@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { cn } from '../../utils/cn';
 
 export const Button = ({
   children,
@@ -34,6 +35,8 @@ export const Button = ({
       'bg-red-600 hover:bg-red-700 text-white shadow-sm shadow-red-600/20 focus:ring-red-500 border border-transparent',
     ghost:
       'bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 focus:ring-slate-400 border border-transparent',
+    white:
+      'bg-white hover:bg-emerald-50 text-emerald-800 dark:text-emerald-900 shadow-md focus:ring-white border border-transparent font-semibold',
   };
 
   return (
@@ -41,7 +44,7 @@ export const Button = ({
       type={type}
       disabled={disabled || isLoading}
       onClick={onClick}
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`}
+      className={cn(baseClasses, sizeClasses[size], variantClasses[variant], className)}
       {...props}
     >
       {isLoading ? (

@@ -1,6 +1,7 @@
 import React from 'react';
 import { getStockStatus } from '../../utils/formatters';
 import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { cn } from '../../utils/cn';
 
 export const Badge = ({ children, variant = 'slate', size = 'md', className = '' }) => {
   const variantMap = {
@@ -19,7 +20,7 @@ export const Badge = ({ children, variant = 'slate', size = 'md', className = ''
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border ${variantMap[variant] || variantMap.slate} ${sizeMap[size]} ${className}`}
+      className={cn('inline-flex items-center gap-1.5 rounded-full border', variantMap[variant] || variantMap.slate, sizeMap[size], className)}
     >
       {children}
     </span>

@@ -31,7 +31,7 @@ export const Navbar = () => {
         <Logo size="md" />
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-7">
+        <nav className="hidden md:flex items-center gap-4 lg:gap-6 xl:gap-8">
           {navLinks.map((link) => (
             <Link
               key={link.label}

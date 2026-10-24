@@ -413,12 +413,12 @@ export const LandingPage = () => {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
             <Link to="/demo-access">
-              <Button size="lg" className="bg-white text-emerald-700 hover:bg-emerald-50 border-transparent shadow-lg">
+              <Button size="lg" variant="white" className="shadow-lg shadow-emerald-950/20 text-emerald-800">
                 Explore Demo Roles
               </Button>
             </Link>
             <Link to="/register">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 focus:ring-white">
                 Create Account
               </Button>
             </Link>
