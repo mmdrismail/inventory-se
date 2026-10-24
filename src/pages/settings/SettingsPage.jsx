@@ -1,0 +1,313 @@
+import React, { useState } from 'react';
+import { useAppData } from '../../context/AppDataContext';
+import { storageService } from '../../services/storageService';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
+import { Button } from '../../components/common/Button';
+import { Input, Select, Textarea } from '../../components/forms/FormControls';
+import {
+  Settings,
+  Building,
+  Coins,
+  Boxes,
+  Bell,
+  Sun,
+  Database,
+  RotateCcw,
+  Download,
+  Upload,
+  Save,
+  CheckCircle2,
+} from 'lucide-react';
+
+export const SettingsPage = () => {
+  const { settings, updateSettings, resetAllDemoData, confirmAction, addToast } = useAppData();
+
+  const [formData, setFormData] = useState({
+    businessName: settings.businessName || '',
+    businessEmail: settings.businessEmail || '',
+    businessPhone: settings.businessPhone || '',
+    address: settings.address || '',
+    currency: settings.currency || 'BDT',
+    defaultReorderLevel: String(settings.defaultReorderLevel || 10),
+    theme: settings.theme || 'light',
+    notificationsEnabled: settings.notificationsEnabled !== false,
+    lowStockAlerts: settings.lowStockAlerts !== false,
+    orderStockDeductionPolicy: settings.orderStockDeductionPolicy || 'on_confirm',
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setTimeout(() => {
+      updateSettings({
+        ...formData,
+        defaultReorderLevel: Number(formData.defaultReorderLevel) || 10,
+      });
+      setIsSaving(false);
+    }, 250);
+  };
+
+  const handleResetData = () => {
+    confirmAction({
+      title: 'Reset All Local Demo Data?',
+      message: 'This will restore all products, suppliers, customers, categories, transactions, and settings back to pristine seed data. Any newly added records will be replaced.',
+      confirmText: 'Confirm Hard Reset',
+      isDestructive: true,
+      onConfirm: () => {
+        resetAllDemoData();
+      },
+    });
+  };
+
+  const handleExportBackup = () => {
+    const jsonStr = storageService.exportAllData();
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `stockline_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    addToast({ title: 'Backup Exported', message: 'All demo data downloaded as JSON backup.' });
+  };
+
+  const handleImportBackup = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const success = storageService.importAllData(event.target.result);
+        if (success) {
+          window.location.reload();
+        } else {
+          alert('Failed to parse and import JSON backup file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          System Preferences & Configuration
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+          Customize currency formatting, regional information, automated stock deduction policy, and backups.
+        </p>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* 1. Business Profile */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="h-4 w-4 text-emerald-500" />
+              <span>Business Profile</span>
+            </CardTitle>
+            <p className="text-xs text-slate-400">
+              Information displayed on printable receipts and invoices
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Business / Organization Name"
+                name="businessName"
+                value={formData.businessName}
+                onChange={handleChange}
+                required
+              />
+              <Input
+                label="Support Email"
+                type="email"
+                name="businessEmail"
+                value={formData.businessEmail}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Contact Phone"
+                name="businessPhone"
+                value={formData.businessPhone}
+                onChange={handleChange}
+                required
+              />
+              <Input
+                label="Physical Facility Address"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 2. Currency & Inventory Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Coins className="h-4 w-4 text-blue-500" />
+              <span>Currency & Inventory Thresholds</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Select
+                label="System Currency"
+                name="currency"
+                value={formData.currency}
+                onChange={handleChange}
+                options={[
+                  { value: 'BDT', label: 'BDT (৳ Bangladeshi Taka)' },
+                  { value: 'USD', label: 'USD ($ US Dollar)' },
+                  { value: 'EUR', label: 'EUR (€ Euro)' },
+                  { value: 'GBP', label: 'GBP (£ British Pound)' },
+                  { value: 'INR', label: 'INR (₹ Indian Rupee)' },
+                ]}
+                helperText="Applies across all POS tables, catalogs & charts"
+              />
+
+              <Input
+                label="Default Low Stock Threshold"
+                type="number"
+                name="defaultReorderLevel"
+                value={formData.defaultReorderLevel}
+                onChange={handleChange}
+                helperText="Fallback safety point for new items"
+              />
+
+              <Select
+                label="Storefront Order Stock Deduction Policy"
+                name="orderStockDeductionPolicy"
+                value={formData.orderStockDeductionPolicy}
+                onChange={handleChange}
+                options={[
+                  { value: 'on_confirm', label: 'Deduct once on Order Confirmation' },
+                  { value: 'on_complete', label: 'Deduct once on Order Delivery' },
+                ]}
+                helperText="Enforces safe reservation policy"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. Notifications & Appearance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-amber-500" />
+              <span>Alerts & Appearance</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Select
+                label="Theme Mode"
+                name="theme"
+                value={formData.theme}
+                onChange={handleChange}
+                options={[
+                  { value: 'light', label: 'Light Clean Minimalist' },
+                  { value: 'dark', label: 'Dark High Contrast' },
+                ]}
+              />
+
+              <div className="flex flex-col justify-center space-y-2 pt-2">
+                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="notificationsEnabled"
+                    checked={formData.notificationsEnabled}
+                    onChange={handleChange}
+                    className="rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>Enable top notification bell alerts</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="lowStockAlerts"
+                    checked={formData.lowStockAlerts}
+                    onChange={handleChange}
+                    className="rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>Show low-stock warnings in overview widgets</span>
+                </label>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Save button */}
+        <div className="flex justify-end">
+          <Button type="submit" variant="primary" size="md" icon={Save} isLoading={isSaving}>
+            Save Preferences
+          </Button>
+        </div>
+      </form>
+
+      {/* 4. LocalStorage Data Management & Seed Reset */}
+      <Card className="border-red-200/50 dark:border-red-900/30">
+        <CardHeader>
+          <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+            <Database className="h-4 w-4 text-red-500" />
+            <span>Demo Data Management (LocalStorage)</span>
+          </CardTitle>
+          <p className="text-xs text-slate-400">
+            Export complete JSON database backup or restore pristine laboratory seed records.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" icon={Download} onClick={handleExportBackup}>
+                Export Backup (JSON)
+              </Button>
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportBackup}
+                  className="hidden"
+                />
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors">
+                  <Upload className="h-4 w-4" />
+                  Import Backup
+                </span>
+              </label>
+            </div>
+
+            <Button
+              variant="danger"
+              size="sm"
+              icon={RotateCcw}
+              onClick={handleResetData}
+            >
+              Reset All Demo Data
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};

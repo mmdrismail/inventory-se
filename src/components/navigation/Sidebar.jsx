@@ -1,0 +1,177 @@
+import React, { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Logo } from '../common/Logo';
+import { useAuth } from '../../context/AuthContext';
+import {
+  LayoutDashboard,
+  Package,
+  FolderTree,
+  Truck,
+  Users2,
+  ShoppingCart,
+  Receipt,
+  Boxes,
+  ClipboardList,
+  BarChart3,
+  UserCog,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  ShoppingBag,
+} from 'lucide-react';
+
+export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { currentUser, role, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Navigation Items with permitted roles
+  const navigationItems = [
+    { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'staff'] },
+    { label: 'Products', to: '/products', icon: Package, roles: ['admin', 'manager', 'staff'] },
+    { label: 'Categories', to: '/categories', icon: FolderTree, roles: ['admin', 'manager'] },
+    { label: 'Suppliers', to: '/suppliers', icon: Truck, roles: ['admin', 'manager'] },
+    { label: 'Customers', to: '/customers', icon: Users2, roles: ['admin', 'manager', 'staff'] },
+    { label: 'Purchases', to: '/purchases', icon: ShoppingCart, roles: ['admin', 'manager'] },
+    { label: 'Sales & POS', to: '/sales', icon: Receipt, roles: ['admin', 'manager', 'staff'] },
+    { label: 'Inventory', to: '/inventory', icon: Boxes, roles: ['admin', 'manager', 'staff'] },
+    { label: 'Customer Orders', to: '/orders', icon: ClipboardList, roles: ['admin', 'manager', 'staff'] },
+    { label: 'Reports & Analytics', to: '/reports', icon: BarChart3, roles: ['admin', 'manager'] },
+    { label: 'User Management', to: '/users', icon: UserCog, roles: ['admin'] },
+    { label: 'Settings', to: '/settings', icon: Settings, roles: ['admin'] },
+  ];
+
+  // Filter based on user's active demo role
+  const visibleItems = navigationItems.filter((item) => item.roles.includes(role || 'staff'));
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300">
+      {/* Brand Header */}
+      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800">
+        {!isCollapsed ? (
+          <Logo size="sm" showTagline={false} />
+        ) : (
+          <div className="mx-auto">
+            <Boxes className="h-6 w-6 text-emerald-500" />
+          </div>
+        )}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {/* Nav Menu Items */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {!isCollapsed ? 'Operations' : '•••'}
+        </div>
+        {visibleItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onCloseMobile}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 font-semibold shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
+                } ${isCollapsed ? 'justify-center px-2' : ''}`
+              }
+              title={isCollapsed ? item.label : undefined}
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              {!isCollapsed && <span>{item.label}</span>}
+            </NavLink>
+          );
+        })}
+
+        {/* Public Storefront Link for easy testing */}
+        <div className="pt-4 px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {!isCollapsed ? 'Storefront' : '•••'}
+        </div>
+        <NavLink
+          to="/shop"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all ${
+              isActive
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 font-semibold shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
+            } ${isCollapsed ? 'justify-center px-2' : ''}`
+          }
+          title={isCollapsed ? 'Customer Storefront' : undefined}
+        >
+          <ShoppingBag className="h-5 w-5 shrink-0" />
+          {!isCollapsed && <span>Customer Shop</span>}
+        </NavLink>
+      </div>
+
+      {/* User Footer Card */}
+      <div className="p-3 border-t border-slate-100 dark:border-slate-800">
+        <div
+          className={`flex items-center gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 ${
+            isCollapsed ? 'justify-center p-1.5' : ''
+          }`}
+        >
+          <img
+            src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+            alt="Avatar"
+            className="h-8 w-8 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"
+          />
+          {!isCollapsed && (
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                {currentUser?.name || 'Demo User'}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
+                  {role}
+                </span>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors"
+            title="Log out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Persistent Sidebar */}
+      <aside
+        className={`hidden lg:block h-screen sticky top-0 z-30 shrink-0 transition-all duration-300 ${
+          isCollapsed ? 'w-20' : 'w-64'
+        }`}
+      >
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Drawer */}
+      {isMobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onCloseMobile} />
+          <div className="relative w-72 max-w-xs h-full z-10">{sidebarContent}</div>
+        </div>
+      )}
+    </>
+  );
+};
