@@ -5,18 +5,11 @@ import { storageService, STORAGE_KEYS } from '../services/storageService';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Ensure seed data initialized before session read
+  const [currentUser, setCurrentUser] = useState(() => {
     storageService.initializeSeedData();
-    const session = authService.getCurrentUser();
-    if (session) {
-      setCurrentUser(session);
-    }
-    setLoading(false);
-  }, []);
+    return authService.getCurrentUser();
+  });
+  const [loading, setLoading] = useState(false);
 
   const login = (email, password) => {
     const res = authService.login(email, password);

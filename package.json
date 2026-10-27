@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node server/server.js",
+    "server:dev": "node --watch server/server.js",
+    "server:seed": "node server/seeder.js -i",
+    "server:destroy": "node server/seeder.js -d"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

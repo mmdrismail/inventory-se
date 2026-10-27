@@ -126,7 +126,7 @@ class ProductService {
     return { success: true, message: `Product "${product.name}" deleted successfully.` };
   }
 
-  importCSV(parsedRows, performedBy = 'Admin') {
+  importCSV(parsedRows, _performedBy = 'Admin') {
     let imported = 0;
     const errors = [];
     const products = this.getAll();

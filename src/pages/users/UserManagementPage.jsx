@@ -9,16 +9,12 @@ import { Badge } from '../../components/common/Badge';
 import { EmptyState } from '../../components/common/EmptyState';
 import { formatDate } from '../../utils/formatters';
 import {
-  UserCog,
   Plus,
   Search,
   Edit2,
   Trash2,
-  Shield,
-  ShieldAlert,
   Power,
   RotateCcw,
-  Sparkles,
 } from 'lucide-react';
 
 export const UserManagementPage = () => {

@@ -1,0 +1,304 @@
+const Product = require('../models/Product');
+const Sale = require('../models/Sale');
+const Purchase = require('../models/Purchase');
+const Order = require('../models/Order');
+const StockMovement = require('../models/StockMovement');
+
+// @desc    Get all products with filtering & search
+// @route   GET /api/products
+// @access  Public
+exports.getProducts = async (req, res, next) => {
+  try {
+    const { search, category, status, stockStatus, isPublic } = req.query;
+    const query = {};
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { barcode: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    if (category && category !== 'all') {
+      query.categoryId = category;
+    }
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    if (isPublic !== undefined) {
+      query.isPublic = isPublic === 'true';
+    }
+
+    let products = await Product.find(query).sort({ createdAt: -1 });
+
+    if (stockStatus) {
+      if (stockStatus === 'out') {
+        products = products.filter((p) => p.quantity <= 0);
+      } else if (stockStatus === 'low') {
+        products = products.filter((p) => p.quantity > 0 && p.quantity <= p.reorderLevel);
+      } else if (stockStatus === 'in') {
+        products = products.filter((p) => p.quantity > p.reorderLevel);
+      }
+    }
+
+    res.json({
+      success: true,
+      count: products.length,
+      data: products,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get single product by ID
+// @route   GET /api/products/:id
+// @access  Public
+exports.getProductById = async (req, res, next) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: `Product with ID '${req.params.id}' not found.`,
+      });
+    }
+    res.json({ success: true, data: product });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create a product
+// @route   POST /api/products
+// @access  Private (Admin, Manager)
+exports.createProduct = async (req, res, next) => {
+  try {
+    const {
+      name,
+      sku,
+      barcode,
+      description,
+      categoryId,
+      supplierId,
+      costPrice,
+      sellingPrice,
+      quantity,
+      reorderLevel,
+      unit,
+      imageUrl,
+      isPublic,
+    } = req.body;
+
+    const formattedSku = (sku || `SKU-${Date.now().toString().slice(-6)}`).toUpperCase().trim();
+
+    const existingSku = await Product.findOne({ sku: formattedSku });
+    if (existingSku) {
+      return res.status(400).json({
+        success: false,
+        message: `A product with SKU "${formattedSku}" already exists.`,
+      });
+    }
+
+    const product = await Product.create({
+      name: name.trim(),
+      sku: formattedSku,
+      barcode: barcode || '',
+      description: description || '',
+      categoryId: categoryId || null,
+      supplierId: supplierId || null,
+      costPrice: Number(costPrice) || 0,
+      sellingPrice: Number(sellingPrice) || 0,
+      quantity: Number(quantity) || 0,
+      reorderLevel: Number(reorderLevel) || 10,
+      unit: unit || 'pcs',
+      imageUrl: imageUrl || '',
+      isPublic: isPublic !== undefined ? isPublic : true,
+    });
+
+    // If initial stock > 0, log initial movement
+    if (product.quantity > 0) {
+      await StockMovement.create({
+        productId: product._id,
+        type: 'adjustment',
+        quantity: product.quantity,
+        balanceAfter: product.quantity,
+        reference: 'INITIAL_STOCK',
+        reason: 'Initial stock intake on creation',
+        performedBy: req.user ? req.user.name : 'System',
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully.',
+      data: product,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update a product
+// @route   PUT /api/products/:id
+// @access  Private (Admin, Manager)
+exports.updateProduct = async (req, res, next) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: `Product with ID '${req.params.id}' not found.`,
+      });
+    }
+
+    if (req.body.sku) {
+      const formattedSku = req.body.sku.toUpperCase().trim();
+      const existingSku = await Product.findOne({ sku: formattedSku, _id: { $ne: req.params.id } });
+      if (existingSku) {
+        return res.status(400).json({
+          success: false,
+          message: `SKU "${formattedSku}" is already taken by another product.`,
+        });
+      }
+      req.body.sku = formattedSku;
+    }
+
+    const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.json({
+      success: true,
+      message: 'Product updated successfully.',
+      data: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete a product (with dependency safety guards)
+// @route   DELETE /api/products/:id
+// @access  Private (Admin)
+exports.deleteProduct = async (req, res, next) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: `Product with ID '${req.params.id}' not found.`,
+      });
+    }
+
+    // Dependency check: Sales
+    const hasSales = await Sale.findOne({ 'items.productId': req.params.id });
+    if (hasSales) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete "${product.name}" because it is referenced in completed sales invoices.`,
+      });
+    }
+
+    // Dependency check: Purchases
+    const hasPurchases = await Purchase.findOne({ 'items.productId': req.params.id });
+    if (hasPurchases) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete "${product.name}" because it is linked to purchase orders.`,
+      });
+    }
+
+    // Dependency check: Customer Orders
+    const hasOrders = await Order.findOne({ 'items.productId': req.params.id });
+    if (hasOrders) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete "${product.name}" because it belongs to customer orders.`,
+      });
+    }
+
+    await Product.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: `Product "${product.name}" deleted successfully.`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Bulk CSV Import products
+// @route   POST /api/products/import-csv
+// @access  Private (Admin, Manager)
+exports.importCSV = async (req, res, next) => {
+  try {
+    const { products: rows } = req.body;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No product rows provided in request.',
+      });
+    }
+
+    let imported = 0;
+    const errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const name = row.name || row['Product Name'];
+      const sku = (row.sku || row['SKU'] || '').toUpperCase().trim();
+
+      if (!name || !sku) {
+        errors.push(`Row ${i + 1}: Missing Name or SKU.`);
+        continue;
+      }
+
+      const existing = await Product.findOne({ sku });
+      if (existing) {
+        errors.push(`Row ${i + 1}: SKU "${sku}" already exists. Skipping.`);
+        continue;
+      }
+
+      const newProduct = await Product.create({
+        name,
+        sku,
+        description: row.description || row['Description'] || '',
+        costPrice: Number(row.costPrice || row['Cost Price']) || 0,
+        sellingPrice: Number(row.sellingPrice || row['Selling Price']) || 0,
+        quantity: Number(row.quantity || row['Quantity']) || 0,
+        reorderLevel: Number(row.reorderLevel || row['Reorder Level']) || 10,
+        imageUrl: row.imageUrl || row['Image URL'] || '',
+      });
+
+      if (newProduct.quantity > 0) {
+        await StockMovement.create({
+          productId: newProduct._id,
+          type: 'adjustment',
+          quantity: newProduct.quantity,
+          balanceAfter: newProduct.quantity,
+          reference: 'CSV_IMPORT',
+          reason: 'Bulk stock import via CSV',
+          performedBy: req.user ? req.user.name : 'Admin',
+        });
+      }
+
+      imported++;
+    }
+
+    res.json({
+      success: true,
+      message: `Imported ${imported} products successfully.`,
+      imported,
+      errors,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

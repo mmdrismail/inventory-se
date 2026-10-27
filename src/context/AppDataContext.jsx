@@ -14,18 +14,21 @@ import { settingsService } from '../services/settingsService';
 const AppDataContext = createContext(null);
 
 export const AppDataProvider = ({ children }) => {
-  // Primary collections
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [purchases, setPurchases] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [inventoryMovements, setInventoryMovements] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [settings, setSettings] = useState(settingsService.getSettings());
-  const [cart, setCart] = useState([]);
+  // Ensure seed data initialized before reading collections
+  storageService.initializeSeedData();
+
+  // Primary collections lazily loaded from storage
+  const [products, setProducts] = useState(() => storageService.getItem(STORAGE_KEYS.PRODUCTS, []));
+  const [categories, setCategories] = useState(() => storageService.getItem(STORAGE_KEYS.CATEGORIES, []));
+  const [suppliers, setSuppliers] = useState(() => storageService.getItem(STORAGE_KEYS.SUPPLIERS, []));
+  const [customers, setCustomers] = useState(() => storageService.getItem(STORAGE_KEYS.CUSTOMERS, []));
+  const [purchases, setPurchases] = useState(() => storageService.getItem(STORAGE_KEYS.PURCHASES, []));
+  const [sales, setSales] = useState(() => storageService.getItem(STORAGE_KEYS.SALES, []));
+  const [inventoryMovements, setInventoryMovements] = useState(() => storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
+  const [orders, setOrders] = useState(() => storageService.getItem(STORAGE_KEYS.ORDERS, []));
+  const [users, setUsers] = useState(() => storageService.getItem(STORAGE_KEYS.USERS, []));
+  const [settings, setSettings] = useState(() => settingsService.getSettings());
+  const [cart, setCart] = useState(() => storageService.getItem(STORAGE_KEYS.CART, []));
 
   // UI state: Toasts and Confirm Modals
   const [toasts, setToasts] = useState([]);
@@ -63,8 +66,12 @@ export const AppDataProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    storageService.initializeSeedData();
-    reloadState();
+    const curSettings = settingsService.getSettings();
+    if (curSettings.theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, []);
 
   // Toast Helpers

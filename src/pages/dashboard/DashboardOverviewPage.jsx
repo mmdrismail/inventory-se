@@ -14,8 +14,6 @@ import {
 import {
   formatCurrency,
   formatNumber,
-  formatDate,
-  formatDateTime,
 } from '../../utils/formatters';
 import {
   calculateInventoryMetrics,
@@ -32,10 +30,6 @@ import {
   ClipboardList,
   Calendar,
   ArrowRight,
-  TrendingUp,
-  Boxes,
-  PlusCircle,
-  Eye,
 } from 'lucide-react';
 
 export const DashboardOverviewPage = () => {

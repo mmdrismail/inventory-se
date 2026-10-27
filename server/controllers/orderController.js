@@ -1,0 +1,179 @@
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+const StockMovement = require('../models/StockMovement');
+
+// @desc    Get all storefront customer orders
+// @route   GET /api/orders
+// @access  Private / Public (filtered for customers)
+exports.getOrders = async (req, res, next) => {
+  try {
+    const { status, email } = req.query;
+    const query = {};
+
+    if (status && status !== 'all') query.status = status;
+    if (email) query.customerEmail = email.toLowerCase();
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: orders.length,
+      data: orders,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get single order by ID or orderNumber
+// @route   GET /api/orders/:id
+// @access  Public / Private
+exports.getOrderById = async (req, res, next) => {
+  try {
+    let order = await Order.findById(req.params.id);
+    if (!order) {
+      order = await Order.findOne({ orderNumber: req.params.id });
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found.',
+      });
+    }
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create storefront customer order
+// @route   POST /api/orders
+// @access  Public
+exports.createOrder = async (req, res, next) => {
+  try {
+    const {
+      customerName,
+      customerEmail,
+      customerPhone,
+      shippingAddress,
+      city,
+      items,
+      subtotal,
+      deliveryFee,
+      totalAmount,
+      paymentMethod,
+      notes,
+    } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order must contain at least one item.',
+      });
+    }
+
+    const count = await Order.countDocuments();
+    const orderNumber = `ORD-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+
+    const order = await Order.create({
+      orderNumber,
+      customerName,
+      customerEmail: customerEmail.toLowerCase(),
+      customerPhone,
+      shippingAddress,
+      city: city || 'Dhaka',
+      items,
+      subtotal: Number(subtotal) || 0,
+      deliveryFee: Number(deliveryFee) || 60,
+      totalAmount: Number(totalAmount) || 0,
+      paymentMethod: paymentMethod || 'cod',
+      status: 'pending',
+      stockDeducted: false,
+      notes: notes || '',
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Order ${orderNumber} placed successfully!`,
+      data: order,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update order status (with single stock deduction policy)
+// @route   PUT /api/orders/:id/status
+// @access  Private (Admin, Manager)
+exports.updateOrderStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found.',
+      });
+    }
+
+    // Single stock deduction on confirmation
+    if (status === 'confirmed' && !order.stockDeducted) {
+      for (const item of order.items) {
+        const prod = await Product.findById(item.productId);
+        if (prod) {
+          const newQty = Math.max(0, prod.quantity - Number(item.quantity));
+          prod.quantity = newQty;
+          await prod.save();
+
+          await StockMovement.create({
+            productId: prod._id,
+            type: 'sale_out',
+            quantity: -Number(item.quantity),
+            balanceAfter: newQty,
+            reference: order.orderNumber,
+            reason: `Online order ${order.orderNumber} confirmed`,
+            performedBy: req.user ? req.user.name : 'Admin',
+          });
+        }
+      }
+      order.stockDeducted = true;
+    }
+
+    // Reversal if cancelled after stock deduction
+    if (status === 'cancelled' && order.stockDeducted) {
+      for (const item of order.items) {
+        const prod = await Product.findById(item.productId);
+        if (prod) {
+          const newQty = prod.quantity + Number(item.quantity);
+          prod.quantity = newQty;
+          await prod.save();
+
+          await StockMovement.create({
+            productId: prod._id,
+            type: 'reversal',
+            quantity: Number(item.quantity),
+            balanceAfter: newQty,
+            reference: order.orderNumber,
+            reason: `Reversal: Online order ${order.orderNumber} cancelled`,
+            performedBy: req.user ? req.user.name : 'Admin',
+          });
+        }
+      }
+      order.stockDeducted = false;
+    }
+
+    order.status = status;
+    await order.save();
+
+    res.json({
+      success: true,
+      message: `Order ${order.orderNumber} status updated to "${status}".`,
+      data: order,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

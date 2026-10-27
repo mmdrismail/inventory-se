@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppData } from '../../context/AppDataContext';
 import { storageService } from '../../services/storageService';
+import { apiClient } from '../../services/apiClient';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { Badge } from '../../components/common/Badge';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import {
   Settings,
@@ -17,10 +19,19 @@ import {
   Upload,
   Save,
   CheckCircle2,
+  Server,
+  Activity,
+  Terminal,
 } from 'lucide-react';
 
 export const SettingsPage = () => {
   const { settings, updateSettings, resetAllDemoData, confirmAction, addToast } = useAppData();
+
+  const [backendState, setBackendState] = useState({
+    checking: true,
+    isOnline: false,
+    details: null,
+  });
 
   const [formData, setFormData] = useState({
     businessName: settings.businessName || '',
@@ -36,6 +47,37 @@ export const SettingsPage = () => {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const checkBackendHealth = async () => {
+    setBackendState((prev) => ({ ...prev, checking: true }));
+    try {
+      const res = await fetch('http://localhost:5000/api/health', {
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(2500),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBackendState({ checking: false, isOnline: true, details: data });
+      } else {
+        setBackendState({ checking: false, isOnline: false, details: null });
+      }
+    } catch {
+      setBackendState({ checking: false, isOnline: false, details: null });
+    }
+  };
+
+  useEffect(() => {
+    checkBackendHealth();
+  }, []);
+
+  const handleTestBackend = async () => {
+    await checkBackendHealth();
+    addToast({
+      title: 'Backend Checked',
+      message: 'Status refreshed. See MERN API status card below.',
+      type: 'info',
+    });
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -266,7 +308,66 @@ export const SettingsPage = () => {
         </div>
       </form>
 
-      {/* 4. LocalStorage Data Management & Seed Reset */}
+      {/* 4. MERN Backend API Diagnostics */}
+      <Card className="border-emerald-200/60 dark:border-emerald-800/40">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+              <Server className="h-4 w-4 text-emerald-500" />
+              <span>MERN Stack API Server (Express.js & MongoDB)</span>
+            </CardTitle>
+            <Badge variant={backendState.isOnline ? 'emerald' : 'amber'} size="sm">
+              <Activity className="h-3 w-3" />
+              {backendState.checking
+                ? 'Checking...'
+                : backendState.isOnline
+                ? 'Online (Port 5000)'
+                : 'Offline (LocalStorage Fallback)'}
+            </Badge>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Real-time diagnostics for the Node.js Express REST API backend and MongoDB connection.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+              <span className="text-slate-400 font-semibold block uppercase text-[10px]">API Base URL</span>
+              <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">http://localhost:5000/api</span>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+              <span className="text-slate-400 font-semibold block uppercase text-[10px]">Database Engine</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {backendState.details?.database || 'MongoDB (Auto-detect)'}
+              </span>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+              <span className="text-slate-400 font-semibold block uppercase text-[10px]">Server Process</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {backendState.isOnline ? `Uptime: ${Math.round(backendState.details?.uptime || 0)}s` : 'npm run server'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Terminal className="h-4 w-4 text-emerald-600" />
+              <span>Run <code className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-mono text-[11px]">npm run server</code> to launch backend daemon</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Activity}
+              onClick={handleTestBackend}
+              isLoading={backendState.checking}
+            >
+              Test API Connection
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 5. LocalStorage Data Management & Seed Reset */}
       <Card className="border-red-200/50 dark:border-red-900/30">
         <CardHeader>
           <CardTitle className="text-slate-900 dark:text-white flex items-center gap-2">

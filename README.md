@@ -120,19 +120,31 @@ The login screen (`/login`) includes a **1-Click Demo Login Panel** to immediate
    npm install
    ```
 
-3. **Start the development server:**
+3. **Start the Frontend development server:**
    ```bash
    npm run dev
    ```
    Open your browser and navigate to `http://localhost:5173`.
 
-4. **Build for production:**
+4. **Start the Express.js & MongoDB Backend server:**
+   ```bash
+   npm run server
+   ```
+   Backend REST API starts on port 5000 at `http://localhost:5000/`. (For live hot-reload, use `npm run server:dev`).
+
+5. **Seed the MongoDB database (Optional):**
+   ```bash
+   npm run server:seed
+   ```
+   Populates MongoDB with the complete realistic demo dataset (products, categories, users, purchases, sales).
+
+6. **Build for production:**
    ```bash
    npm run build
    ```
-   Assets will be compiled into the `dist/` directory ready for deployment on Vercel, Netlify, or any static web host.
+   Assets will be compiled into the `dist/` directory ready for deployment.
 
-5. **Preview production build locally:**
+7. **Preview production build locally:**
    ```bash
    npm run preview
    ```
@@ -144,10 +156,22 @@ The login screen (`/login`) includes a **1-Click Demo Login Panel** to immediate
 ```
 inventory se/
 ├── index.html                   # HTML entry point with Inter font & SVG favicon
-├── package.json                 # Project dependencies & scripts
+├── package.json                 # Project dependencies & root npm scripts
 ├── postcss.config.js            # PostCSS configuration for Tailwind
 ├── tailwind.config.js           # Tailwind configuration (dark mode, brand colors)
 ├── vite.config.js               # Vite build configuration
+│
+├── server/                      # Complete Express.js & MongoDB REST API Backend
+│   ├── package.json             # Backend dependencies (express, mongoose, bcryptjs, jwt, cors)
+│   ├── server.js                # Express entry point & route registration (port 5000)
+│   ├── seeder.js                # Database seeder (CLI & programmatic reset)
+│   ├── .env                     # Server environment variables
+│   ├── config/                  # Database connection (MongoDB with graceful fallback)
+│   ├── middleware/              # JWT auth guard, role-based access & central error handler
+│   ├── models/                  # 10 Mongoose schemas (User, Product, Category, Sale, Purchase, etc.)
+│   ├── controllers/             # Business logic controllers
+│   └── routes/                  # REST API routes (/api/auth, /api/products, /api/sales, etc.)
+│
 ├── src/
 │   ├── main.jsx                 # Application bootstrapping & router mounts
 │   ├── App.jsx                  # Route definitions & protected route guards

@@ -54,11 +54,12 @@ export const ProductFormPage = () => {
       }
     } else {
       // Default to first category and supplier if available
-      if (categories.length > 0 && !formData.categoryId) {
-        setFormData((prev) => ({ ...prev, categoryId: categories[0].id }));
-      }
-      if (suppliers.length > 0 && !formData.supplierId) {
-        setFormData((prev) => ({ ...prev, supplierId: suppliers[0].id }));
+      if (categories.length > 0 || suppliers.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          categoryId: prev.categoryId || categories[0]?.id || '',
+          supplierId: prev.supplierId || suppliers[0]?.id || '',
+        }));
       }
     }
   }, [id, isEditMode, products, categories, suppliers, navigate]);
