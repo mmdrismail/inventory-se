@@ -1,5 +1,6 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { inventoryService } from './inventoryService';
+import { apiClient } from './apiClient';
 
 class ProductService {
   getAll() {
@@ -51,6 +52,25 @@ class ProductService {
       });
     }
 
+    // Live sync to MongoDB Atlas backend
+    apiClient.post('/products', {
+      name: newProduct.name,
+      sku: newProduct.sku,
+      barcode: newProduct.barcode || '',
+      description: newProduct.description || '',
+      categoryId: newProduct.categoryId || null,
+      supplierId: newProduct.supplierId || null,
+      costPrice: newProduct.costPrice,
+      sellingPrice: newProduct.sellingPrice,
+      quantity: newProduct.quantity,
+      reorderLevel: newProduct.reorderLevel,
+      unit: newProduct.unit || 'pcs',
+      imageUrl: newProduct.imageUrl,
+      isPublic: newProduct.isPublic,
+    }).catch((err) => {
+      console.warn('[MongoDB Atlas sync notice]:', err.message);
+    });
+
     return { success: true, product: newProduct };
   }
 
@@ -81,6 +101,10 @@ class ProductService {
 
     products[index] = updatedProduct;
     storageService.setItem(STORAGE_KEYS.PRODUCTS, products);
+
+    // Live sync to MongoDB Atlas backend
+    apiClient.put(`/products/${id}`, updates).catch(() => {});
+
     return { success: true, product: updatedProduct };
   }
 
@@ -123,6 +147,10 @@ class ProductService {
 
     const filtered = products.filter((p) => p.id !== id);
     storageService.setItem(STORAGE_KEYS.PRODUCTS, filtered);
+
+    // Live sync to MongoDB Atlas backend
+    apiClient.delete(`/products/${id}`).catch(() => {});
+
     return { success: true, message: `Product "${product.name}" deleted successfully.` };
   }
 

@@ -232,7 +232,14 @@ const seedAllData = async () => {
     }
     return true;
   } catch (error) {
-    console.error('Seeding error:', error);
+    console.error('\x1b[31mSeeding error:\x1b[0m', error.message);
+    if (error.message.includes('SSL alert number 80') || (error.cause && JSON.stringify(error.cause).includes('SSL alert number 80'))) {
+      console.warn('\n\x1b[33m💡 Solution for MongoDB Atlas (SSL alert number 80):\x1b[0m');
+      console.warn('\x1b[36m1. Go to cloud.mongodb.com and open your Cluster dashboard.\x1b[0m');
+      console.warn('\x1b[36m2. In the left menu under "Security", click "Network Access".\x1b[0m');
+      console.warn('\x1b[36m3. Click "+ ADD IP ADDRESS" -> choose "ALLOW ACCESS FROM ANYWHERE (0.0.0.0/0)".\x1b[0m');
+      console.warn('\x1b[36m4. Click "Confirm" and wait 30 seconds for it to become Active, then run "npm run server:seed" again!\x1b[0m\n');
+    }
     if (require.main === module) {
       process.exit(1);
     }
