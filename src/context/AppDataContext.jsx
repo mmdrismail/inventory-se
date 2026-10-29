@@ -10,6 +10,7 @@ import { inventoryService } from '../services/inventoryService';
 import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
 import { settingsService } from '../services/settingsService';
+import { apiClient } from '../services/apiClient';
 
 const AppDataContext = createContext(null);
 
@@ -42,7 +43,64 @@ export const AppDataProvider = ({ children }) => {
     onConfirm: null,
   });
 
-  // Reload all state from storage
+  // Synchronize state with MongoDB Atlas backend if online
+  const syncWithBackend = async () => {
+    try {
+      const isUp = await apiClient.isBackendAvailable();
+      if (!isUp) return;
+
+      const [prodsRes, catsRes, supsRes, custsRes] = await Promise.allSettled([
+        apiClient.get('/products'),
+        apiClient.get('/categories'),
+        apiClient.get('/suppliers'),
+        apiClient.get('/customers'),
+      ]);
+
+      if (prodsRes.status === 'fulfilled' && prodsRes.value?.success && Array.isArray(prodsRes.value.data) && prodsRes.value.data.length > 0) {
+        const normalized = prodsRes.value.data.map((p) => ({
+          ...p,
+          id: p._id || p.id,
+          _id: p._id || p.id,
+        }));
+        setProducts(normalized);
+        storageService.setItem(STORAGE_KEYS.PRODUCTS, normalized);
+      }
+
+      if (catsRes.status === 'fulfilled' && catsRes.value?.success && Array.isArray(catsRes.value.data) && catsRes.value.data.length > 0) {
+        const normalized = catsRes.value.data.map((c) => ({
+          ...c,
+          id: c._id || c.id,
+          _id: c._id || c.id,
+        }));
+        setCategories(normalized);
+        storageService.setItem(STORAGE_KEYS.CATEGORIES, normalized);
+      }
+
+      if (supsRes.status === 'fulfilled' && supsRes.value?.success && Array.isArray(supsRes.value.data) && supsRes.value.data.length > 0) {
+        const normalized = supsRes.value.data.map((s) => ({
+          ...s,
+          id: s._id || s.id,
+          _id: s._id || s.id,
+        }));
+        setSuppliers(normalized);
+        storageService.setItem(STORAGE_KEYS.SUPPLIERS, normalized);
+      }
+
+      if (custsRes.status === 'fulfilled' && custsRes.value?.success && Array.isArray(custsRes.value.data) && custsRes.value.data.length > 0) {
+        const normalized = custsRes.value.data.map((c) => ({
+          ...c,
+          id: c._id || c.id,
+          _id: c._id || c.id,
+        }));
+        setCustomers(normalized);
+        storageService.setItem(STORAGE_KEYS.CUSTOMERS, normalized);
+      }
+    } catch (err) {
+      console.info('[StockLine API Sync notice]:', err.message);
+    }
+  };
+
+  // Reload all state from storage and backend
   const reloadState = () => {
     setProducts(storageService.getItem(STORAGE_KEYS.PRODUCTS, []));
     setCategories(storageService.getItem(STORAGE_KEYS.CATEGORIES, []));
@@ -63,6 +121,7 @@ export const AppDataProvider = ({ children }) => {
     }
 
     setCart(storageService.getItem(STORAGE_KEYS.CART, []));
+    syncWithBackend();
   };
 
   useEffect(() => {
@@ -72,6 +131,7 @@ export const AppDataProvider = ({ children }) => {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    syncWithBackend();
   }, []);
 
   // Toast Helpers
@@ -599,6 +659,7 @@ export const AppDataProvider = ({ children }) => {
     clearCart,
     resetAllDemoData,
     reloadState,
+    syncWithBackend,
   };
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

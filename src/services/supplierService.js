@@ -1,4 +1,5 @@
 import { storageService, STORAGE_KEYS } from './storageService';
+import { apiClient } from './apiClient';
 
 class SupplierService {
   getAll() {
@@ -28,6 +29,30 @@ class SupplierService {
 
     suppliers.unshift(newSupplier);
     storageService.setItem(STORAGE_KEYS.SUPPLIERS, suppliers);
+
+    // Live sync to MongoDB Atlas
+    apiClient.post('/suppliers', {
+      name: newSupplier.name,
+      companyName: newSupplier.companyName,
+      email: newSupplier.email,
+      phone: newSupplier.phone,
+      address: newSupplier.address,
+      contactPerson: newSupplier.contactPerson,
+      notes: newSupplier.notes,
+    }).then((res) => {
+      if (res?.data?._id) {
+        const cur = storageService.getItem(STORAGE_KEYS.SUPPLIERS, []);
+        const idx = cur.findIndex((s) => s.name === newSupplier.name);
+        if (idx !== -1) {
+          cur[idx].id = res.data._id;
+          cur[idx]._id = res.data._id;
+          storageService.setItem(STORAGE_KEYS.SUPPLIERS, cur);
+        }
+      }
+    }).catch((err) => {
+      console.warn('[MongoDB Supplier sync]:', err.message);
+    });
+
     return { success: true, supplier: newSupplier };
   }
 
@@ -45,6 +70,12 @@ class SupplierService {
     };
 
     storageService.setItem(STORAGE_KEYS.SUPPLIERS, suppliers);
+
+    // Live sync to MongoDB Atlas
+    apiClient.put(`/suppliers/${id}`, updates).catch((err) => {
+      console.warn('[MongoDB Supplier update notice]:', err.message);
+    });
+
     return { success: true, supplier: suppliers[index] };
   }
 
@@ -77,6 +108,12 @@ class SupplierService {
 
     const filtered = suppliers.filter((s) => s.id !== id);
     storageService.setItem(STORAGE_KEYS.SUPPLIERS, filtered);
+
+    // Live sync to MongoDB Atlas
+    apiClient.delete(`/suppliers/${id}`).catch((err) => {
+      console.warn('[MongoDB Supplier delete notice]:', err.message);
+    });
+
     return { success: true, message: `Supplier "${supplier.name}" removed.` };
   }
 

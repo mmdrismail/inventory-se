@@ -1,8 +1,19 @@
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Sale = require('../models/Sale');
 const Purchase = require('../models/Purchase');
 const Order = require('../models/Order');
 const StockMovement = require('../models/StockMovement');
+
+// Safe lookup helper supporting MongoDB ObjectId or SKU
+const findProduct = async (idOrSku) => {
+  if (!idOrSku) return null;
+  if (mongoose.Types.ObjectId.isValid(idOrSku)) {
+    const byId = await Product.findById(idOrSku);
+    if (byId) return byId;
+  }
+  return await Product.findOne({ sku: String(idOrSku).toUpperCase().trim() });
+};
 
 // @desc    Get all products with filtering & search
 // @route   GET /api/products
@@ -59,7 +70,7 @@ exports.getProducts = async (req, res, next) => {
 // @access  Public
 exports.getProductById = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await findProduct(req.params.id);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -147,7 +158,7 @@ exports.createProduct = async (req, res, next) => {
 // @access  Private (Admin, Manager)
 exports.updateProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await findProduct(req.params.id);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -157,7 +168,7 @@ exports.updateProduct = async (req, res, next) => {
 
     if (req.body.sku) {
       const formattedSku = req.body.sku.toUpperCase().trim();
-      const existingSku = await Product.findOne({ sku: formattedSku, _id: { $ne: req.params.id } });
+      const existingSku = await Product.findOne({ sku: formattedSku, _id: { $ne: product._id } });
       if (existingSku) {
         return res.status(400).json({
           success: false,
@@ -167,7 +178,7 @@ exports.updateProduct = async (req, res, next) => {
       req.body.sku = formattedSku;
     }
 
-    const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    const updated = await Product.findByIdAndUpdate(product._id, req.body, {
       new: true,
       runValidators: true,
     });
@@ -187,7 +198,7 @@ exports.updateProduct = async (req, res, next) => {
 // @access  Private (Admin)
 exports.deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await findProduct(req.params.id);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -196,7 +207,7 @@ exports.deleteProduct = async (req, res, next) => {
     }
 
     // Dependency check: Sales
-    const hasSales = await Sale.findOne({ 'items.productId': req.params.id });
+    const hasSales = await Sale.findOne({ 'items.productId': product._id });
     if (hasSales) {
       return res.status(400).json({
         success: false,
@@ -205,7 +216,7 @@ exports.deleteProduct = async (req, res, next) => {
     }
 
     // Dependency check: Purchases
-    const hasPurchases = await Purchase.findOne({ 'items.productId': req.params.id });
+    const hasPurchases = await Purchase.findOne({ 'items.productId': product._id });
     if (hasPurchases) {
       return res.status(400).json({
         success: false,
@@ -214,7 +225,7 @@ exports.deleteProduct = async (req, res, next) => {
     }
 
     // Dependency check: Customer Orders
-    const hasOrders = await Order.findOne({ 'items.productId': req.params.id });
+    const hasOrders = await Order.findOne({ 'items.productId': product._id });
     if (hasOrders) {
       return res.status(400).json({
         success: false,
@@ -222,7 +233,7 @@ exports.deleteProduct = async (req, res, next) => {
       });
     }
 
-    await Product.findByIdAndDelete(req.params.id);
+    await Product.findByIdAndDelete(product._id);
 
     res.json({
       success: true,

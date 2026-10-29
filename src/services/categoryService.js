@@ -1,4 +1,5 @@
 import { storageService, STORAGE_KEYS } from './storageService';
+import { apiClient } from './apiClient';
 
 class CategoryService {
   getAll() {
@@ -27,6 +28,25 @@ class CategoryService {
 
     categories.push(newCategory);
     storageService.setItem(STORAGE_KEYS.CATEGORIES, categories);
+
+    // Live sync to MongoDB Atlas
+    apiClient.post('/categories', {
+      name: newCategory.name,
+      description: newCategory.description,
+    }).then((res) => {
+      if (res && res.data && res.data._id) {
+        const cur = storageService.getItem(STORAGE_KEYS.CATEGORIES, []);
+        const idx = cur.findIndex((c) => c.name.toLowerCase() === newCategory.name.toLowerCase());
+        if (idx !== -1) {
+          cur[idx].id = res.data._id;
+          cur[idx]._id = res.data._id;
+          storageService.setItem(STORAGE_KEYS.CATEGORIES, cur);
+        }
+      }
+    }).catch((err) => {
+      console.warn('[MongoDB Category sync]:', err.message);
+    });
+
     return { success: true, category: newCategory };
   }
 
@@ -52,6 +72,12 @@ class CategoryService {
     };
 
     storageService.setItem(STORAGE_KEYS.CATEGORIES, categories);
+
+    // Live sync to MongoDB Atlas
+    apiClient.put(`/categories/${id}`, updates).catch((err) => {
+      console.warn('[MongoDB Category update notice]:', err.message);
+    });
+
     return { success: true, category: categories[index] };
   }
 
@@ -74,6 +100,12 @@ class CategoryService {
 
     const filtered = categories.filter((c) => c.id !== id);
     storageService.setItem(STORAGE_KEYS.CATEGORIES, filtered);
+
+    // Live sync to MongoDB Atlas
+    apiClient.delete(`/categories/${id}`).catch((err) => {
+      console.warn('[MongoDB Category delete notice]:', err.message);
+    });
+
     return { success: true, message: `Category "${category.name}" removed.` };
   }
 }

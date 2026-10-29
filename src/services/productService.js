@@ -67,6 +67,16 @@ class ProductService {
       unit: newProduct.unit || 'pcs',
       imageUrl: newProduct.imageUrl,
       isPublic: newProduct.isPublic,
+    }).then((res) => {
+      if (res && res.data && res.data._id) {
+        const currentProducts = storageService.getItem(STORAGE_KEYS.PRODUCTS, []);
+        const idx = currentProducts.findIndex((p) => p.sku === newProduct.sku);
+        if (idx !== -1) {
+          currentProducts[idx].id = res.data._id;
+          currentProducts[idx]._id = res.data._id;
+          storageService.setItem(STORAGE_KEYS.PRODUCTS, currentProducts);
+        }
+      }
     }).catch((err) => {
       console.warn('[MongoDB Atlas sync notice]:', err.message);
     });

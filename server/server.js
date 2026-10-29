@@ -37,6 +37,12 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logger
+app.use((req, res, next) => {
+  console.log(`\x1b[36m[API Request]\x1b[0m ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // Root & Health check
 app.get('/', (req, res) => {
   res.json({

@@ -1,4 +1,5 @@
 import { storageService, STORAGE_KEYS } from './storageService';
+import { apiClient } from './apiClient';
 
 class CustomerService {
   getAll() {
@@ -26,6 +27,29 @@ class CustomerService {
 
     customers.unshift(newCustomer);
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, customers);
+
+    // Live sync to MongoDB Atlas
+    apiClient.post('/customers', {
+      name: newCustomer.name,
+      email: newCustomer.email,
+      phone: newCustomer.phone,
+      address: newCustomer.address,
+      customerType: newCustomer.customerType,
+      notes: newCustomer.notes,
+    }).then((res) => {
+      if (res?.data?._id) {
+        const cur = storageService.getItem(STORAGE_KEYS.CUSTOMERS, []);
+        const idx = cur.findIndex((c) => c.name === newCustomer.name);
+        if (idx !== -1) {
+          cur[idx].id = res.data._id;
+          cur[idx]._id = res.data._id;
+          storageService.setItem(STORAGE_KEYS.CUSTOMERS, cur);
+        }
+      }
+    }).catch((err) => {
+      console.warn('[MongoDB Customer sync]:', err.message);
+    });
+
     return { success: true, customer: newCustomer };
   }
 
@@ -43,6 +67,12 @@ class CustomerService {
     };
 
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, customers);
+
+    // Live sync to MongoDB Atlas
+    apiClient.put(`/customers/${id}`, updates).catch((err) => {
+      console.warn('[MongoDB Customer update notice]:', err.message);
+    });
+
     return { success: true, customer: customers[index] };
   }
 
@@ -75,6 +105,12 @@ class CustomerService {
 
     const filtered = customers.filter((c) => c.id !== id);
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, filtered);
+
+    // Live sync to MongoDB Atlas
+    apiClient.delete(`/customers/${id}`).catch((err) => {
+      console.warn('[MongoDB Customer delete notice]:', err.message);
+    });
+
     return { success: true, message: `Customer "${customer.name}" removed.` };
   }
 
