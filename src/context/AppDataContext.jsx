@@ -49,11 +49,15 @@ export const AppDataProvider = ({ children }) => {
       const isUp = await apiClient.isBackendAvailable();
       if (!isUp) return;
 
-      const [prodsRes, catsRes, supsRes, custsRes] = await Promise.allSettled([
+      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, ordsRes, setsRes] = await Promise.allSettled([
         apiClient.get('/products'),
         apiClient.get('/categories'),
         apiClient.get('/suppliers'),
         apiClient.get('/customers'),
+        apiClient.get('/purchases'),
+        apiClient.get('/sales'),
+        apiClient.get('/orders'),
+        apiClient.get('/settings'),
       ]);
 
       if (prodsRes.status === 'fulfilled' && prodsRes.value?.success && Array.isArray(prodsRes.value.data) && prodsRes.value.data.length > 0) {
@@ -94,6 +98,42 @@ export const AppDataProvider = ({ children }) => {
         }));
         setCustomers(normalized);
         storageService.setItem(STORAGE_KEYS.CUSTOMERS, normalized);
+      }
+
+      if (pursRes.status === 'fulfilled' && pursRes.value?.success && Array.isArray(pursRes.value.data) && pursRes.value.data.length > 0) {
+        const normalized = pursRes.value.data.map((p) => ({
+          ...p,
+          id: p._id || p.id,
+          _id: p._id || p.id,
+        }));
+        setPurchases(normalized);
+        storageService.setItem(STORAGE_KEYS.PURCHASES, normalized);
+      }
+
+      if (salesRes.status === 'fulfilled' && salesRes.value?.success && Array.isArray(salesRes.value.data) && salesRes.value.data.length > 0) {
+        const normalized = salesRes.value.data.map((s) => ({
+          ...s,
+          id: s._id || s.id,
+          _id: s._id || s.id,
+        }));
+        setSales(normalized);
+        storageService.setItem(STORAGE_KEYS.SALES, normalized);
+      }
+
+      if (ordsRes.status === 'fulfilled' && ordsRes.value?.success && Array.isArray(ordsRes.value.data) && ordsRes.value.data.length > 0) {
+        const normalized = ordsRes.value.data.map((o) => ({
+          ...o,
+          id: o._id || o.id,
+          _id: o._id || o.id,
+        }));
+        setOrders(normalized);
+        storageService.setItem(STORAGE_KEYS.ORDERS, normalized);
+      }
+
+      if (setsRes.status === 'fulfilled' && setsRes.value?.success && setsRes.value.data) {
+        const remoteSettings = setsRes.value.data;
+        setSettings((prev) => ({ ...prev, ...remoteSettings }));
+        storageService.setItem(STORAGE_KEYS.SETTINGS, { ...settingsService.getSettings(), ...remoteSettings });
       }
     } catch (err) {
       console.info('[StockLine API Sync notice]:', err.message);

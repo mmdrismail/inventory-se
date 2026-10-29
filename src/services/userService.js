@@ -1,5 +1,6 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { INITIAL_USERS } from '../data/seedData';
+import { apiClient } from './apiClient';
 
 class UserService {
   getAll() {
@@ -32,6 +33,29 @@ class UserService {
 
     users.push(newUser);
     storageService.setItem(STORAGE_KEYS.USERS, users);
+
+    // Live sync to MongoDB Atlas
+    apiClient.post('/users', {
+      name: newUser.name,
+      email: newUser.email,
+      password: userData.password || 'password123',
+      role: newUser.role,
+      department: newUser.department,
+      avatar: newUser.avatar,
+    }).then((res) => {
+      if (res?.data?._id) {
+        const cur = storageService.getItem(STORAGE_KEYS.USERS, []);
+        const idx = cur.findIndex((u) => u.email === newUser.email);
+        if (idx !== -1) {
+          cur[idx].id = res.data._id;
+          cur[idx]._id = res.data._id;
+          storageService.setItem(STORAGE_KEYS.USERS, cur);
+        }
+      }
+    }).catch((err) => {
+      console.warn('[MongoDB User sync]:', err.message);
+    });
+
     return { success: true, user: newUser };
   }
 
@@ -67,6 +91,12 @@ class UserService {
     };
 
     storageService.setItem(STORAGE_KEYS.USERS, users);
+
+    // Live sync to MongoDB Atlas
+    apiClient.put(`/users/${id}`, updates).catch((err) => {
+      console.warn('[MongoDB User update notice]:', err.message);
+    });
+
     return { success: true, user: users[index] };
   }
 
@@ -90,6 +120,12 @@ class UserService {
 
     const filtered = users.filter((u) => u.id !== id);
     storageService.setItem(STORAGE_KEYS.USERS, filtered);
+
+    // Live sync to MongoDB Atlas
+    apiClient.delete(`/users/${id}`).catch((err) => {
+      console.warn('[MongoDB User delete notice]:', err.message);
+    });
+
     return { success: true, message: 'User removed from demo accounts.' };
   }
 

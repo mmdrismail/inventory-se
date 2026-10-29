@@ -1,6 +1,7 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { inventoryService } from './inventoryService';
 import { calculateSaleTotals } from '../utils/calculations';
+import { apiClient } from './apiClient';
 
 class SalesService {
   getAll() {
@@ -40,6 +41,39 @@ class SalesService {
 
     sales.unshift(newSale);
     storageService.setItem(STORAGE_KEYS.SALES, sales);
+
+    // Live sync to MongoDB Atlas
+    apiClient.post('/sales', {
+      customerId: newSale.customerId,
+      items: (newSale.items || []).map((it) => ({
+        productId: it.productId || it.id,
+        productName: it.productName || it.name,
+        sku: it.sku,
+        quantity: Number(it.quantity) || 1,
+        unitPrice: Number(it.unitPrice || it.sellingPrice) || 0,
+        subtotal: Number(it.subtotal || (it.quantity * it.unitPrice)) || 0,
+      })),
+      subtotal: newSale.subtotal,
+      discount: newSale.discount,
+      totalAmount: newSale.total,
+      paymentMethod: newSale.paymentMethod || 'cash',
+      paymentStatus: newSale.paymentStatus,
+      status: newSale.status,
+      notes: newSale.notes,
+    }).then((res) => {
+      if (res?.data?._id) {
+        const cur = storageService.getItem(STORAGE_KEYS.SALES, []);
+        const idx = cur.findIndex((s) => s.id === newSale.id);
+        if (idx !== -1) {
+          cur[idx].id = res.data._id;
+          cur[idx]._id = res.data._id;
+          storageService.setItem(STORAGE_KEYS.SALES, cur);
+        }
+      }
+    }).catch((err) => {
+      console.warn('[MongoDB Sales sync]:', err.message);
+    });
+
     return { success: true, sale: newSale };
   }
 

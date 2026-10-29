@@ -1,5 +1,6 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { inventoryService } from './inventoryService';
+import { apiClient } from './apiClient';
 
 /**
  * Order Stock Reservation Policy:
@@ -59,6 +60,39 @@ class OrderService {
 
     orders.unshift(newOrder);
     storageService.setItem(STORAGE_KEYS.ORDERS, orders);
+
+    // Live sync to MongoDB Atlas
+    apiClient.post('/orders', {
+      customerName: newOrder.customerName || 'Storefront Customer',
+      customerEmail: newOrder.email || 'customer@stockline.com',
+      customerPhone: newOrder.phone || '',
+      shippingAddress: newOrder.shippingAddress || newOrder.address || 'Standard Delivery',
+      items: (newOrder.items || []).map((it) => ({
+        productId: it.productId || it.id,
+        name: it.productName || it.name,
+        sku: it.sku,
+        quantity: Number(it.quantity) || 1,
+        price: Number(it.price || it.sellingPrice) || 0,
+      })),
+      totalAmount: newOrder.total,
+      shippingFee: newOrder.shippingFee,
+      paymentMethod: newOrder.paymentMethod,
+      status: newOrder.status,
+      notes: newOrder.notes,
+    }).then((res) => {
+      if (res?.data?._id) {
+        const cur = storageService.getItem(STORAGE_KEYS.ORDERS, []);
+        const idx = cur.findIndex((o) => o.id === newOrder.id);
+        if (idx !== -1) {
+          cur[idx].id = res.data._id;
+          cur[idx]._id = res.data._id;
+          storageService.setItem(STORAGE_KEYS.ORDERS, cur);
+        }
+      }
+    }).catch((err) => {
+      console.warn('[MongoDB Order sync]:', err.message);
+    });
+
     return { success: true, order: newOrder };
   }
 

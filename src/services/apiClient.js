@@ -3,6 +3,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 class ApiClient {
   constructor(baseUrl) {
     this.baseUrl = baseUrl;
+    this.cache = new Map();
+    this.defaultTTL = 15 * 1000; // 15 seconds client cache
   }
 
   getAuthHeader() {
@@ -18,6 +20,18 @@ class ApiClient {
       // Ignore
     }
     return {};
+  }
+
+  clearCache(pattern = null) {
+    if (!pattern) {
+      this.cache.clear();
+      return;
+    }
+    for (const key of this.cache.keys()) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
   }
 
   async request(endpoint, options = {}) {
@@ -48,7 +62,10 @@ class ApiClient {
     }
   }
 
-  get(endpoint, queryParams = {}) {
+  /**
+   * High-speed GET with memory cache
+   */
+  async get(endpoint, queryParams = {}, config = {}) {
     const params = new URLSearchParams();
     Object.entries(queryParams).forEach(([key, val]) => {
       if (val !== undefined && val !== null && val !== '') {
@@ -56,24 +73,58 @@ class ApiClient {
       }
     });
     const qs = params.toString() ? `?${params.toString()}` : '';
-    return this.request(`${endpoint}${qs}`, { method: 'GET' });
+    const fullKey = `${endpoint}${qs}`;
+
+    const now = Date.now();
+    const cached = this.cache.get(fullKey);
+
+    // Serve from RAM cache if not expired and not bypassed
+    if (!config.bypassCache && cached && now < cached.expiresAt) {
+      return cached.data;
+    }
+
+    const data = await this.request(fullKey, { method: 'GET' });
+
+    // Store in RAM cache
+    const ttl = config.ttl !== undefined ? config.ttl : this.defaultTTL;
+    this.cache.set(fullKey, {
+      data,
+      expiresAt: now + ttl,
+    });
+
+    return data;
   }
 
-  post(endpoint, body) {
+  async post(endpoint, body) {
+    // Invalidate related cache
+    const rootPath = endpoint.split('?')[0].split('/')[1];
+    if (rootPath) this.clearCache(rootPath);
+    this.clearCache('reports');
+
     return this.request(endpoint, {
       method: 'POST',
       body: JSON.stringify(body),
     });
   }
 
-  put(endpoint, body) {
+  async put(endpoint, body) {
+    // Invalidate related cache
+    const rootPath = endpoint.split('?')[0].split('/')[1];
+    if (rootPath) this.clearCache(rootPath);
+    this.clearCache('reports');
+
     return this.request(endpoint, {
       method: 'PUT',
       body: JSON.stringify(body),
     });
   }
 
-  delete(endpoint) {
+  async delete(endpoint) {
+    // Invalidate related cache
+    const rootPath = endpoint.split('?')[0].split('/')[1];
+    if (rootPath) this.clearCache(rootPath);
+    this.clearCache('reports');
+
     return this.request(endpoint, { method: 'DELETE' });
   }
 

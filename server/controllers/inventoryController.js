@@ -1,5 +1,15 @@
+const mongoose = require('mongoose');
 const StockMovement = require('../models/StockMovement');
 const Product = require('../models/Product');
+
+const findProduct = async (idOrSku) => {
+  if (!idOrSku) return null;
+  if (mongoose.Types.ObjectId.isValid(idOrSku)) {
+    const byId = await Product.findById(idOrSku);
+    if (byId) return byId;
+  }
+  return await Product.findOne({ sku: String(idOrSku).toUpperCase().trim() });
+};
 
 // @desc    Get all stock movements (audit log)
 // @route   GET /api/inventory/movements
@@ -9,7 +19,7 @@ exports.getMovements = async (req, res, next) => {
     const { productId, type } = req.query;
     const query = {};
 
-    if (productId) query.productId = productId;
+    if (productId && mongoose.Types.ObjectId.isValid(productId)) query.productId = productId;
     if (type && type !== 'all') query.type = type;
 
     const movements = await StockMovement.find(query).sort({ createdAt: -1 });
@@ -29,7 +39,7 @@ exports.getMovements = async (req, res, next) => {
 // @access  Private (Admin, Manager)
 exports.adjustStock = async (req, res, next) => {
   try {
-    const { productId, mode, quantity, reason } = req.body;
+    const { productId, mode, type, quantity, reason } = req.body;
 
     if (!productId) {
       return res.status(400).json({
@@ -46,7 +56,7 @@ exports.adjustStock = async (req, res, next) => {
       });
     }
 
-    const product = await Product.findById(productId);
+    const product = await findProduct(productId);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -54,22 +64,24 @@ exports.adjustStock = async (req, res, next) => {
       });
     }
 
+    const normalizedMode = mode || (type === 'reduce' ? 'deduct' : type === 'correction' ? 'set' : type);
+
     let diff = 0;
     let newBalance = product.quantity;
 
-    if (mode === 'add') {
+    if (normalizedMode === 'add') {
       diff = qty;
       newBalance = product.quantity + qty;
-    } else if (mode === 'deduct') {
+    } else if (normalizedMode === 'deduct') {
       diff = -qty;
       newBalance = Math.max(0, product.quantity - qty);
-    } else if (mode === 'set') {
+    } else if (normalizedMode === 'set') {
       diff = qty - product.quantity;
       newBalance = qty;
     } else {
       return res.status(400).json({
         success: false,
-        message: 'Invalid adjustment mode. Valid options: "add", "deduct", "set".',
+        message: 'Invalid adjustment mode. Valid options: "add", "deduct" / "reduce", "set" / "correction".',
       });
     }
 

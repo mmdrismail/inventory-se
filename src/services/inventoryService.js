@@ -1,4 +1,5 @@
 import { storageService, STORAGE_KEYS } from './storageService';
+import { apiClient } from './apiClient';
 
 /**
  * Inventory Service
@@ -82,6 +83,16 @@ class InventoryService {
       referenceId: `adj-${Date.now()}`,
       reason: reason || `Stock adjusted via ${type}`,
       performedBy: performedBy || 'Manager',
+    });
+
+    // Live sync to MongoDB Atlas
+    apiClient.post('/inventory/adjust', {
+      productId: product._id || product.id,
+      mode: type === 'reduce' ? 'deduct' : type === 'correction' ? 'set' : type,
+      quantity: inputQty,
+      reason: reason || `Stock adjusted via ${type}`,
+    }).catch((err) => {
+      console.warn('[MongoDB Inventory adjust notice]:', err.message);
     });
 
     return { success: true, product, newQuantity: newQty };

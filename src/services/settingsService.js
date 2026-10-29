@@ -1,5 +1,6 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { INITIAL_SETTINGS } from '../data/seedData';
+import { apiClient } from './apiClient';
 
 class SettingsService {
   getSettings() {
@@ -23,6 +24,11 @@ class SettingsService {
         document.documentElement.classList.remove('dark');
       }
     }
+
+    // Live sync to MongoDB Atlas
+    apiClient.put('/settings', updates).catch((err) => {
+      console.warn('[MongoDB Settings sync]:', err.message);
+    });
 
     return { success: true, settings: updated };
   }

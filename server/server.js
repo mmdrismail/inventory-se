@@ -23,19 +23,28 @@ const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 
+const compression = require('compression');
+const { cacheMiddleware, cacheInvalidator } = require('./middleware/cache');
+
 // Initialize MongoDB connection
 connectDB();
 
 const app = express();
 
-// Middleware
+// High-speed response compression (Gzip / Deflate)
+app.use(compression());
+
+// CORS & Body Parsers
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Automatic cache invalidation on any POST/PUT/DELETE
+app.use(cacheInvalidator());
 
 // Request logger
 app.use((req, res, next) => {
@@ -77,19 +86,19 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Mount Routes
+// Mount Routes with High-Speed In-Memory Caching on GET requests
 app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/suppliers', supplierRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/purchases', purchaseRoutes);
-app.use('/api/sales', saleRoutes);
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/settings', settingRoutes);
+app.use('/api/products', cacheMiddleware(20), productRoutes);
+app.use('/api/categories', cacheMiddleware(30), categoryRoutes);
+app.use('/api/suppliers', cacheMiddleware(30), supplierRoutes);
+app.use('/api/customers', cacheMiddleware(30), customerRoutes);
+app.use('/api/purchases', cacheMiddleware(15), purchaseRoutes);
+app.use('/api/sales', cacheMiddleware(15), saleRoutes);
+app.use('/api/inventory', cacheMiddleware(15), inventoryRoutes);
+app.use('/api/orders', cacheMiddleware(15), orderRoutes);
+app.use('/api/reports', cacheMiddleware(30), reportRoutes);
+app.use('/api/users', cacheMiddleware(15), userRoutes);
+app.use('/api/settings', cacheMiddleware(60), settingRoutes);
 
 // Error Handling Middleware
 app.use(notFound);
