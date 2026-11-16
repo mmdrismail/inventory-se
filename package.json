@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "node server/test_suite.js",
+    "env:check": "node scripts/verify_env.cjs",
     "sprint:sync": "node scripts/trello_sync.cjs",
     "server": "node server/server.js",
     "server:dev": "node --watch server/server.js",
