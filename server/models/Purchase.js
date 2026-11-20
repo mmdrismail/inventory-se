@@ -53,7 +53,7 @@ const purchaseSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['draft', 'received', 'cancelled'],
+      enum: ['draft', 'ordered', 'pending', 'received', 'cancelled'],
       default: 'draft',
     },
     receivedDate: {

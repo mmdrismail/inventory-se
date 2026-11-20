@@ -70,9 +70,12 @@ class OrderService {
       items: (newOrder.items || []).map((it) => ({
         productId: it.productId || it.id,
         name: it.productName || it.name,
+        productName: it.productName || it.name,
         sku: it.sku,
         quantity: Number(it.quantity) || 1,
         price: Number(it.price || it.sellingPrice) || 0,
+        unitPrice: Number(it.price || it.sellingPrice) || 0,
+        lineTotal: Number(it.lineTotal || ((it.quantity || 1) * (it.price || it.sellingPrice || 0))) || 0,
       })),
       totalAmount: newOrder.total,
       shippingFee: newOrder.shippingFee,

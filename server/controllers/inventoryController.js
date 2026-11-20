@@ -64,7 +64,12 @@ exports.adjustStock = async (req, res, next) => {
       });
     }
 
-    const normalizedMode = mode || (type === 'reduce' ? 'deduct' : type === 'correction' ? 'set' : type);
+    const normalizedMode = mode || (
+      type === 'reduce' || type === 'deduct' ? 'deduct' :
+      type === 'correction' || type === 'set' ? 'set' :
+      type === 'add' ? 'add' :
+      'add'
+    );
 
     let diff = 0;
     let newBalance = product.quantity;

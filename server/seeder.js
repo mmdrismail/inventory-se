@@ -14,6 +14,7 @@ const Sale = require('./models/Sale');
 const StockMovement = require('./models/StockMovement');
 const Order = require('./models/Order');
 const Setting = require('./models/Setting');
+const Quotation = require('./models/Quotation');
 
 const seedUsers = [
   {
@@ -162,6 +163,7 @@ const seedAllData = async () => {
     await StockMovement.deleteMany();
     await Order.deleteMany();
     await Setting.deleteMany();
+    await Quotation.deleteMany();
 
     console.log('Cleared existing collections.');
 
@@ -213,10 +215,20 @@ const seedAllData = async () => {
 
     // Seed Setting
     await Setting.create({
-      companyName: 'StockLine Commerce Ltd.',
-      companyEmail: 'support@stockline.io',
-      companyPhone: '+880 1711 000000',
-      companyAddress: 'House 42, Road 11, Banani, Dhaka-1213, Bangladesh',
+      companyName: 'মেসার্স শান্তা রেফ্রিজারেশন',
+      companyNameEn: 'M/S. SHANTA REFRIGERATION',
+      proprietor: 'মোঃ রুহুল আমিন (লিটন)',
+      proprietorEn: 'Md. Ruhul Amin (Liton)',
+      companyEmail: 'shanta.refrigeration@gmail.com',
+      companyPhone: '01711-169875',
+      companyAddress: '৪০৬, সি.ডি.এ মার্কেট (মসজিদের বিপরীতে), পাহাড়তলী, চট্টগ্রাম।',
+      companyAddressEn: '406, C.D.A Market (Opposite to Mosque), Pahartali, Chattogram.',
+      bin: 'BIN-001651149-0505',
+      businessScope: 'এখানে সকল প্রকারের রেফ্রিজারেশন কোল্ড স্টোর, এয়ার কন্ডিশন, মেশিন ও যন্ত্রাংশ, আইস প্ল্যান্ট, চিলার প্ল্যান্ট R-12, R-22, R-502a, R-134a, R-407a, R-404a ইত্যাদি গ্যাস, কম্প্রেসার ওয়েল, পিস্টন ও এ্যামোনিয়া কম্প্রেসারের খুচরা যন্ত্রাংশ ক্রয় ও বিক্রয় করা হয়।',
+      businessScopeEn: 'Dealers & suppliers of all types of refrigeration cold storage, air conditioning equipment & parts, ice plant, chiller plant, R-12, R-22, R-502a, R-134a, R-407a, R-404a gases, compressor oil, piston and ammonia compressor spare parts.',
+      disclaimer: 'বিঃদ্রঃ উপরোক্ত মালামাল ভালো অবস্থায় বুঝিয়া পাইলাম। বিক্রিত মাল ফেরত নেওয়া হয় না।',
+      disclaimerEn: 'Note: Received goods in good condition. Sold goods are non-refundable.',
+      docLanguage: 'bn',
       currency: 'BDT',
       currencySymbol: '৳',
       taxRate: 5,
@@ -224,6 +236,49 @@ const seedAllData = async () => {
       theme: 'light',
     });
     console.log('✔ Seeded system settings.');
+
+    // Seed Initial Quotation
+    await Quotation.create({
+      quotationNumber: 'QT-2026-0541',
+      date: new Date('2026-10-28'),
+      validUntil: new Date('2026-11-28'),
+      requisitionRef: 'RFQ-WHATSAPP-09',
+      customerName: 'ইঞ্জিঃ রফিকুল ইসলাম',
+      customerCompany: 'কর্ণফুলী কোল্ড স্টোরেজ লিমিটেড',
+      customerRole: 'purchaser',
+      customerPhone: '01819-234567',
+      customerAddress: 'কালুরঘাট শিল্প এলাকা, চট্টগ্রাম',
+      items: [
+        { name: 'Connecting Rod with Piston complete', quantity: 1, unit: 'pc', unitPrice: 10000, lineTotal: 10000 },
+        { name: 'Bearing Bush (motor side)', quantity: 1, unit: 'pc', unitPrice: 2000, lineTotal: 2000 },
+        { name: 'Bearing Bush (crank side)', quantity: 1, unit: 'pc', unitPrice: 2000, lineTotal: 2000 },
+        { name: 'Thrust Washer (crank side)', quantity: 1, unit: 'pc', unitPrice: 1500, lineTotal: 1500 },
+        { name: 'Bushing for Crankshaft', quantity: 1, unit: 'pc', unitPrice: 500, lineTotal: 500 },
+        { name: 'Rear Bearing Flange Gasket', quantity: 1, unit: 'pc', unitPrice: 1000, lineTotal: 1000 },
+        { name: 'Suction Strainer', quantity: 1, unit: 'pc', unitPrice: 500, lineTotal: 500 },
+        { name: 'Gasket for Suction Valves', quantity: 1, unit: 'pc', unitPrice: 500, lineTotal: 500 },
+        { name: 'Oil Pump complete', quantity: 1, unit: 'pc', unitPrice: 10000, lineTotal: 10000 },
+        { name: 'O-Ring for Oil Pump', quantity: 1, unit: 'pc', unitPrice: 500, lineTotal: 500 },
+        { name: 'Valve Plate complete', quantity: 1, unit: 'pc', unitPrice: 7000, lineTotal: 7000 },
+        { name: 'Lower Valve Plate Gasket', quantity: 1, unit: 'pc', unitPrice: 600, lineTotal: 600 },
+        { name: 'Upper Valve Plate Gasket', quantity: 1, unit: 'pc', unitPrice: 600, lineTotal: 600 },
+        { name: 'Cylinder Head, Air Cooled (Modern)', quantity: 1, unit: 'pc', unitPrice: 5000, lineTotal: 5000 },
+        { name: 'Shaft Seal complete', quantity: 1, unit: 'pc', unitPrice: 5000, lineTotal: 5000 },
+        { name: 'Gasket for Shaft Seal Cover', quantity: 1, unit: 'pc', unitPrice: 500, lineTotal: 500 },
+        { name: 'Set of Gasket', quantity: 1, unit: 'set', unitPrice: 5000, lineTotal: 5000 },
+        { name: 'Base Plate Gasket', quantity: 1, unit: 'pc', unitPrice: 1500, lineTotal: 1500 },
+        { name: 'Gasket Disch. Valve', quantity: 1, unit: 'pc', unitPrice: 500, lineTotal: 500 },
+      ],
+      subtotal: 55200,
+      discount: 2100,
+      tax: 0,
+      totalAmount: 53100,
+      status: 'approved',
+      termsAndConditions: '১. সকল মালামাল প্রাপ্যতা সাপেক্ষে সরবরাহ করা হইবে।\n২. কার্যাদেশ প্রাপ্তির ৩ কার্যদিবসের মধ্যে ডেলিভারি সম্পন্ন হইবে।\n৩. এই কোটেশনের মেয়াদ জারির তারিখ হইতে ১৫ দিন পর্যন্ত বৈধ।',
+      notes: 'মেসার্স শান্তা রেফ্রিজারেশনের মূল হ্যান্ডরিটেন কোটেশন',
+      preparedBy: 'মোহাম্মদ ইসমাঈল',
+    });
+    console.log('✔ Seeded initial quotation.');
 
     console.log('\x1b[32m✔ Database seeding completed successfully!\x1b[0m');
 
@@ -260,6 +315,7 @@ const destroyData = async () => {
     await StockMovement.deleteMany();
     await Order.deleteMany();
     await Setting.deleteMany();
+    await Quotation.deleteMany();
     console.log('\x1b[31mData destroyed successfully!\x1b[0m');
     process.exit(0);
   } catch (error) {

@@ -28,7 +28,15 @@ export const Footer = () => {
             <h4 className="text-xs font-semibold text-white uppercase tracking-wider">Navigation</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/" className="hover:text-emerald-400 transition-colors">
+                <Link
+                  to="/"
+                  onClick={() => {
+                    if (window.location.pathname === '/') {
+                      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+                    }
+                  }}
+                  className="hover:text-emerald-400 transition-colors"
+                >
                   Home
                 </Link>
               </li>

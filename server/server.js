@@ -22,6 +22,8 @@ const orderRoutes = require('./routes/orderRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
 const settingRoutes = require('./routes/settingRoutes');
+const quotationRoutes = require('./routes/quotationRoutes');
+const lotRoutes = require('./routes/lotRoutes');
 
 const compression = require('compression');
 const { cacheMiddleware, cacheInvalidator } = require('./middleware/cache');
@@ -34,12 +36,25 @@ const app = express();
 // High-speed response compression (Gzip / Deflate)
 app.use(compression());
 
-// CORS & Body Parsers
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
-}));
+// CORS Configuration supporting multiple environments
+const rawClientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+const allowedOrigins = rawClientUrl.split(',').map((u) => u.trim());
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow non-browser requests or matching origins, or wildcard in development
+      if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS policy violation: Origin '${origin}' is not authorized.`));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -99,24 +114,53 @@ app.use('/api/orders', cacheMiddleware(15), orderRoutes);
 app.use('/api/reports', cacheMiddleware(30), reportRoutes);
 app.use('/api/users', cacheMiddleware(15), userRoutes);
 app.use('/api/settings', cacheMiddleware(60), settingRoutes);
+app.use('/api/quotations', cacheMiddleware(15), quotationRoutes);
+app.use('/api/lots', cacheMiddleware(15), lotRoutes);
 
 // Error Handling Middleware
 app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+let server;
 
-const server = app.listen(PORT, () => {
-  console.log(`\n\x1b[32m=================================================\x1b[0m`);
-  console.log(`\x1b[32m✔ StockLine Backend Server running on port ${PORT}\x1b[0m`);
-  console.log(`\x1b[36m➜ API Root: http://localhost:${PORT}/\x1b[0m`);
-  console.log(`\x1b[36m➜ Health:   http://localhost:${PORT}/api/health\x1b[0m`);
-  console.log(`\x1b[32m=================================================\x1b[0m\n`);
-});
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`\n\x1b[32m=================================================\x1b[0m`);
+    console.log(`\x1b[32m✔ StockLine Backend Server running on port ${PORT}\x1b[0m`);
+    console.log(`\x1b[36m➜ API Root: http://localhost:${PORT}/\x1b[0m`);
+    console.log(`\x1b[36m➜ Health:   http://localhost:${PORT}/api/health\x1b[0m`);
+    console.log(`\x1b[32m=================================================\x1b[0m\n`);
+  });
+}
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error('\x1b[31mUnhandled Rejection:\x1b[0m', err.message);
 });
+
+// International Standard Graceful Shutdown (Cloud/Container lifecycle compliance)
+const gracefulShutdown = (signal) => {
+  console.log(`\n\x1b[33m[Process] Received ${signal}. Starting graceful shutdown...\x1b[0m`);
+  if (server) {
+    server.close(async () => {
+      console.log('\x1b[32m✔ HTTP server closed to new incoming requests.\x1b[0m');
+      try {
+        const mongoose = require('mongoose');
+        await mongoose.connection.close(false);
+        console.log('\x1b[32m✔ MongoDB connections closed successfully.\x1b[0m');
+        process.exit(0);
+      } catch (err) {
+        console.error('Error during shutdown:', err);
+        process.exit(1);
+      }
+    });
+  } else {
+    process.exit(0);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 module.exports = app;

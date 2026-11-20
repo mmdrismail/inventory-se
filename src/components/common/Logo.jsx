@@ -34,7 +34,19 @@ export const Logo = ({ to = '/', size = 'md', isWhite = false, showTagline = fal
   );
 
   if (to) {
-    return <Link to={to} className="inline-block">{content}</Link>;
+    return (
+      <Link
+        to={to}
+        onClick={() => {
+          if (window.location.pathname === to) {
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+          }
+        }}
+        className="inline-block"
+      >
+        {content}
+      </Link>
+    );
   }
 
   return content;

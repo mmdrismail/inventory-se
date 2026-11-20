@@ -1,15 +1,18 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { PlusCircle, ShoppingCart, Receipt, UserPlus, BarChart3, SlidersHorizontal } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const QuickActions = () => {
+  const { t } = useLanguage();
+
   const actions = [
-    { label: 'Add Product', to: '/products/new', icon: PlusCircle, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/50 dark:border-emerald-800/50' },
-    { label: 'Record Purchase', to: '/purchases/new', icon: ShoppingCart, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200/50 dark:border-blue-800/50' },
-    { label: 'Record Sale', to: '/sales/new', icon: Receipt, color: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40 border-teal-200/50 dark:border-teal-800/50' },
-    { label: 'Add Customer', to: '/customers', icon: UserPlus, color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200/50 dark:border-purple-800/50' },
-    { label: 'Stock Adjustment', to: '/inventory', icon: SlidersHorizontal, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200/50 dark:border-amber-800/50' },
-    { label: 'View Reports', to: '/reports', icon: BarChart3, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' },
+    { label: t('qa_add_product', 'Add Product'), to: '/products/new', icon: PlusCircle, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/50 dark:border-emerald-800/50' },
+    { label: t('qa_record_purchase', 'Record Purchase'), to: '/purchases/new', icon: ShoppingCart, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40 border-blue-200/50 dark:border-blue-800/50' },
+    { label: t('qa_record_sale', 'Record Sale'), to: '/sales/new', icon: Receipt, color: 'text-teal-600 bg-teal-50 dark:bg-teal-950/40 border-teal-200/50 dark:border-teal-800/50' },
+    { label: t('qa_add_customer', 'Add Customer'), to: '/customers', icon: UserPlus, color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 border-purple-200/50 dark:border-purple-800/50' },
+    { label: t('qa_stock_adjust', 'Stock Adjustment'), to: '/inventory', icon: SlidersHorizontal, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 border-amber-200/50 dark:border-amber-800/50' },
+    { label: t('qa_view_reports', 'View Reports'), to: '/reports', icon: BarChart3, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' },
   ];
 
   return (

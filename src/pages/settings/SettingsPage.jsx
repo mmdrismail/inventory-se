@@ -34,10 +34,20 @@ export const SettingsPage = () => {
   });
 
   const [formData, setFormData] = useState({
-    businessName: settings.businessName || '',
-    businessEmail: settings.businessEmail || '',
-    businessPhone: settings.businessPhone || '',
-    address: settings.address || '',
+    businessName: settings.companyName || settings.businessName || 'মেসার্স শান্তা রেফ্রিজারেশন',
+    businessNameEn: settings.companyNameEn || settings.businessNameEn || 'M/S. SHANTA REFRIGERATION',
+    proprietor: settings.proprietor || 'মোঃ রুহুল আমিন (লিটন)',
+    proprietorEn: settings.proprietorEn || 'Md. Ruhul Amin (Liton)',
+    businessEmail: settings.companyEmail || settings.businessEmail || 'shanta.refrigeration@gmail.com',
+    businessPhone: settings.companyPhone || settings.businessPhone || '01711-169875',
+    address: settings.companyAddress || settings.address || '৪০৬, সি.ডি.এ মার্কেট (মসজিদের বিপরীতে), পাহাড়তলী, চট্টগ্রাম।',
+    addressEn: settings.companyAddressEn || settings.addressEn || '406, C.D.A Market, Pahartali, Chattogram.',
+    bin: settings.bin || 'BIN-001651149-0505',
+    businessScope: settings.businessScope || '',
+    businessScopeEn: settings.businessScopeEn || '',
+    disclaimer: settings.disclaimer || '',
+    disclaimerEn: settings.disclaimerEn || '',
+    docLanguage: settings.docLanguage || 'bn',
     currency: settings.currency || 'BDT',
     defaultReorderLevel: String(settings.defaultReorderLevel || 10),
     theme: settings.theme || 'light',
@@ -93,9 +103,20 @@ export const SettingsPage = () => {
     setTimeout(() => {
       updateSettings({
         ...formData,
+        companyName: formData.businessName,
+        companyNameEn: formData.businessNameEn,
+        companyEmail: formData.businessEmail,
+        companyPhone: formData.businessPhone,
+        companyAddress: formData.address,
+        companyAddressEn: formData.addressEn,
         defaultReorderLevel: Number(formData.defaultReorderLevel) || 10,
       });
       setIsSaving(false);
+      addToast({
+        title: 'Settings Saved',
+        message: 'Business profile and stationery preferences updated successfully.',
+        type: 'success',
+      });
     }, 250);
   };
 
@@ -168,36 +189,130 @@ export const SettingsPage = () => {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Business / Organization Name"
+                label="প্রতিষ্ঠানের নাম (বাংলা)"
                 name="businessName"
                 value={formData.businessName}
                 onChange={handleChange}
+                helperText="ক্যাশ মেমো, চালান ও অফিশিয়াল প্যাডে প্রদর্শিত হবে"
                 required
               />
               <Input
-                label="Support Email"
-                type="email"
-                name="businessEmail"
-                value={formData.businessEmail}
+                label="Company Name (English)"
+                name="businessNameEn"
+                value={formData.businessNameEn}
                 onChange={handleChange}
+                helperText="Displayed in English invoices & export pads"
                 required
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Contact Phone"
+                label="স্বত্বাধিকারী / প্রোপ্রাইটর (বাংলা)"
+                name="proprietor"
+                value={formData.proprietor}
+                onChange={handleChange}
+                placeholder="যেমন: মোঃ রুহুল আমিন (লিটন)"
+              />
+              <Input
+                label="Proprietor Name (English)"
+                name="proprietorEn"
+                value={formData.proprietorEn}
+                onChange={handleChange}
+                placeholder="e.g. Md. Ruhul Amin (Liton)"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Input
+                label="যোগাযোগের মোবাইল / ফোন"
                 name="businessPhone"
                 value={formData.businessPhone}
                 onChange={handleChange}
                 required
               />
               <Input
-                label="Physical Facility Address"
+                label="অফিসিয়াল ইমেইল"
+                type="email"
+                name="businessEmail"
+                value={formData.businessEmail}
+                onChange={handleChange}
+                required
+              />
+              <Input
+                label="BIN / ভ্যাট নিবন্ধন নম্বর"
+                name="bin"
+                value={formData.bin}
+                onChange={handleChange}
+                placeholder="BIN-001651149-0505"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="প্রতিষ্ঠানের ঠিকানা (বাংলা)"
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
                 required
+              />
+              <Input
+                label="Facility Address (English)"
+                name="addressEn"
+                value={formData.addressEn}
+                onChange={handleChange}
+                placeholder="e.g. 406, C.D.A Market, Pahartali, Chattogram"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Textarea
+                label="ব্যবসার বিবরণী ও পণ্যের পরিধি (বাংলা)"
+                name="businessScope"
+                value={formData.businessScope}
+                onChange={handleChange}
+                rows={2}
+                helperText="মেমোর হেডারের নিচে বক্স আকারে প্রদর্শিত হবে"
+              />
+              <Textarea
+                label="Business Scope & Goods Description (English)"
+                name="businessScopeEn"
+                value={formData.businessScopeEn}
+                onChange={handleChange}
+                rows={2}
+                helperText="Appears below header on English trade pads"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="বিক্রয় শর্ত ও নোটিশ (বাংলা)"
+                name="disclaimer"
+                value={formData.disclaimer}
+                onChange={handleChange}
+                placeholder="বিঃদ্রঃ উপরোক্ত মালামাল ভালো অবস্থায় বুঝিয়া পাইলাম।"
+              />
+              <Input
+                label="Return Policy / Disclaimer (English)"
+                name="disclaimerEn"
+                value={formData.disclaimerEn}
+                onChange={handleChange}
+                placeholder="Notice: Received goods in good condition."
+              />
+            </div>
+
+            <div className="pt-1">
+              <Select
+                label="ডিফল্ট ডকুমেন্ট ভাষা (Default Print Language)"
+                name="docLanguage"
+                value={formData.docLanguage}
+                onChange={handleChange}
+                options={[
+                  { value: 'bn', label: 'বাংলা (Bangla) - মেসার্স শান্তা রেফ্রিজারেশন' },
+                  { value: 'en', label: 'English - Commercial Trade Invoice' },
+                  { value: 'bilingual', label: 'উভয় ভাষা (Bilingual Bangla + English)' },
+                ]}
+                helperText="প্রিন্ট মোডালে যেকোনো সময় মাউসের এক ক্লিকেই ভাষা পরিবর্তন করা যাবে"
               />
             </div>
           </CardContent>

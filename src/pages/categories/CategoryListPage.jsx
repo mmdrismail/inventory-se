@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input, Textarea, Select } from '../../components/forms/FormControls';
@@ -10,6 +11,7 @@ import { Plus, Search, Edit2, Trash2, FolderTree, Package } from 'lucide-react';
 
 export const CategoryListPage = () => {
   const { categories, products, addCategory, updateCategory, deleteCategory, confirmAction } = useAppData();
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -103,15 +105,15 @@ export const CategoryListPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Product Categories
+            {t('categories_title', 'Product Categories')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Organize catalog inventory into clear departmental groupings.
+            {t('categories_subtitle', 'Organize catalog inventory into clear departmental groupings.')}
           </p>
         </div>
 
         <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenAdd}>
-          Add Category
+          {t('btn_add_category', 'Add Category')}
         </Button>
       </div>
 

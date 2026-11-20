@@ -4,7 +4,16 @@ const saleItemSchema = new mongoose.Schema({
   productId: {
     type: mongoose.Schema.Types.Mixed,
     ref: 'Product',
-    required: true,
+    required: false,
+    default: null,
+  },
+  productName: {
+    type: String,
+    default: '',
+  },
+  sku: {
+    type: String,
+    default: '',
   },
   quantity: {
     type: Number,
@@ -34,7 +43,35 @@ const saleSchema = new mongoose.Schema(
     customerId: {
       type: mongoose.Schema.Types.Mixed,
       ref: 'Customer',
-      required: true,
+      default: null,
+    },
+    customerName: {
+      type: String,
+      default: 'Walk-in Retail Customer',
+    },
+    customerCompany: {
+      type: String,
+      default: '',
+    },
+    customerRole: {
+      type: String,
+      default: 'owner',
+    },
+    customerPhone: {
+      type: String,
+      default: '',
+    },
+    customerEmail: {
+      type: String,
+      default: '',
+    },
+    customerAddress: {
+      type: String,
+      default: '',
+    },
+    customerLocation: {
+      type: String,
+      default: '',
     },
     items: [saleItemSchema],
     subtotal: {
@@ -55,20 +92,37 @@ const saleSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+    paidAmount: {
+      type: Number,
+      default: 0,
+    },
+    dueAmount: {
+      type: Number,
+      default: 0,
+    },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'card', 'mobile_banking'],
+      enum: ['cash', 'card', 'mobile_banking', 'bank_transfer', 'cheque'],
       default: 'cash',
     },
     paymentStatus: {
       type: String,
-      enum: ['paid', 'partial', 'pending'],
+      enum: ['paid', 'partial', 'pending', 'due'],
       default: 'paid',
     },
     status: {
       type: String,
       enum: ['draft', 'completed', 'cancelled'],
       default: 'completed',
+    },
+    requisitionRef: {
+      type: String,
+      default: '',
+    },
+    quotationId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: 'Quotation',
+      default: null,
     },
     cashierName: {
       type: String,
@@ -78,8 +132,24 @@ const saleSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    showRate: {
+      type: Boolean,
+      default: true,
+    },
+    showLineTotal: {
+      type: Boolean,
+      default: true,
+    },
+    showGrandTotal: {
+      type: Boolean,
+      default: true,
+    },
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
+
+// High-speed sales history & reporting indexes
+saleSchema.index({ customerId: 1, createdAt: -1 });
+saleSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Sale', saleSchema);

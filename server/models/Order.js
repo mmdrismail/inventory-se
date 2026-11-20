@@ -101,4 +101,8 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// High-speed order lookup and queue indexes
+orderSchema.index({ customerEmail: 1, createdAt: -1 });
+orderSchema.index({ status: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Order', orderSchema);

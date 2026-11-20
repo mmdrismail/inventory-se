@@ -9,6 +9,8 @@ import {
   INITIAL_ORDERS,
   INITIAL_USERS,
   INITIAL_SETTINGS,
+  INITIAL_QUOTATIONS,
+  INITIAL_LOT_PURCHASES,
 } from '../data/seedData';
 
 const PREFIX = 'stockline_demo_v1_';
@@ -19,7 +21,9 @@ export const STORAGE_KEYS = {
   SUPPLIERS: `${PREFIX}suppliers`,
   CUSTOMERS: `${PREFIX}customers`,
   PURCHASES: `${PREFIX}purchases`,
+  LOT_PURCHASES: `${PREFIX}lot_purchases`,
   SALES: `${PREFIX}sales`,
+  QUOTATIONS: `${PREFIX}quotations`,
   INVENTORY_MOVEMENTS: `${PREFIX}inventory_movements`,
   ORDERS: `${PREFIX}orders`,
   USERS: `${PREFIX}users`,
@@ -88,8 +92,14 @@ class StorageService {
     if (!this.getItem(STORAGE_KEYS.PURCHASES)) {
       this.setItem(STORAGE_KEYS.PURCHASES, INITIAL_PURCHASES);
     }
+    if (!this.getItem(STORAGE_KEYS.LOT_PURCHASES)) {
+      this.setItem(STORAGE_KEYS.LOT_PURCHASES, INITIAL_LOT_PURCHASES);
+    }
     if (!this.getItem(STORAGE_KEYS.SALES)) {
       this.setItem(STORAGE_KEYS.SALES, INITIAL_SALES);
+    }
+    if (!this.getItem(STORAGE_KEYS.QUOTATIONS)) {
+      this.setItem(STORAGE_KEYS.QUOTATIONS, INITIAL_QUOTATIONS);
     }
     if (!this.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS)) {
       this.setItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, INITIAL_INVENTORY_MOVEMENTS);
@@ -120,7 +130,9 @@ class StorageService {
     this.setItem(STORAGE_KEYS.CUSTOMERS, INITIAL_CUSTOMERS);
     this.setItem(STORAGE_KEYS.PRODUCTS, INITIAL_PRODUCTS);
     this.setItem(STORAGE_KEYS.PURCHASES, INITIAL_PURCHASES);
+    this.setItem(STORAGE_KEYS.LOT_PURCHASES, INITIAL_LOT_PURCHASES);
     this.setItem(STORAGE_KEYS.SALES, INITIAL_SALES);
+    this.setItem(STORAGE_KEYS.QUOTATIONS, INITIAL_QUOTATIONS);
     this.setItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, INITIAL_INVENTORY_MOVEMENTS);
     this.setItem(STORAGE_KEYS.ORDERS, INITIAL_ORDERS);
     this.setItem(STORAGE_KEYS.USERS, INITIAL_USERS);

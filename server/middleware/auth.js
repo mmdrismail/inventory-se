@@ -25,7 +25,7 @@ const protect = async (req, res, next) => {
   }
 
   if (!token) {
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' && process.env.ALLOW_DEV_AUTH_BYPASS === 'true') {
       const devAdmin = await User.findOne({ role: 'admin' });
       if (devAdmin) {
         req.user = devAdmin;

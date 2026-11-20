@@ -8,17 +8,7 @@ exports.getSettings = async (req, res, next) => {
   try {
     let setting = await Setting.findOne();
     if (!setting) {
-      setting = await Setting.create({
-        companyName: 'StockLine Commerce Ltd.',
-        companyEmail: 'support@stockline.io',
-        companyPhone: '+880 1711 000000',
-        companyAddress: 'House 42, Road 11, Banani, Dhaka-1213, Bangladesh',
-        currency: 'BDT',
-        currencySymbol: '৳',
-        taxRate: 5,
-        defaultReorderThreshold: 10,
-        theme: 'light',
-      });
+      setting = await Setting.create({});
     }
     res.json({ success: true, data: setting });
   } catch (error) {

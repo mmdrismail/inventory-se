@@ -51,6 +51,7 @@ class PurchaseService {
         sku: it.sku,
         quantity: Number(it.quantity) || 1,
         unitCost: Number(it.unitCost || it.costPrice) || 0,
+        lineTotal: Number(it.lineTotal || it.total || (it.quantity * (it.unitCost || it.costPrice || 0))) || 0,
         total: Number(it.total) || 0,
       })),
       subtotal: newPurchase.subtotal,

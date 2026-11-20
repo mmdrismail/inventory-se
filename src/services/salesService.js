@@ -1,5 +1,6 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { inventoryService } from './inventoryService';
+import { customerService } from './customerService';
 import { calculateSaleTotals } from '../utils/calculations';
 import { apiClient } from './apiClient';
 
@@ -16,17 +17,56 @@ class SalesService {
   create(saleData, performedBy = 'Sales Executive') {
     const sales = this.getAll();
     const { subtotal, discount, total } = calculateSaleTotals(saleData.items || [], saleData.discount);
+    const totalVal = total;
+    let paidVal = Number(saleData.paidAmount !== undefined ? saleData.paidAmount : (saleData.paymentStatus === 'paid' ? totalVal : (saleData.paymentStatus === 'due' ? 0 : 0)));
+    if (saleData.paymentStatus === 'paid') paidVal = totalVal;
+    const dueVal = Math.max(0, totalVal - paidVal);
+
+    // Auto-upsert customer profile if details provided
+    let customerId = saleData.customerId;
+    if (saleData.customerName && saleData.customerName.trim() && saleData.customerName !== 'Walk-in Retail Customer') {
+      const cust = customerService.upsertCustomer({
+        id: saleData.customerId,
+        name: saleData.customerName,
+        companyName: saleData.customerCompany,
+        designationRole: saleData.customerRole,
+        phone: saleData.customerPhone,
+        email: saleData.customerEmail,
+        address: saleData.customerAddress,
+        location: saleData.customerLocation || saleData.customerAddress,
+      });
+      if (cust && cust.id) {
+        customerId = cust.id;
+      }
+    }
+
+    const isCompleted = saleData.status === 'completed' || !saleData.status;
+
+    if (customerId && isCompleted) {
+      customerService.updateFinancials(customerId, totalVal, paidVal, dueVal);
+    }
 
     const newSale = {
       ...saleData,
       id: `sal-${Date.now()}`,
       invoiceNo: saleData.invoiceNo?.trim() || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      customerId,
+      customerName: saleData.customerName || 'Walk-in Retail Customer',
+      customerCompany: saleData.customerCompany || '',
+      customerRole: saleData.customerRole || 'owner',
+      customerPhone: saleData.customerPhone || '',
+      customerAddress: saleData.customerAddress || '',
+      customerLocation: saleData.customerLocation || '',
       date: saleData.date || new Date().toISOString(),
-      status: saleData.status || 'completed', // 'completed' | 'draft' | 'cancelled'
+      status: saleData.status || 'completed',
       paymentStatus: saleData.paymentStatus || 'paid',
       subtotal,
       discount,
       total,
+      paidAmount: paidVal,
+      dueAmount: dueVal,
+      requisitionRef: saleData.requisitionRef || '',
+      quotationId: saleData.quotationId || null,
       notes: saleData.notes?.trim() || '',
       createdAt: new Date().toISOString(),
     };
@@ -51,6 +91,7 @@ class SalesService {
         sku: it.sku,
         quantity: Number(it.quantity) || 1,
         unitPrice: Number(it.unitPrice || it.sellingPrice) || 0,
+        lineTotal: Number(it.lineTotal || it.subtotal || ((it.quantity || 1) * (it.unitPrice || it.sellingPrice || 0))) || 0,
         subtotal: Number(it.subtotal || (it.quantity * it.unitPrice)) || 0,
       })),
       subtotal: newSale.subtotal,

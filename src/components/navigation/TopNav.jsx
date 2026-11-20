@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Breadcrumbs } from './Breadcrumbs';
 import { NotificationDropdown } from './NotificationDropdown';
 import { GlobalSearchModal } from './GlobalSearchModal';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
+import { ShortcutsHelpModal } from '../common/ShortcutsHelpModal';
+import { isSoundEnabled, setSoundEnabled } from '../../utils/soundEffects';
 import { useAuth } from '../../context/AuthContext';
 import { useAppData } from '../../context/AppDataContext';
 import {
@@ -17,15 +20,47 @@ import {
   Shield,
   Layers,
   Sparkles,
+  Volume2,
+  VolumeX,
+  Keyboard,
+  HelpCircle,
 } from 'lucide-react';
 
 export const TopNav = ({ onOpenMobileSidebar }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const profileRef = useRef(null);
   const { currentUser, role, logout, demoLogin } = useAuth();
   const { settings, toggleTheme } = useAppData();
   const navigate = useNavigate();
+
+  // Global Keyboard Shortcuts (Ctrl+K for search, ? for help, Ctrl+Shift+D for dark mode)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Don't intercept if user is typing inside an input/textarea/select
+      const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName);
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        toggleTheme();
+      } else if (e.key === '?' && !inInput && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setIsHelpOpen((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+        setIsHelpOpen(false);
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [toggleTheme]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -36,6 +71,12 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleToggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+  };
 
   const handleRoleSwitch = (newRole) => {
     demoLogin(newRole);
@@ -68,13 +109,13 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
             <Breadcrumbs />
           </div>
 
-          {/* Right: Search, Notifications, Theme, User Menu */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Right: Search, Sound, Shortcuts, Notifications, Theme, User Menu */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Global Search trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 transition-all text-xs"
-              title="Quick Search"
+              title="ক্যাটালগ ও ডাটাবেজ সার্চ (Ctrl+K)"
             >
               <Search className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Quick Search...</span>
@@ -83,8 +124,35 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
               </kbd>
             </button>
 
+            {/* Audio Feedback Toggle */}
+            <button
+              type="button"
+              onClick={handleToggleSound}
+              className={`p-2 rounded-xl transition-colors ${
+                soundOn
+                  ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                  : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title={soundOn ? 'বারকোড স্ক্যানার সাউন্ড সক্রিয় (Sound On)' : 'সাউন্ড বন্ধ (Muted)'}
+            >
+              {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+
+            {/* Keyboard Shortcuts Help */}
+            <button
+              type="button"
+              onClick={() => setIsHelpOpen(true)}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="কীবোর্ড শর্টকাট সহায়তা (?)"
+            >
+              <Keyboard className="h-4 w-4" />
+            </button>
+
             {/* Notification bell */}
             <NotificationDropdown />
+
+            {/* Global Multi-Language Switcher */}
+            <LanguageSwitcher />
 
             {/* Theme Toggle */}
             <button
@@ -133,11 +201,11 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
                     </div>
                   </div>
 
-                  {/* Quick Role Switcher for University Lab Evaluators */}
+                  {/* Quick Role Switcher (Simulation / Test Mode) */}
                   <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30">
                     <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                      <Sparkles className="h-3 w-3 text-amber-500" />
-                      Switch Demo Role
+                      <Sparkles className="h-3 w-3 text-emerald-500" />
+                      অ্যাক্টিভ প্রোফাইল রোল (Simulation)
                     </div>
                     <div className="grid grid-cols-2 gap-1 text-xs">
                       {['admin', 'manager', 'staff', 'customer'].map((r) => (
@@ -196,6 +264,9 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
 
       {/* Global Search Modal */}
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      {/* Keyboard Shortcuts Help Modal */}
+      <ShortcutsHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </>
   );
 };

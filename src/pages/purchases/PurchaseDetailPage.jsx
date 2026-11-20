@@ -1,18 +1,60 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
-import { ArrowLeft, ShoppingCart, CheckCircle2, XCircle, Clock, Truck } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, CheckCircle2, XCircle, Clock, Truck, Barcode, Printer } from 'lucide-react';
+import { LotBarcodePrintModal } from '../../components/products/LotBarcodePrintModal';
 
 export const PurchaseDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { purchases, suppliers, receivePurchase, cancelPurchase, confirmAction, settings } = useAppData();
+  const { purchases, suppliers, products, receivePurchase, cancelPurchase, confirmAction, settings } = useAppData();
+  const { t } = useLanguage();
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   const purchase = purchases.find((p) => p.id === id);
   const supplier = suppliers.find((s) => s.id === purchase?.supplierId);
+
+  // Prepare lot-compatible items for thermal sticker printing
+  const lotForPrint = React.useMemo(() => {
+    if (!purchase) return null;
+    const printItems = (purchase.items || []).map((line, idx) => {
+      const prod = products?.find((p) => p.id === line.productId || p.name === line.productName);
+      const loc = prod?.warehouseLocation || {};
+      const locCode = loc.code || (loc.rack ? `${loc.zone || 'A'}-${loc.rack}` : 'A-01-01-1-A');
+      const cost = Number(line.unitCost) || Number(prod?.costPrice) || 0;
+      const staff = Number(prod?.staffPrice) || Math.round(cost * 1.3);
+      const mgr = Number(prod?.managerPrice) || Math.round(cost * 1.5);
+      const cust = Number(prod?.sellingPrice) || Math.round(cost * 1.8);
+      return {
+        partName: line.productName || prod?.name || `Item #${idx + 1}`,
+        brand: prod?.brand || 'Industrial',
+        modelNumber: prod?.modelNumber || '',
+        condition: prod?.condition || 'new',
+        quantity: Number(line.quantity) || 1,
+        unit: prod?.unit || 'pc',
+        allocatedCost: cost,
+        staffPrice: staff,
+        managerPrice: mgr,
+        targetSellingPrice: cust,
+        customerPrice: cust,
+        warehouseLocation: {
+          code: locCode,
+        },
+      };
+    });
+
+    return {
+      id: purchase.id,
+      lotNumber: purchase.referenceNo || 'PO-2026',
+      lotName: `Purchase Order #${purchase.referenceNo}`,
+      sourceShip: supplier?.name || 'Direct Supplier',
+      items: printItems,
+    };
+  }, [purchase, supplier, products]);
 
   if (!purchase) {
     return (
@@ -63,14 +105,25 @@ export const PurchaseDetailPage = () => {
         </Link>
 
         <div className="flex items-center gap-2">
+          {/* Print Barcode Stickers Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            icon={Barcode}
+            onClick={() => setIsPrintModalOpen(true)}
+            className="text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+          >
+            {t('action_print_barcodes', 'বারকোড স্টিকার প্রিন্ট')}
+          </Button>
+
           {purchase.status === 'draft' && (
             <Button variant="primary" size="sm" icon={CheckCircle2} onClick={handleReceive}>
-              Receive Order Now
+              {t('receive_order_now', 'Receive Order Now')}
             </Button>
           )}
           {purchase.status !== 'cancelled' && (
             <Button variant="outline" size="sm" icon={XCircle} onClick={handleCancel}>
-              Cancel Order
+              {t('cancel_order', 'Cancel Order')}
             </Button>
           )}
         </div>
@@ -190,17 +243,26 @@ export const PurchaseDetailPage = () => {
         {/* Totals Summary */}
         <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col items-end gap-1 text-xs">
           <div className="flex justify-between w-64 text-slate-500">
-            <span>Subtotal:</span>
+            <span>{t('col_subtotal', 'Subtotal')}:</span>
             <span className="font-mono">{formatCurrency(purchase.subtotal, settings.currency)}</span>
           </div>
           <div className="flex justify-between w-64 text-base font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-100 dark:border-slate-800">
-            <span>Grand Total:</span>
+            <span>{t('col_grand_total', 'Grand Total')}:</span>
             <span className="font-mono text-emerald-600 dark:text-emerald-400">
               {formatCurrency(purchase.total, settings.currency)}
             </span>
           </div>
         </div>
       </Card>
+
+      {/* Thermal Barcode Sticker Print Modal */}
+      {isPrintModalOpen && lotForPrint && (
+        <LotBarcodePrintModal
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          lot={lotForPrint}
+        />
+      )}
     </div>
   );
 };

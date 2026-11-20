@@ -123,6 +123,80 @@ class CustomerService {
     const orders = storageService.getItem(STORAGE_KEYS.ORDERS, []);
     return orders.filter((o) => o.customerId === customerId);
   }
+
+  /**
+   * Upsert customer from Sales or Quotation form
+   */
+  upsertCustomer(data) {
+    if (!data.name || !data.name.trim() || data.name === 'Walk-in Retail Customer') {
+      return null;
+    }
+    const customers = this.getAll();
+    let existing = null;
+    if (data.id) {
+      existing = customers.find((c) => c.id === data.id);
+    }
+    if (!existing && data.phone) {
+      existing = customers.find((c) => c.phone && c.phone.trim() === data.phone.trim());
+    }
+    if (!existing && data.name) {
+      existing = customers.find((c) => c.name.toLowerCase().trim() === data.name.toLowerCase().trim());
+    }
+
+    if (existing) {
+      const updates = {
+        name: data.name.trim(),
+        companyName: data.companyName !== undefined ? data.companyName : existing.companyName || '',
+        designationRole: data.designationRole || data.customerRole || existing.designationRole || 'owner',
+        phone: data.phone || existing.phone || '',
+        companyPhone: data.companyPhone || existing.companyPhone || '',
+        email: data.email || existing.email || '',
+        address: data.address || existing.address || '',
+        location: data.location || data.address || existing.location || '',
+        customerType: data.customerType || existing.customerType || 'Retail',
+      };
+      this.update(existing.id, updates);
+      return { ...existing, ...updates };
+    } else {
+      const res = this.create({
+        name: data.name.trim(),
+        companyName: data.companyName || '',
+        designationRole: data.designationRole || data.customerRole || 'owner',
+        phone: data.phone || '',
+        companyPhone: data.companyPhone || '',
+        email: data.email || '',
+        address: data.address || '',
+        location: data.location || data.address || '',
+        customerType: data.customerType || 'Retail',
+        totalSales: 0,
+        totalPaid: 0,
+        totalDue: 0,
+        balance: 0,
+      });
+      return res.customer;
+    }
+  }
+
+  /**
+   * Updates total sales, paid, and due balance for customer ledger
+   */
+  updateFinancials(customerId, totalAmount = 0, paidAmount = 0, dueAmount = 0) {
+    if (!customerId) return;
+    const customers = this.getAll();
+    const customer = customers.find((c) => c.id === customerId);
+    if (!customer) return;
+
+    const newSales = (Number(customer.totalSales) || 0) + Number(totalAmount);
+    const newPaid = (Number(customer.totalPaid) || 0) + Number(paidAmount);
+    const newDue = (Number(customer.totalDue) || 0) + Number(dueAmount);
+
+    this.update(customerId, {
+      totalSales: newSales,
+      totalPaid: newPaid,
+      totalDue: newDue,
+      balance: newDue,
+    });
+  }
 }
 
 export const customerService = new CustomerService();

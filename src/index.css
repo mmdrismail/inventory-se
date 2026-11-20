@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   * {
     border-color: theme('colors.slate.200');
   }
@@ -30,24 +33,8 @@
   background: #94a3b8;
 }
 
-/* Print utilities for receipts */
+/* Clean Print utilities */
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  #printable-receipt, #printable-receipt * {
-    visibility: visible;
-  }
-  #printable-receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
-    background: white !important;
-    color: black !important;
-  }
   .no-print {
     display: none !important;
   }

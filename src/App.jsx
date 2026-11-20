@@ -2,7 +2,9 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppDataProvider } from './context/AppDataContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { ProtectedRoute } from './routes/ProtectedRoute';
+import { ScrollToTop } from './components/common/ScrollToTop';
 
 // Layouts
 import { PublicLayout } from './layouts/PublicLayout';
@@ -59,6 +61,11 @@ import { SalesListPage } from './pages/sales/SalesListPage';
 import { SalesFormPage } from './pages/sales/SalesFormPage';
 import { SaleDetailPage } from './pages/sales/SaleDetailPage';
 
+// Quotations (দরপত্র ও কোটেশন)
+import { QuotationListPage } from './pages/quotations/QuotationListPage';
+import { QuotationFormPage } from './pages/quotations/QuotationFormPage';
+import { QuotationDetailPage } from './pages/quotations/QuotationDetailPage';
+
 // Inventory Control
 import { InventoryPage } from './pages/inventory/InventoryPage';
 
@@ -79,8 +86,10 @@ import { ProfilePage } from './pages/settings/ProfilePage';
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthProvider>
-        <AppDataProvider>
+        <LanguageProvider>
+          <AppDataProvider>
           <Routes>
             {/* PUBLIC & STOREFRONT ROUTES */}
             <Route element={<PublicLayout />}>
@@ -184,6 +193,12 @@ export default function App() {
               <Route path="/sales/new" element={<SalesFormPage />} />
               <Route path="/sales/:id" element={<SaleDetailPage />} />
 
+              {/* Quotations (দরপত্র) */}
+              <Route path="/quotations" element={<QuotationListPage />} />
+              <Route path="/quotations/new" element={<QuotationFormPage />} />
+              <Route path="/quotations/:id" element={<QuotationDetailPage />} />
+              <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
+
               {/* Inventory */}
               <Route path="/inventory" element={<InventoryPage />} />
 
@@ -229,7 +244,8 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </AppDataProvider>
-      </AuthProvider>
+      </LanguageProvider>
+    </AuthProvider>
     </BrowserRouter>
   );
 }

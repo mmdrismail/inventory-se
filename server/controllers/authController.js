@@ -22,11 +22,14 @@ exports.register = async (req, res, next) => {
       });
     }
 
+    // Security: Only existing admins can assign privileged roles via register endpoint
+    const assignedRole = (req.user && req.user.role === 'admin' && role) ? role : 'customer';
+
     const user = await User.create({
       name,
       email: email.toLowerCase(),
       password,
-      role: role || 'customer',
+      role: assignedRole,
       phone: phone || '',
     });
 

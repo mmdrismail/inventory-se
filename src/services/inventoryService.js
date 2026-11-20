@@ -196,41 +196,42 @@ class InventoryService {
     const products = storageService.getItem(STORAGE_KEYS.PRODUCTS, []);
     const movements = this.getMovements();
 
-    // Validate sufficient stock for all items
+    // Validate sufficient stock for inventory-tracked items
     for (const item of sale.items) {
       const p = products.find((prod) => prod.id === item.productId);
-      if (!p) {
-        return { success: false, message: `Product ${item.productName} not found in inventory.` };
-      }
-      const available = Number(p.quantity) || 0;
-      const requested = Number(item.quantity) || 0;
-      if (requested > available) {
-        return {
-          success: false,
-          message: `Insufficient stock for "${p.name}". Requested: ${requested}, Available: ${available}.`,
-        };
+      if (p) {
+        const available = Number(p.quantity) || 0;
+        const requested = Number(item.quantity) || 0;
+        if (requested > available) {
+          return {
+            success: false,
+            message: `Insufficient stock for "${p.name}". Requested: ${requested}, Available: ${available}.`,
+          };
+        }
       }
     }
 
-    // Deduct stock
+    // Deduct stock for inventory-tracked items
     sale.items.forEach((item) => {
       const p = products.find((prod) => prod.id === item.productId);
-      const req = Number(item.quantity) || 0;
-      p.quantity = (Number(p.quantity) || 0) - req;
+      if (p) {
+        const req = Number(item.quantity) || 0;
+        p.quantity = (Number(p.quantity) || 0) - req;
 
-      movements.unshift({
-        id: `mov-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        productId: p.id,
-        productName: p.name,
-        sku: p.sku,
-        type: 'sale_out',
-        quantityChange: -req,
-        balanceAfter: p.quantity,
-        referenceId: sale.id,
-        reason: `Completed Sale Invoice ${sale.invoiceNo || sale.id}`,
-        timestamp: new Date().toISOString(),
-        performedBy,
-      });
+        movements.unshift({
+          id: `mov-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          productId: p.id,
+          productName: p.name,
+          sku: p.sku,
+          type: 'sale_out',
+          quantityChange: -req,
+          balanceAfter: p.quantity,
+          referenceId: sale.id,
+          reason: `Completed Sale Invoice ${sale.invoiceNo || sale.id}`,
+          timestamp: new Date().toISOString(),
+          performedBy,
+        });
+      }
     });
 
     storageService.setItem(STORAGE_KEYS.PRODUCTS, products);

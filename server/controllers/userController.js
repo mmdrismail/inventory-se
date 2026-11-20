@@ -43,6 +43,7 @@ exports.createUser = async (req, res, next) => {
       success: true,
       message: `User ${user.name} created successfully.`,
       data: {
+        _id: user._id,
         id: user._id,
         name: user.name,
         email: user.email,

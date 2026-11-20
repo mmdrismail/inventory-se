@@ -11,6 +11,7 @@ export const Modal = ({
   children,
   maxWidth = 'max-w-lg',
   showClose = true,
+  zIndex = 'z-50',
 }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -31,7 +32,7 @@ export const Modal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4 sm:p-6 overflow-y-auto`}>
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"

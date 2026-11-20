@@ -6,6 +6,8 @@ import { supplierService } from '../services/supplierService';
 import { customerService } from '../services/customerService';
 import { purchaseService } from '../services/purchaseService';
 import { salesService } from '../services/salesService';
+import { quotationService } from '../services/quotationService';
+import { lotService } from '../services/lotService';
 import { inventoryService } from '../services/inventoryService';
 import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
@@ -18,13 +20,24 @@ export const AppDataProvider = ({ children }) => {
   // Ensure seed data initialized before reading collections
   storageService.initializeSeedData();
 
-  // Primary collections lazily loaded from storage
+  // Primary collections lazily loaded from storage (deduplicated by name/id)
   const [products, setProducts] = useState(() => storageService.getItem(STORAGE_KEYS.PRODUCTS, []));
   const [categories, setCategories] = useState(() => storageService.getItem(STORAGE_KEYS.CATEGORIES, []));
-  const [suppliers, setSuppliers] = useState(() => storageService.getItem(STORAGE_KEYS.SUPPLIERS, []));
+  const [suppliers, setSuppliers] = useState(() => {
+    const raw = storageService.getItem(STORAGE_KEYS.SUPPLIERS, []);
+    const seen = new Set();
+    return raw.filter((s) => {
+      const k = (s.name || '').trim().toLowerCase();
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  });
   const [customers, setCustomers] = useState(() => storageService.getItem(STORAGE_KEYS.CUSTOMERS, []));
   const [purchases, setPurchases] = useState(() => storageService.getItem(STORAGE_KEYS.PURCHASES, []));
   const [sales, setSales] = useState(() => storageService.getItem(STORAGE_KEYS.SALES, []));
+  const [quotations, setQuotations] = useState(() => storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
+  const [lotPurchases, setLotPurchases] = useState(() => storageService.getItem(STORAGE_KEYS.LOT_PURCHASES, []));
   const [inventoryMovements, setInventoryMovements] = useState(() => storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
   const [orders, setOrders] = useState(() => storageService.getItem(STORAGE_KEYS.ORDERS, []));
   const [users, setUsers] = useState(() => storageService.getItem(STORAGE_KEYS.USERS, []));
@@ -49,15 +62,17 @@ export const AppDataProvider = ({ children }) => {
       const isUp = await apiClient.isBackendAvailable();
       if (!isUp) return;
 
-      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, ordsRes, setsRes] = await Promise.allSettled([
+      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, ordsRes, setsRes, lotsRes] = await Promise.allSettled([
         apiClient.get('/products'),
         apiClient.get('/categories'),
         apiClient.get('/suppliers'),
         apiClient.get('/customers'),
         apiClient.get('/purchases'),
         apiClient.get('/sales'),
+        apiClient.get('/quotations'),
         apiClient.get('/orders'),
         apiClient.get('/settings'),
+        apiClient.get('/lots'),
       ]);
 
       if (prodsRes.status === 'fulfilled' && prodsRes.value?.success && Array.isArray(prodsRes.value.data) && prodsRes.value.data.length > 0) {
@@ -81,11 +96,16 @@ export const AppDataProvider = ({ children }) => {
       }
 
       if (supsRes.status === 'fulfilled' && supsRes.value?.success && Array.isArray(supsRes.value.data) && supsRes.value.data.length > 0) {
-        const normalized = supsRes.value.data.map((s) => ({
-          ...s,
-          id: s._id || s.id,
-          _id: s._id || s.id,
-        }));
+        const seen = new Set();
+        const normalized = [];
+        for (const s of supsRes.value.data) {
+          const item = { ...s, id: s._id || s.id, _id: s._id || s.id };
+          const k = (item.name || '').trim().toLowerCase();
+          if (k && !seen.has(k)) {
+            seen.add(k);
+            normalized.push(item);
+          }
+        }
         setSuppliers(normalized);
         storageService.setItem(STORAGE_KEYS.SUPPLIERS, normalized);
       }
@@ -101,31 +121,72 @@ export const AppDataProvider = ({ children }) => {
       }
 
       if (pursRes.status === 'fulfilled' && pursRes.value?.success && Array.isArray(pursRes.value.data) && pursRes.value.data.length > 0) {
-        const normalized = pursRes.value.data.map((p) => ({
-          ...p,
-          id: p._id || p.id,
-          _id: p._id || p.id,
-        }));
+        const normalized = pursRes.value.data.map((p) => {
+          const tot = Number(p.total !== undefined ? p.total : p.totalAmount) || 0;
+          return {
+            ...p,
+            id: p._id || p.id,
+            _id: p._id || p.id,
+            total: tot,
+            totalAmount: tot,
+            date: p.date || p.createdAt,
+          };
+        });
         setPurchases(normalized);
         storageService.setItem(STORAGE_KEYS.PURCHASES, normalized);
       }
 
       if (salesRes.status === 'fulfilled' && salesRes.value?.success && Array.isArray(salesRes.value.data) && salesRes.value.data.length > 0) {
-        const normalized = salesRes.value.data.map((s) => ({
-          ...s,
-          id: s._id || s.id,
-          _id: s._id || s.id,
-        }));
+        const normalized = salesRes.value.data.map((s) => {
+          const tot = Number(s.total !== undefined ? s.total : s.totalAmount) || 0;
+          const paid = Number(s.paidAmount !== undefined ? s.paidAmount : (s.paymentStatus === 'paid' ? tot : 0)) || 0;
+          const due = Math.max(0, tot - paid);
+          const inv = s.invoiceNo || s.invoiceNumber || `INV-${s._id || s.id}`;
+          return {
+            ...s,
+            id: s._id || s.id,
+            _id: s._id || s.id,
+            invoiceNo: inv,
+            invoiceNumber: inv,
+            total: tot,
+            totalAmount: tot,
+            paidAmount: paid,
+            dueAmount: s.dueAmount !== undefined ? Number(s.dueAmount) : due,
+            date: s.date || s.createdAt,
+          };
+        });
         setSales(normalized);
         storageService.setItem(STORAGE_KEYS.SALES, normalized);
       }
 
+      if (quotesRes.status === 'fulfilled' && quotesRes.value?.success && Array.isArray(quotesRes.value.data) && quotesRes.value.data.length > 0) {
+        const normalized = quotesRes.value.data.map((q) => {
+          const tot = Number(q.totalAmount !== undefined ? q.totalAmount : q.total) || 0;
+          return {
+            ...q,
+            id: q._id || q.id,
+            _id: q._id || q.id,
+            totalAmount: tot,
+            total: tot,
+            date: q.date || q.createdAt,
+          };
+        });
+        setQuotations(normalized);
+        storageService.setItem(STORAGE_KEYS.QUOTATIONS, normalized);
+      }
+
       if (ordsRes.status === 'fulfilled' && ordsRes.value?.success && Array.isArray(ordsRes.value.data) && ordsRes.value.data.length > 0) {
-        const normalized = ordsRes.value.data.map((o) => ({
-          ...o,
-          id: o._id || o.id,
-          _id: o._id || o.id,
-        }));
+        const normalized = ordsRes.value.data.map((o) => {
+          const tot = Number(o.totalAmount !== undefined ? o.totalAmount : o.total) || 0;
+          return {
+            ...o,
+            id: o._id || o.id,
+            _id: o._id || o.id,
+            total: tot,
+            totalAmount: tot,
+            date: o.date || o.createdAt,
+          };
+        });
         setOrders(normalized);
         storageService.setItem(STORAGE_KEYS.ORDERS, normalized);
       }
@@ -134,6 +195,16 @@ export const AppDataProvider = ({ children }) => {
         const remoteSettings = setsRes.value.data;
         setSettings((prev) => ({ ...prev, ...remoteSettings }));
         storageService.setItem(STORAGE_KEYS.SETTINGS, { ...settingsService.getSettings(), ...remoteSettings });
+      }
+
+      if (lotsRes.status === 'fulfilled' && lotsRes.value?.success && Array.isArray(lotsRes.value.data) && lotsRes.value.data.length > 0) {
+        const normalized = lotsRes.value.data.map((l) => ({
+          ...l,
+          id: l._id || l.id,
+          _id: l._id || l.id,
+        }));
+        setLotPurchases(normalized);
+        storageService.setItem(STORAGE_KEYS.LOT_PURCHASES, normalized);
       }
     } catch (err) {
       console.info('[StockLine API Sync notice]:', err.message);
@@ -147,7 +218,9 @@ export const AppDataProvider = ({ children }) => {
     setSuppliers(storageService.getItem(STORAGE_KEYS.SUPPLIERS, []));
     setCustomers(storageService.getItem(STORAGE_KEYS.CUSTOMERS, []));
     setPurchases(storageService.getItem(STORAGE_KEYS.PURCHASES, []));
+    setLotPurchases(storageService.getItem(STORAGE_KEYS.LOT_PURCHASES, []));
     setSales(storageService.getItem(STORAGE_KEYS.SALES, []));
+    setQuotations(storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
     setInventoryMovements(storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
     setOrders(storageService.getItem(STORAGE_KEYS.ORDERS, []));
     setUsers(storageService.getItem(STORAGE_KEYS.USERS, []));
@@ -439,6 +512,150 @@ export const AppDataProvider = ({ children }) => {
     return res;
   };
 
+  // ================= QUOTATIONS =================
+  const createQuotation = (data, preparedBy = 'Sales Executive') => {
+    const res = quotationService.create(data, preparedBy);
+    if (res.success) {
+      reloadState();
+      addToast({
+        title: 'দরপত্র তৈরি সম্পন্ন (Quotation Created)',
+        message: `Quotation #${res.quotation.quotationNumber} successfully created.`,
+        type: 'success',
+      });
+    } else {
+      addToast({ title: 'Quotation Failed', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
+  const updateQuotation = (id, updates) => {
+    const res = quotationService.update(id, updates);
+    if (res.success) {
+      reloadState();
+      addToast({
+        title: 'দরপত্র আপডেট হয়েছে',
+        message: `Quotation updated successfully.`,
+      });
+    } else {
+      addToast({ title: 'Update Failed', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
+  const deleteQuotation = (id) => {
+    const res = quotationService.remove(id);
+    if (res.success) {
+      reloadState();
+      addToast({ title: 'Quotation Removed', message: res.message });
+    }
+    return res;
+  };
+
+  const convertQuotationToSale = (id) => {
+    const quote = quotationService.getById(id);
+    if (!quote) {
+      addToast({ title: 'Not Found', message: 'Quotation not found.', type: 'error' });
+      return { success: false };
+    }
+
+    const salesItems = (quote.items || []).map((it) => {
+      const prod = products.find((p) => p.id === it.productId || p.name === it.name);
+      return {
+        productId: prod?.id || it.productId || 'custom-item',
+        productName: it.name,
+        sku: prod?.sku || 'QUOTE-ITEM',
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        total: it.lineTotal,
+      };
+    });
+
+    const res = salesService.create({
+      customerId: quote.customerId,
+      customerName: quote.customerName,
+      customerCompany: quote.customerCompany,
+      customerRole: quote.customerRole,
+      customerPhone: quote.customerPhone,
+      customerAddress: quote.customerAddress,
+      customerLocation: quote.customerLocation,
+      items: salesItems,
+      subtotal: quote.subtotal,
+      discount: quote.discount,
+      total: quote.totalAmount,
+      paidAmount: quote.totalAmount,
+      dueAmount: 0,
+      paymentStatus: 'paid',
+      status: 'completed',
+      requisitionRef: quote.requisitionRef || quote.quotationNumber,
+      quotationId: quote.id,
+      notes: `Converted from Quotation #${quote.quotationNumber}. ${quote.notes || ''}`.trim(),
+    });
+
+    if (res.success) {
+      quotationService.update(id, {
+        status: 'converted',
+        convertedSaleId: res.sale.id,
+      });
+      reloadState();
+      addToast({
+        title: 'ইনভয়েসে রূপান্তর সম্পন্ন',
+        message: `কোটেশন #${quote.quotationNumber} সফলভাবে সেলস ইনভয়েস #${res.sale.invoiceNo}-এ রূপান্তরিত হয়েছে।`,
+        type: 'success',
+      });
+    }
+    return res;
+  };
+
+  // ================= LOT AUCTION PURCHASES =================
+  const createLotPurchase = (data) => {
+    const res = lotService.create(data);
+    if (res.success) {
+      reloadState();
+      addToast({
+        title: 'নিলাম লট এন্ট্রি সম্পন্ন',
+        message: `Lot #${res.lot.lotNumber} (${res.lot.lotName || 'Bulk Scrap'}) created.`,
+        type: 'success',
+      });
+    }
+    return res;
+  };
+
+  const updateLotPurchase = (id, updates) => {
+    const res = lotService.update(id, updates);
+    if (res.success) {
+      reloadState();
+      addToast({
+        title: 'লট আপডেট হয়েছে',
+        message: 'Lot purchase details updated.',
+      });
+    }
+    return res;
+  };
+
+  const deleteLotPurchase = (id) => {
+    const res = lotService.delete(id);
+    if (res.success) {
+      reloadState();
+      addToast({ title: 'Lot Removed', message: 'Lot deleted from system.' });
+    }
+    return res;
+  };
+
+  const distributeLotToInventory = (id, performedBy = 'Warehouse Master') => {
+    const res = lotService.distributeToInventory(id, performedBy);
+    if (res.success) {
+      reloadState();
+      addToast({
+        title: 'ওয়্যারহাউজে মালামাল বণ্টন সম্পন্ন',
+        message: res.message,
+        type: 'success',
+      });
+    } else {
+      addToast({ title: 'Distribution Failed', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
   // ================= INVENTORY ADJUSTMENT =================
   const adjustStock = (data) => {
     const res = inventoryService.adjustStock(data);
@@ -652,6 +869,8 @@ export const AppDataProvider = ({ children }) => {
     customers,
     purchases,
     sales,
+    quotations,
+    lotPurchases,
     inventoryMovements,
     orders,
     users,
@@ -683,6 +902,14 @@ export const AppDataProvider = ({ children }) => {
     createSale,
     completeSale,
     cancelSale,
+    createQuotation,
+    updateQuotation,
+    deleteQuotation,
+    convertQuotationToSale,
+    createLotPurchase,
+    updateLotPurchase,
+    deleteLotPurchase,
+    distributeLotToInventory,
     adjustStock,
     createOrder,
     updateOrderStatus,

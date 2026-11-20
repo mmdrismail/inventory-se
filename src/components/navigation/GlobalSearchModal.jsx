@@ -1,18 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
-import { Search, Package, Users2, Truck, ShoppingCart, Receipt, ClipboardList, X } from 'lucide-react';
+import { formatCurrency } from '../../utils/formatters';
+import {
+  Search,
+  Package,
+  Users2,
+  Truck,
+  ShoppingCart,
+  Receipt,
+  ClipboardList,
+  FileSpreadsheet,
+  Layers,
+  MapPin,
+  Tag,
+  ArrowRight,
+  Sparkles,
+  GitFork,
+  X,
+  Boxes,
+} from 'lucide-react';
 
 export const GlobalSearchModal = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState('');
-  const { products, categories, suppliers, customers, purchases, sales, orders } = useAppData();
+  const {
+    products,
+    categories,
+    suppliers,
+    customers,
+    purchases,
+    lotPurchases,
+    sales,
+    quotations,
+    orders,
+    settings,
+  } = useAppData();
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        // Toggle or open
         if (isOpen) onClose();
       }
       if (e.key === 'Escape' && isOpen) {
@@ -27,33 +55,116 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
 
   const q = query.trim().toLowerCase();
 
-  // Search results
-  const matchedProducts = q
-    ? products.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)).slice(0, 4)
-    : [];
+  // Condition Badge helper
+  const renderConditionBadge = (condition) => {
+    switch (condition) {
+      case 'original_oem':
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300">Original OEM</span>;
+      case 'reconditioned':
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">Reconditioned</span>;
+      case 'std_overhaul':
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300">STD Overhaul</span>;
+      case 'used':
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">Used (ব্যবহারযোগ্য)</span>;
+      case 'new':
+      default:
+        return <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">New (নতুন)</span>;
+    }
+  };
+
+  // Google-Like Smart Fuzzy Search across all machinery attributes & alternatives
+  const matchedProducts = useMemo(() => {
+    if (!q) return [];
+    return products.filter((p) => {
+      const nameMatch = p.name?.toLowerCase().includes(q);
+      const skuMatch = p.sku?.toLowerCase().includes(q);
+      const barcodeMatch = p.barcode?.toLowerCase().includes(q);
+      const brandMatch = p.brand?.toLowerCase().includes(q);
+      const modelMatch = p.modelNumber?.toLowerCase().includes(q);
+      const oemMatch = p.oemPartNumber?.toLowerCase().includes(q);
+      const impaMatch = p.impaCode?.toLowerCase().includes(q);
+      const condMatch = p.condition?.toLowerCase().includes(q);
+      const lotMatch = p.lotNumber?.toLowerCase().includes(q);
+
+      // Warehouse rack / bin match
+      const locCodeMatch = p.warehouseLocation?.code?.toLowerCase().includes(q);
+      const locRackMatch = p.warehouseLocation?.rack?.toLowerCase().includes(q);
+      const locZoneMatch = p.warehouseLocation?.zone?.toLowerCase().includes(q);
+
+      // Compatible engine / compressor models match
+      const compatMatch = Array.isArray(p.compatibleModels)
+        ? p.compatibleModels.some((m) => m.toLowerCase().includes(q))
+        : false;
+
+      // Variants match (e.g. searching "+0.25", "STD", "oversize")
+      const variantMatch = Array.isArray(p.variants)
+        ? p.variants.some((v) => v.name?.toLowerCase().includes(q) || v.sku?.toLowerCase().includes(q))
+        : false;
+
+      // Alternative parts cross-reference match
+      const altMatch = Array.isArray(p.alternatives)
+        ? p.alternatives.some((a) => a.toLowerCase().includes(q))
+        : false;
+
+      return (
+        nameMatch ||
+        skuMatch ||
+        barcodeMatch ||
+        brandMatch ||
+        modelMatch ||
+        oemMatch ||
+        impaMatch ||
+        condMatch ||
+        lotMatch ||
+        locCodeMatch ||
+        locRackMatch ||
+        locZoneMatch ||
+        compatMatch ||
+        variantMatch ||
+        altMatch
+      );
+    }).slice(0, 6);
+  }, [products, q]);
+
+  // Quotations search
+  const matchedQuotations = useMemo(() => {
+    if (!q) return [];
+    return (quotations || []).filter((quote) => {
+      const qNum = quote.quotationNumber?.toLowerCase().includes(q);
+      const cName = quote.customerName?.toLowerCase().includes(q);
+      const cComp = quote.customerCompany?.toLowerCase().includes(q);
+      const reqRef = quote.requisitionRef?.toLowerCase().includes(q);
+      const itemMatch = (quote.items || []).some((it) => it.name?.toLowerCase().includes(q));
+      return qNum || cName || cComp || reqRef || itemMatch;
+    }).slice(0, 3);
+  }, [quotations, q]);
+
+  // Lots & Scrap Purchases search
+  const matchedLots = useMemo(() => {
+    if (!q) return [];
+    return (lotPurchases || []).filter((lot) => {
+      const num = lot.lotNumber?.toLowerCase().includes(q);
+      const name = lot.lotName?.toLowerCase().includes(q);
+      const ship = lot.sourceShip?.toLowerCase().includes(q);
+      const notes = lot.notes?.toLowerCase().includes(q);
+      return num || name || ship || notes;
+    }).slice(0, 2);
+  }, [lotPurchases, q]);
+
   const matchedCustomers = q
-    ? customers.filter((c) => c.name.toLowerCase().includes(q) || c.phone.includes(q)).slice(0, 3)
+    ? customers.filter((c) => c.name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.companyName?.toLowerCase().includes(q)).slice(0, 3)
     : [];
-  const matchedSuppliers = q
-    ? suppliers.filter((s) => s.name.toLowerCase().includes(q) || s.companyName.toLowerCase().includes(q)).slice(0, 3)
-    : [];
-  const matchedPurchases = q
-    ? purchases.filter((p) => p.referenceNo.toLowerCase().includes(q)).slice(0, 3)
-    : [];
+
   const matchedSales = q
-    ? sales.filter((s) => s.invoiceNo.toLowerCase().includes(q) || (s.customerName && s.customerName.toLowerCase().includes(q))).slice(0, 3)
-    : [];
-  const matchedOrders = q
-    ? orders.filter((o) => o.orderNumber.toLowerCase().includes(q) || o.customerName.toLowerCase().includes(q)).slice(0, 3)
+    ? sales.filter((s) => s.invoiceNo?.toLowerCase().includes(q) || (s.customerName && s.customerName.toLowerCase().includes(q))).slice(0, 3)
     : [];
 
   const hasResults =
     matchedProducts.length > 0 ||
+    matchedQuotations.length > 0 ||
+    matchedLots.length > 0 ||
     matchedCustomers.length > 0 ||
-    matchedSuppliers.length > 0 ||
-    matchedPurchases.length > 0 ||
-    matchedSales.length > 0 ||
-    matchedOrders.length > 0;
+    matchedSales.length > 0;
 
   const handleSelect = (url) => {
     onClose();
@@ -62,20 +173,22 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-14 p-4 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
-        {/* Search Input Bar */}
-        <div className="flex items-center px-4 py-3 border-b border-slate-100 dark:border-slate-800 gap-3">
-          <Search className="h-5 w-5 text-slate-400 shrink-0" />
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+        {/* Search Header Bar */}
+        <div className="flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <Search className="h-4 w-4" />
+          </div>
           <input
             type="text"
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products, SKUs, customers, invoices, orders... (Ctrl + K)"
+            placeholder="Search part name, Bitzer/Carrier, model, IMPA code, OEM #, rack location, alternatives... (Ctrl+K)"
             className="flex-1 bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
           />
           {query && (
@@ -86,91 +199,291 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
               <X className="h-4 w-4" />
             </button>
           )}
-          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-mono">
+          <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-mono border border-slate-200 dark:border-slate-700">
             ESC
           </span>
         </div>
 
+        {/* Quick Suggestion Chips */}
+        {!q && (
+          <div className="px-4 py-2 bg-slate-100/60 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800/80 flex items-center gap-1.5 text-[11px] text-slate-500 overflow-x-auto">
+            <span className="font-bold shrink-0 text-slate-400">Quick Filters:</span>
+            <button onClick={() => setQuery('Bitzer')} className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-emerald-600">Bitzer</button>
+            <button onClick={() => setQuery('Connecting Rod')} className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-emerald-600">Connecting Rod</button>
+            <button onClick={() => setQuery('Zone-A')} className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-emerald-600">Zone-A Racks</button>
+            <button onClick={() => setQuery('Reconditioned')} className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-emerald-600">Reconditioned</button>
+            <button onClick={() => setQuery('Carrier')} className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:text-emerald-600">Carrier Alternatives</button>
+          </div>
+        )}
+
         {/* Results Body */}
-        <div className="max-h-96 overflow-y-auto p-2">
+        <div className="max-h-[32rem] overflow-y-auto p-3 space-y-3">
           {!q && (
-            <div className="py-8 text-center text-xs text-slate-400">
-              Type to quickly locate any product, invoice, customer, or transaction across StockLine.
+            <div className="py-12 text-center space-y-2">
+              <Sparkles className="h-8 w-8 mx-auto text-emerald-500 opacity-60" />
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Google-Style Machinery & Spare Parts Instant Search
+              </p>
+              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                Type any part name, brand, compressor model, OEM part number, IMPA code, or warehouse bin/rack location.
+              </p>
             </div>
           )}
 
           {q && !hasResults && (
-            <div className="py-8 text-center text-xs text-slate-400">
-              No matching records found for "{query}".
+            <div className="py-10 text-center space-y-1">
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                কোনো মালামাল বা রেকর্ড পাওয়া যায়নি ("{query}")
+              </p>
+              <p className="text-[11px] text-slate-400">
+                স্পেলিং চেক করুন অথবা জেনেরিক নাম দিয়ে সার্চ করুন (যেমন: "Piston", "Valve", "Bitzer")।
+              </p>
             </div>
           )}
 
+          {/* MACHINERY & PARTS MATCHES */}
           {matchedProducts.length > 0 && (
-            <div className="mb-3">
-              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Package className="h-3.5 w-3.5 text-emerald-500" />
-                Products ({matchedProducts.length})
+            <div>
+              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Package className="h-3.5 w-3.5" />
+                  <span>যন্ত্রাংশ ও মালামাল / Machinery Parts ({matchedProducts.length})</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-normal">লাইভ স্টক ও বিকল্প তালিকা</span>
               </div>
-              {matchedProducts.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleSelect(`/products/${p.id}`)}
-                  className="w-full text-left flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <img src={p.imageUrl} alt="" className="h-7 w-7 rounded object-cover" />
-                    <div>
-                      <div className="font-semibold text-slate-800 dark:text-slate-200">{p.name}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">SKU: {p.sku} · Qty: {p.quantity}</div>
+
+              <div className="space-y-2 mt-1">
+                {matchedProducts.map((p) => {
+                  const locCode = p.warehouseLocation?.code || (p.warehouseLocation?.rack ? `${p.warehouseLocation.zone || ''} ${p.warehouseLocation.rack}` : null);
+                  const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+                  const hasAlternatives = Array.isArray(p.alternatives) && p.alternatives.length > 0;
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 bg-slate-50/50 dark:bg-slate-850 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-xs"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          {/* Title + Brand + Condition */}
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            {p.brand && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-slate-800 text-white dark:bg-slate-700">
+                                {p.brand}
+                              </span>
+                            )}
+                            {renderConditionBadge(p.condition)}
+                            <h4
+                              onClick={() => handleSelect(`/products/${p.id}`)}
+                              className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 cursor-pointer truncate"
+                            >
+                              {p.name}
+                            </h4>
+                          </div>
+
+                          {/* Technical Codes & Location */}
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                            <span className="font-mono">SKU: {p.sku}</span>
+                            {p.oemPartNumber && (
+                              <span>• OEM #: <strong className="font-mono text-slate-700 dark:text-slate-300">{p.oemPartNumber}</strong></span>
+                            )}
+                            {p.impaCode && (
+                              <span>• IMPA: <strong className="font-mono text-slate-700 dark:text-slate-300">{p.impaCode}</strong></span>
+                            )}
+                            {locCode && (
+                              <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                                <MapPin className="h-3 w-3" />
+                                <span>{locCode}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Compatible Engine Models */}
+                          {p.compatibleModels && p.compatibleModels.length > 0 && (
+                            <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 flex items-center gap-1 flex-wrap">
+                              <span className="font-semibold text-slate-500">মডেল ম্যাচ:</span>
+                              {p.compatibleModels.slice(0, 3).map((m, idx) => (
+                                <span key={idx} className="bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.2 rounded text-[10px] font-mono">
+                                  {m}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Alternative Parts Suggestion (Google-Style) */}
+                          {hasAlternatives && (
+                            <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 text-[10.5px]">
+                              <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                                <GitFork className="h-3 w-3" />
+                                <span>বিকল্প পার্টস:</span>
+                              </span>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {p.alternatives.map((alt, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => setQuery(alt)}
+                                    className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 font-semibold hover:bg-amber-100 transition-colors"
+                                  >
+                                    {alt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Variants Info */}
+                          {hasVariants && (
+                            <div className="mt-1 text-[10.5px] text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
+                              <Boxes className="h-3 w-3" />
+                              <span>{p.variants.length} টি ভ্যারিয়েন্ট উপলব্ধ ({p.variants.map((v) => v.name).join(', ')})</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Price & Action */}
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(p.sellingPrice, settings.currency)}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-500 mt-0.5">
+                            Stock: <strong className={p.quantity <= 5 ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}>{p.quantity}</strong> pcs
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleSelect(`/products/${p.id}`)}
+                            className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-colors"
+                          >
+                            <span>ডিটেইলস</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">View</span>
-                </button>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
 
+          {/* QUOTATION MATCHES */}
+          {matchedQuotations.length > 0 && (
+            <div>
+              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 flex items-center gap-1.5">
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <span>দরপত্র ও কোটেশন / Quotations ({matchedQuotations.length})</span>
+              </div>
+              <div className="space-y-1.5 mt-1">
+                {matchedQuotations.map((qItem) => (
+                  <button
+                    key={qItem.id}
+                    onClick={() => handleSelect(`/quotations/${qItem.id}`)}
+                    className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <span className="font-mono text-purple-600 dark:text-purple-400">{qItem.quotationNumber}</span>
+                        <span>• {qItem.customerName}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {qItem.customerCompany || 'Direct Client'} · {qItem.items?.length || 0} items · Req: {qItem.requisitionRef || 'N/A'}
+                      </div>
+                    </div>
+                    <div className="text-right font-mono font-bold text-slate-800 dark:text-slate-200">
+                      {formatCurrency(qItem.totalAmount, settings.currency)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LOT SCRAP PURCHASES MATCHES */}
+          {matchedLots.length > 0 && (
+            <div>
+              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5" />
+                <span>জাহাজ নিলাম লট / Ship Lot Purchases ({matchedLots.length})</span>
+              </div>
+              <div className="space-y-1.5 mt-1">
+                {matchedLots.map((lot) => (
+                  <button
+                    key={lot.id}
+                    onClick={() => handleSelect('/purchases')}
+                    className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <span className="font-mono text-amber-600 dark:text-amber-400">{lot.lotNumber}</span>
+                        <span>• {lot.lotName}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {lot.sourceShip || 'Ship Scrap Yard'} · Status: {lot.status}
+                      </div>
+                    </div>
+                    <div className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(lot.totalLotCost, settings.currency)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CUSTOMERS MATCHES */}
           {matchedCustomers.length > 0 && (
-            <div className="mb-3">
-              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Users2 className="h-3.5 w-3.5 text-blue-500" />
-                Customers
+            <div>
+              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                <Users2 className="h-3.5 w-3.5" />
+                <span>গ্রাহক / Customers ({matchedCustomers.length})</span>
               </div>
-              {matchedCustomers.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => handleSelect(`/customers/${c.id}`)}
-                  className="w-full text-left flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <div>
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">{c.name}</div>
-                    <div className="text-[11px] text-slate-400">{c.email || c.phone}</div>
-                  </div>
-                  <span className="text-blue-500 font-semibold">Profile</span>
-                </button>
-              ))}
+              <div className="space-y-1.5 mt-1">
+                {matchedCustomers.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => handleSelect(`/customers/${c.id}`)}
+                    className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100">{c.name}</div>
+                      <div className="text-[11px] text-slate-400">{c.companyName || c.phone}</div>
+                    </div>
+                    <span className="text-blue-600 dark:text-blue-400 font-semibold text-[11px]">লেজার দেখুন</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {matchedOrders.length > 0 && (
-            <div className="mb-3">
-              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <ClipboardList className="h-3.5 w-3.5 text-purple-500" />
-                Orders
+          {/* SALES MATCHES */}
+          {matchedSales.length > 0 && (
+            <div>
+              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <Receipt className="h-3.5 w-3.5" />
+                <span>বিক্রয় চালান / Invoices ({matchedSales.length})</span>
               </div>
-              {matchedOrders.map((o) => (
-                <button
-                  key={o.id}
-                  onClick={() => handleSelect(`/orders/${o.id}`)}
-                  className="w-full text-left flex items-center justify-between px-3 py-2 rounded-xl text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <div>
-                    <div className="font-semibold text-slate-800 dark:text-slate-200">{o.orderNumber}</div>
-                    <div className="text-[11px] text-slate-400">{o.customerName} · {o.status.toUpperCase()}</div>
-                  </div>
-                  <span className="text-purple-500 font-semibold">Details</span>
-                </button>
-              ))}
+              <div className="space-y-1.5 mt-1">
+                {matchedSales.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelect(`/sales/${s.id}`)}
+                    className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400">{s.invoiceNo}</span>
+                        <span>• {s.customerName || 'Walk-in'}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {s.items?.length || 0} items · {s.paymentStatus?.toUpperCase()}
+                      </div>
+                    </div>
+                    <div className="text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                      {formatCurrency(s.total || s.totalAmount, settings.currency)}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

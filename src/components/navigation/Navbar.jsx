@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Logo } from '../common/Logo';
+import { LanguageSwitcher } from '../common/LanguageSwitcher';
 import { Button } from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useAppData } from '../../context/AppDataContext';
@@ -24,6 +25,12 @@ export const Navbar = () => {
 
   const isActive = (path) => location.pathname === path;
 
+  const handleNavClick = (href) => {
+    if (href === '/' && location.pathname === '/') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -36,6 +43,7 @@ export const Navbar = () => {
             <Link
               key={link.label}
               to={link.href}
+              onClick={() => handleNavClick(link.href)}
               className={`text-sm font-medium transition-colors hover:text-emerald-600 dark:hover:text-emerald-400 ${
                 isActive(link.href)
                   ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
@@ -49,6 +57,9 @@ export const Navbar = () => {
 
         {/* Desktop Action Buttons */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Language Switcher */}
+          <LanguageSwitcher />
+
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}

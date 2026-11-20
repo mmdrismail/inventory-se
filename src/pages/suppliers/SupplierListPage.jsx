@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input, Textarea, Select } from '../../components/forms/FormControls';
@@ -12,6 +13,7 @@ import { Plus, Search, Edit2, Trash2, Truck, Eye, Mail, Phone, MapPin, ShoppingC
 
 export const SupplierListPage = () => {
   const { suppliers, purchases, addSupplier, updateSupplier, deleteSupplier, confirmAction, settings } = useAppData();
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -134,15 +136,15 @@ export const SupplierListPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Suppliers & Vendors
+            {t('suppliers_title', 'Suppliers & Vendors')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Maintain authorized supplier contacts, company details, and procurement histories.
+            {t('suppliers_subtitle', 'Maintain authorized supplier contacts, company details, and procurement histories.')}
           </p>
         </div>
 
         <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenAdd}>
-          Add Supplier
+          {t('btn_add_supplier', 'Add Supplier')}
         </Button>
       </div>
 

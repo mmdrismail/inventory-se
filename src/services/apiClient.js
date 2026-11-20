@@ -42,24 +42,19 @@ class ApiClient {
       ...(options.headers || {}),
     };
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
 
-      const data = await response.json().catch(() => null);
+    const data = await response.json().catch(() => null);
 
-      if (!response.ok) {
-        const errorMessage = data?.message || `Request failed with status ${response.status}`;
-        throw new Error(errorMessage);
-      }
-
-      return data;
-    } catch (err) {
-      // Re-throw so callers can handle or fallback gracefully
-      throw err;
+    if (!response.ok) {
+      const errorMessage = data?.message || `Request failed with status ${response.status}`;
+      throw new Error(errorMessage);
     }
+
+    return data;
   }
 
   /**

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { reportService } from '../../services/reportService';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -35,6 +36,7 @@ export const ReportsPage = () => {
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory', 'sales', 'purchases', 'low_stock'
   const [dateRange, setDateRange] = useState('all'); // '7d', '30d', 'all'
   const { products, categories, suppliers, sales, purchases, settings } = useAppData();
+  const { t } = useLanguage();
 
   // Compute date filter boundary
   const dateFilter = useMemo(() => {
@@ -109,10 +111,10 @@ export const ReportsPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Business Reports & Analytics
+            {t('reports_title', 'Business Reports & Analytics')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Data visualizations and exports for stock valuation, sales margins, and supplier expenditures.
+            {t('reports_subtitle', 'Data visualizations and exports for stock valuation, sales margins, and supplier expenditures.')}
           </p>
         </div>
 
@@ -131,7 +133,7 @@ export const ReportsPage = () => {
           )}
 
           <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>
-            Export Active Report CSV
+            {t('btn_export_csv', 'Export CSV')}
           </Button>
         </div>
       </div>
@@ -139,10 +141,10 @@ export const ReportsPage = () => {
       {/* Report Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 overflow-x-auto whitespace-nowrap">
         {[
-          { key: 'inventory', label: 'Inventory Valuation Report', icon: Package },
-          { key: 'sales', label: 'Sales & Revenue Report', icon: Receipt },
-          { key: 'purchases', label: 'Procurement & Purchase Report', icon: ShoppingCart },
-          { key: 'low_stock', label: 'Low Stock Replenishment Report', icon: AlertTriangle },
+          { key: 'inventory', label: t('tab_rep_inventory', 'Inventory Valuation Report'), icon: Package },
+          { key: 'sales', label: t('tab_rep_sales', 'Sales & Revenue Report'), icon: Receipt },
+          { key: 'purchases', label: t('tab_rep_purchases', 'Procurement & Purchase Report'), icon: ShoppingCart },
+          { key: 'low_stock', label: t('tab_rep_low_stock', 'Low Stock Replenishment Report'), icon: AlertTriangle },
         ].map((tab) => {
           const Icon = tab.icon;
           return (

@@ -60,22 +60,25 @@ exports.getDashboardMetrics = async (req, res, next) => {
 
     const categoryDistribution = Object.values(categoryMap).filter((c) => c.count > 0);
 
+    const kpiMetrics = {
+      totalRevenue,
+      totalInventoryCost,
+      totalRetailValue,
+      potentialProfit,
+      totalProducts: products.length,
+      totalUnits,
+      lowStockCount,
+      outOfStockCount,
+      totalCustomers: customers.length,
+      totalPurchasesCost,
+      pendingOrdersCount,
+    };
+
     res.json({
       success: true,
       data: {
-        kpi: {
-          totalRevenue,
-          totalInventoryCost,
-          totalRetailValue,
-          potentialProfit,
-          totalProducts: products.length,
-          totalUnits,
-          lowStockCount,
-          outOfStockCount,
-          totalCustomers: customers.length,
-          totalPurchasesCost,
-          pendingOrdersCount,
-        },
+        kpi: kpiMetrics,
+        metrics: kpiMetrics,
         categoryDistribution,
       },
     });

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Logo } from '../common/Logo';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   LayoutDashboard,
   Package,
@@ -19,27 +20,30 @@ import {
   ChevronRight,
   LogOut,
   ShoppingBag,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { currentUser, role, logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // Navigation Items with permitted roles
   const navigationItems = [
-    { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'staff'] },
-    { label: 'Products', to: '/products', icon: Package, roles: ['admin', 'manager', 'staff'] },
-    { label: 'Categories', to: '/categories', icon: FolderTree, roles: ['admin', 'manager'] },
-    { label: 'Suppliers', to: '/suppliers', icon: Truck, roles: ['admin', 'manager'] },
-    { label: 'Customers', to: '/customers', icon: Users2, roles: ['admin', 'manager', 'staff'] },
-    { label: 'Purchases', to: '/purchases', icon: ShoppingCart, roles: ['admin', 'manager'] },
-    { label: 'Sales & POS', to: '/sales', icon: Receipt, roles: ['admin', 'manager', 'staff'] },
-    { label: 'Inventory', to: '/inventory', icon: Boxes, roles: ['admin', 'manager', 'staff'] },
-    { label: 'Customer Orders', to: '/orders', icon: ClipboardList, roles: ['admin', 'manager', 'staff'] },
-    { label: 'Reports & Analytics', to: '/reports', icon: BarChart3, roles: ['admin', 'manager'] },
-    { label: 'User Management', to: '/users', icon: UserCog, roles: ['admin'] },
-    { label: 'Settings', to: '/settings', icon: Settings, roles: ['admin'] },
+    { label: t('nav_overview', 'Overview'), to: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_products', 'Products'), to: '/products', icon: Package, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_categories', 'Categories'), to: '/categories', icon: FolderTree, roles: ['admin', 'manager'] },
+    { label: t('nav_suppliers', 'Suppliers'), to: '/suppliers', icon: Truck, roles: ['admin', 'manager'] },
+    { label: t('nav_customers', 'Customers'), to: '/customers', icon: Users2, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_purchases', 'Purchases'), to: '/purchases', icon: ShoppingCart, roles: ['admin', 'manager'] },
+    { label: t('nav_sales', 'Sales & POS'), to: '/sales', icon: Receipt, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_quotations', 'Quotations / দরপত্র'), to: '/quotations', icon: FileSpreadsheet, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_inventory', 'Inventory'), to: '/inventory', icon: Boxes, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_orders', 'Customer Orders'), to: '/orders', icon: ClipboardList, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_reports', 'Reports & Analytics'), to: '/reports', icon: BarChart3, roles: ['admin', 'manager'] },
+    { label: t('nav_users', 'User Management'), to: '/users', icon: UserCog, roles: ['admin'] },
+    { label: t('nav_settings', 'Settings'), to: '/settings', icon: Settings, roles: ['admin'] },
   ];
 
   // Filter based on user's active demo role
@@ -73,7 +77,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       {/* Nav Menu Items */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          {!isCollapsed ? 'Operations' : '•••'}
+          {!isCollapsed ? t('nav_section_operations', 'Operations') : '•••'}
         </div>
         {visibleItems.map((item) => {
           const Icon = item.icon;
@@ -99,7 +103,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
 
         {/* Public Storefront Link for easy testing */}
         <div className="pt-4 px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          {!isCollapsed ? 'Storefront' : '•••'}
+          {!isCollapsed ? t('nav_section_storefront', 'Storefront') : '•••'}
         </div>
         <NavLink
           to="/shop"
@@ -110,10 +114,10 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
             } ${isCollapsed ? 'justify-center px-2' : ''}`
           }
-          title={isCollapsed ? 'Customer Storefront' : undefined}
+          title={isCollapsed ? t('nav_customer_shop', 'Customer Shop') : undefined}
         >
           <ShoppingBag className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span>Customer Shop</span>}
+          {!isCollapsed && <span>{t('nav_customer_shop', 'Customer Shop')}</span>}
         </NavLink>
       </div>
 

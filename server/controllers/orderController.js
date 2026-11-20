@@ -74,8 +74,21 @@ exports.createOrder = async (req, res, next) => {
       });
     }
 
+    const normalizedItems = items.map((it) => {
+      const quantity = Number(it.quantity) || 1;
+      const unitPrice = Number(it.unitPrice !== undefined ? it.unitPrice : (it.price !== undefined ? it.price : it.sellingPrice)) || 0;
+      const lineTotal = Number(it.lineTotal !== undefined ? it.lineTotal : (it.total !== undefined ? it.total : quantity * unitPrice)) || 0;
+      return {
+        productId: it.productId || it.id,
+        productName: it.productName || it.name || '',
+        quantity,
+        unitPrice,
+        lineTotal,
+      };
+    });
+
     const count = await Order.countDocuments();
-    const orderNumber = `ORD-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    const orderNumber = req.body.orderNumber || `ORD-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
 
     const order = await Order.create({
       orderNumber,
@@ -84,9 +97,9 @@ exports.createOrder = async (req, res, next) => {
       customerPhone,
       shippingAddress,
       city: city || 'Dhaka',
-      items,
+      items: normalizedItems,
       subtotal: Number(subtotal) || 0,
-      deliveryFee: Number(deliveryFee) || 60,
+      deliveryFee: Number(deliveryFee !== undefined ? deliveryFee : req.body.shippingFee) || 60,
       totalAmount: Number(totalAmount) || 0,
       paymentMethod: paymentMethod || 'cod',
       status: 'pending',

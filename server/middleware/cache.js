@@ -110,6 +110,19 @@ const cacheInvalidator = (entityPrefixes = []) => {
 
           // Always invalidate reports and summary when mutations occur
           memoryCache.clearByPattern('/api/reports');
+
+          // If inventory, sales, purchases, or orders mutate, invalidate products and inventory caches
+          const pathStr = String(pathSegments);
+          if (
+            pathStr.includes('/purchases') ||
+            pathStr.includes('/sales') ||
+            pathStr.includes('/orders') ||
+            pathStr.includes('/inventory') ||
+            pathStr.includes('/products')
+          ) {
+            memoryCache.clearByPattern('/api/products');
+            memoryCache.clearByPattern('/api/inventory');
+          }
         }
         return originalJson(body);
       };

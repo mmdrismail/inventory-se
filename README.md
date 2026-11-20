@@ -1,435 +1,313 @@
-# StockLine — Complete MERN Inventory Management System (Frontend)
+# StockLine Enterprise — Modern MERN Warehouse & Inventory Management System
 
-> **University Software Engineering Lab Project**  
-> Modern, interactive, multi-role Inventory Management System (IMS) and Storefront frontend built with **React.js, Vite, Tailwind CSS, Lucide Icons, and Recharts**.
+> **Enterprise-Grade WMS & POS Solution for Industrial Equipment, Machinery & Refrigeration Parts**  
+> Developed & Maintained by **[Mohammad Ismail](https://github.com/mmdrismail)** (`mmdrismail`)
 
-[![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![LocalStorage](https://img.shields.io/badge/Storage-Browser_LocalStorage_v1-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
-[![License](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
-
----
-
-## Table of Contents
-1. [Project Overview](#project-overview)
-2. [Key Highlights & Architectural Decisions](#key-highlights--architectural-decisions)
-3. [Technology Stack](#technology-stack)
-4. [Demo Accounts & Role Permissions Matrix](#demo-accounts--role-permissions-matrix)
-5. [Getting Started & Installation](#getting-started--installation)
-6. [Folder Structure](#folder-structure)
-7. [System Modules & Feature Catalog](#system-modules--feature-catalog)
-8. [Data Layer & LocalStorage State Persistence](#data-layer--localstorage-state-persistence)
-9. [MERN Backend Integration Roadmap (Express + MongoDB)](#mern-backend-integration-roadmap-express--mongodb)
-10. [Authors & Academic Disclaimer](#authors--academic-disclaimer)
+[![MERN Stack](https://img.shields.io/badge/Stack-MongoDB%20%7C%20Express%20%7C%20React%20%7C%20Node-47A248?style=flat&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![React 18](https://img.shields.io/badge/Frontend-React%2018%20%2B%20Vite%208-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev/)
+[![Tailwind CSS 3](https://img.shields.io/badge/Styling-Tailwind%20CSS%203.4-38B2AC?style=flat&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![MongoDB Atlas](https://img.shields.io/badge/Database-MongoDB%20Atlas%20Cloud-13AA52?style=flat&logo=mongodb&logoColor=white)](https://cloud.mongodb.com/)
+[![Node.js](https://img.shields.io/badge/Backend-Node.js%20Express%20REST%20API-339933?style=flat&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Automated Tests](https://img.shields.io/badge/Tests-40%2F40%20Passing-brightgreen?style=flat&logo=jest&logoColor=white)](server/test_suite.js)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
-## 1. Project Overview
-
-**StockLine** is an end-to-end Inventory Management & Customer Storefront System developed as a Software Engineering Lab capstone. It simulates a complete business operations suite:
-
-- **Back-Office Management:** Product cataloging, category taxonomy, supplier directory, purchase order procurement, point-of-sale invoicing, manual stock ledger adjustments, customer relationship management, and financial reporting.
-- **Customer Storefront:** Public e-commerce catalog, real-time stock availability, cart management, checkout with confetti feedback, and order tracking.
-- **Full Interactivity:** Zero dead links, zero empty button handlers. Every modal, search filter, column sort, pagination, CSV export, CSV import, dark mode switch, and transaction workflow is fully operational.
-
-> **Note on Backend Status:**  
-> This phase represents the complete, fully functioning frontend application. All backend database operations are simulated client-side via a structured **Services Layer** storing state in browser `LocalStorage`. The architecture enables a seamless, drop-in replacement with Express.js REST API endpoints without rewriting UI components.
-
----
-
-## 2. Key Highlights & Architectural Decisions
-
-* **Atomic Stock Ledger & Double-Entry Tracking:**  
-  Stock is never modified arbitrarily. Every increase or decrease generates an immutable movement log (`purchase_in`, `sale_out`, `adjustment`, `order_hold`, `reversal`) with timestamps, quantities, and remaining balance.
-* **Single Stock Deduction Policy for Online Orders:**  
-  Storefront customer orders deduct stock **once upon admin confirmation** (`pending` -> `confirmed`) and restore stock **once upon cancellation**. The `stockDeducted` boolean flag prevents duplicate deductions.
-* **Referential Integrity Guards:**  
-  Products bound to completed sales, received purchases, or open customer orders cannot be deleted; users receive contextual warnings explaining active dependencies.
-* **Self-Lockout Protection:**  
-  Administrators cannot demote their own active role or deactivate their own session user account.
-* **Modular Service Layer:**  
-  UI components do not call `localStorage` directly. All operations pass through pure JavaScript service modules (`productService`, `salesService`, etc.) returning Promises, mirroring asynchronous REST API calls.
+## 📌 Table of Contents
+1. [Executive Overview](#-executive-overview)
+2. [Architectural Highlights](#-architectural-highlights)
+3. [Specialized Engineering & Trade Capabilities](#-specialized-engineering--trade-capabilities)
+4. [Technology Stack](#-technology-stack)
+5. [Role-Based Access Control (RBAC)](#-role-based-access-control-rbac)
+6. [System Modules & UI Walkthrough](#-system-modules--ui-walkthrough)
+7. [Barcode, Sticker & Print Template Specifications](#-barcode-sticker--print-template-specifications)
+8. [Automated Test Suite & Quality Verification](#-automated-test-suite--quality-verification)
+9. [Installation & Local Deployment Guide](#-installation--local-deployment-guide)
+10. [Environment Configurations](#-environment-configurations)
+11. [Project Roadmap & Future Enhancements](#-project-roadmap--future-enhancements)
+12. [Author & Ownership Information](#-author--ownership-information)
 
 ---
 
-## 3. Technology Stack
+## 🚀 Executive Overview
 
-| Layer | Technology | Purpose |
+**StockLine Enterprise** is a high-performance Warehouse Management System (WMS), Point of Sale (POS), and Procurement platform designed specifically for heavy equipment trading, ship breaking/scrap auction intakes, and cold storage engineering spare parts (e.g., ammonia/freon compressors, cylinder liners, valves, and gaskets).
+
+Unlike standard generic e-commerce templates, StockLine solves real-world logistics challenges:
+- **Bulk Scrap Lot Dismantling:** Ingest multi-ton ship scrap or auction lots, record bulk intake expenses (transport, cutting labor), and apportion landed costs across extracted components.
+- **Trade-Secret Cost Ciphering:** Conceal actual wholesale buying prices from counter sales clerks and visiting buyers using role-based algorithmic substitution ciphers (`B-CODE`, `S-CODE`, `M-CODE`).
+- **5-Tier Physical Location Coordinates:** Track every component using the standardized `Z-A-R-S-B` (Zone, Aisle, Rack, Shelf, Bin) format for instantaneous retrieval.
+- **Multi-Document Voucher Printing:** Generate official Cash Memos, Delivery Challans (চলান), Office Letterhead vouchers, Commercial Quotations, and 80mm POS Thermal receipts in a single click.
+- **Trilingual Operating Experience:** Seamless switching between authentic Bengali (বাংলা), International English, and Banglish (Avro) across all pages, charts, tables, and modals.
+
+---
+
+## 🏗️ Architectural Highlights
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                    Vite + React 18 Frontend                   │
+│   (Context API, Web Audio API, Lucide Icons, Recharts, POS)    │
+└──────────────┬────────────────────────────────┬───────────────┘
+               │                                │
+      [Offline / Fallback]             [HTTP / REST API]
+               │                                │
+               ▼                                ▼
+┌─────────────────────────────┐   ┌─────────────────────────────┐
+│  Browser LocalStorage Engine│   │  Express.js API Backend     │
+│  (Indexed Services Layer)   │   │  (JWT Auth, Gzip, Cache)    │
+└─────────────────────────────┘   └──────────────┬──────────────┘
+                                                 │
+                                                 ▼
+                                  ┌─────────────────────────────┐
+                                  │    MongoDB Atlas Cloud      │
+                                  │  (12 Collections, Mongoose) │
+                                  └─────────────────────────────┘
+```
+
+1. **Dual-Layer Persistence & Instant Fallback:**
+   The frontend communicates seamlessly with the MongoDB Atlas cloud backend via a structured `apiClient`. If network connectivity is lost, the system gracefully continues running using local state services and synchronizes changes upon reconnection.
+2. **Immutable Double-Entry Stock Movement Ledger:**
+   Inventory quantities are never adjusted arbitrarily. Every stock change generates an auditable, immutable ledger movement (`purchase_in`, `sale_out`, `adjustment`, `order_hold`, `reversal`) with before/after balances and timestamped references.
+3. **Single-Deduction Order Lifecycle:**
+   Online storefront orders deduct physical stock strictly upon staff approval (`pending` ➔ `confirmed`) and restore stock cleanly upon order rejection, preventing inventory discrepancies.
+4. **Sub-Millisecond Synthesized Audio Feedback:**
+   Integrated with the native browser `Web Audio API` to produce realistic dual-harmonic barcode scanner beeps (1850Hz / 70ms), POS checkout cash register chimes, and warning error buzzers without loading external audio assets.
+
+---
+
+## ⚙️ Specialized Engineering & Trade Capabilities
+
+### 1. Ship Scrap & Auction Lot Intake (জাহাজ অকশন ও বাল্ক লট ডিসম্যাণ্টল)
+- **Problem Solved:** When purchasing an entire ship section or industrial auction lot for a lump sum (e.g., ৳500,000), individual items do not come with individual purchase receipts.
+- **Workflow:**
+  1. Record auction lot code, vessel name (e.g., `MV Ocean Star - Bhatiari Yard`), primary vendor, base lot cost, transport, and dismantle labor expenses.
+  2. Enumerate extracted machines and parts (reconditioned Bitzer compressors, piston rod sets, suction valves).
+  3. Apportion landed costs and define target retail pricing per item.
+  4. Designate specific warehouse rack coordinates (`Zone-A / Aisle-02 / Rack-04 / Shelf-3 / Bin-B`).
+  5. Check a single box to automatically publish items to the catalog and generate adhesive barcode labels.
+
+### 2. Secret Cost-Code Cipher Engine (গোপন ক্রয়মূল্য সাইফার)
+- **Trade Reality:** Industrial parts retailers display inventory on open shelves. Staff and customers frequently inspect boxes, but actual profit margins and landed wholesale costs must remain confidential.
+- **Cipher Mechanics:**
+  - Standard 10-letter substitution key: `S H A N T A - R E P` (0 through 9).
+  - A landed cost of `৳ 4,500` is encoded as `T-A-S-S`.
+  - Floor stickers display four tiered price markers:
+    - `B-CODE`: Raw buying/landed cost (visible only to managers and owners).
+    - `S-CODE`: Minimum floor selling rate for counter staff.
+    - `M-CODE`: Manager's authorized negotiation threshold.
+    - `C-PRICE`: Standard customer sticker price in Bangladeshi Taka (৳).
+
+### 3. International 5-Tier Warehouse Coordinates (Z-A-R-S-B)
+- Formatted as `Zone-Aisle-Rack-Shelf-Bin` (e.g., `A-02-04-3-B`).
+- Allows warehouse runners and forklift operators to locate any spare part in under two minutes without requiring phone calls to storekeepers.
+
+---
+
+## 💻 Technology Stack
+
+| Layer | Technologies | Key Responsibilities |
 | :--- | :--- | :--- |
-| **Runtime & Bundler** | [Vite 6](https://vitejs.dev/) | Sub-second Hot Module Replacement (HMR) and optimized build bundling. |
-| **UI Framework** | [React 18+](https://react.dev/) (Plain JS) | Declarative component UI and Context API state synchronization. |
-| **Routing** | [React Router v6](https://reactrouter.com/) | Client-side routing, protected routes, and role-based access gates. |
-| **Styling** | [Tailwind CSS v3](https://tailwindcss.com/) | Bespoke emerald/slate palette, responsive layouts, and class-based dark mode. |
-| **Icons** | [Lucide React](https://lucide.dev/) | Clean, consistent vector iconography. |
-| **Data Visualizations** | [Recharts](https://recharts.org/) | Responsive SVG charts (Sales velocity, Category distribution, Stock levels). |
-| **Date Utilities** | [date-fns](https://date-fns.org/) | Timezone-aware date parsing and formatting. |
-| **Micro-Animations** | [canvas-confetti](https://www.npmjs.com/package/canvas-confetti) | Visual celebration on storefront order completion. |
-| **Print Styling** | Pure CSS (`@media print`) | Format-ready printable invoices and transaction receipts. |
+| **Frontend Framework** | React 18, Vite 8 | Fast SPA rendering, component modularity, instant HMR |
+| **UI & Styling** | Tailwind CSS 3.4, Lucide Icons | Responsive styling, dark mode, accessible components |
+| **State & Context** | Context API, Custom Hooks | Synchronized store for products, purchases, cart, auth |
+| **Data Visualization** | Recharts, SVG | Daily sales velocity, stock valuation, department share |
+| **Audio Synthesis** | Web Audio API | Zero-latency hardware-style barcode scanner beeps |
+| **Backend Runtime** | Node.js (v20+ / v24+), Express.js | High-performance RESTful API micro-services |
+| **Database** | MongoDB Atlas, Mongoose ODM | Cloud document storage, schemas, indexing, relations |
+| **Security & Auth** | JWT, bcryptjs, CORS | Bearer token authentication, role validation |
+| **Automated Testing** | Node.js Test Runner | 40-step comprehensive integration and regression suite |
 
 ---
 
-## 4. Demo Accounts & Role Permissions Matrix
+## 👥 Role-Based Access Control (RBAC)
 
-The login screen (`/login`) includes a **1-Click Demo Login Panel** to immediately authenticate as any role without manual typing:
+The system features a pre-configured 1-click role switcher for live demonstration:
 
-| Role | Email | Password | Scope & Privileges |
+| Role | Default Email | Password | Access Level |
 | :--- | :--- | :--- | :--- |
-| **Administrator** | `admin@stockline.io` | `admin123` | Full access across all modules, user administration, system settings, and data reset. |
-| **Warehouse Manager** | `manager@stockline.io` | `manager123` | Products, inventory ledger, purchases, suppliers, and operational reports. |
-| **Cashier / Sales Staff** | `staff@stockline.io` | `staff123` | Point-of-Sale (POS) invoicing, customer directory, sales receipts, and stock balance lookups. |
-| **Storefront Customer** | `customer@stockline.io` | `customer123` | Public shop catalog, shopping cart, checkout, and personal order tracking history (`/my-orders`). |
-
-### Role Permissions Matrix
-
-| Module / Feature | Route | Admin | Manager | Staff | Customer |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| Dashboard & KPIs | `/dashboard` | Full | Full | View Only | — |
-| Products (CRUD & CSV) | `/products` | Full | Full | View Only | — |
-| Category Taxonomy | `/categories` | Full | Full | View Only | — |
-| Inventory Ledger & Stock Adjust | `/inventory` | Full | Full | View Only | — |
-| Supplier Directory | `/suppliers` | Full | Full | — | — |
-| Purchase Orders (Procurement) | `/purchases` | Full | Full | — | — |
-| Sales & POS Invoicing | `/sales` | Full | View Only | Create & Print | — |
-| Customer Directory | `/customers` | Full | Full | Full | — |
-| Storefront Orders (Admin View) | `/orders` | Full | Full | View Only | — |
-| Reports & Analytics | `/reports` | Full | Full | — | — |
-| User Administration | `/users` | Full | — | — | — |
-| System Settings & Hard Reset | `/settings` | Full | — | — | — |
-| Storefront Catalog & Cart | `/shop`, `/cart` | Public | Public | Public | Public |
-| Order Checkout & History | `/checkout`, `/my-orders` | Yes | Yes | Yes | Yes |
+| **System Administrator** | `admin@stockline.io` | `admin123` | Complete system control, user management, database reset |
+| **Warehouse Manager** | `manager@stockline.io` | `manager123` | Inventory, lot intakes, stock adjustments, vendor orders |
+| **Sales Staff / Cashier** | `staff@stockline.io` | `staff123` | POS counter billing, receipt printing, customer directory |
+| **Client / Storefront** | `customer@stockline.io` | `customer123` | Public e-commerce shop, cart, checkout, personal orders |
 
 ---
 
-## 5. Getting Started & Installation
+## 📦 System Modules & UI Walkthrough
+
+### 1. Executive Dashboard (`/dashboard`)
+- Real-time KPIs: Total Products, Stock Valuation (Cost & Retail), Low Stock Items, Today's Sales Volume, and Customer count.
+- Dynamic Sales Velocity Area Charts & Procurement Expenditure Bar Charts filterable by 7, 14, or 30 days.
+- Low stock watchlist with real-time badges indicating critical replenishment levels.
+
+### 2. Product Catalog (`/products`)
+- Search by SKU, product title, IMPA code, brand, or OEM specification.
+- Rich product metadata: Warranty, unit specifications, cost price, selling price, and warehouse coordinates.
+- CSV bulk import and export capabilities.
+
+### 3. Ship Scrap & Lot Procurement (`/purchases`)
+- Dual-tab navigation: Standard Purchase Orders (PO) and Auction Scrap Lots.
+- Live USB Barcode Scanner intake bar with real-time audio confirmation.
+- One-click supplier quick-addition modal without losing form progress.
+
+### 4. Sales & POS Billing (`/sales`)
+- High-speed checkout counter with USB barcode scanner detection.
+- Multi-customer type classification: Corporate, Wholesale, and Retail.
+- Credit/Due balance tracking with automated ledger computation.
+
+### 5. Quotations & RFQs (`/quotations`)
+- Issue commercial estimates and quotations with formal validity windows.
+- One-click conversion from Quotation into an official Sales Invoice.
+
+### 6. Physical Inventory & Audit Ledger (`/inventory`)
+- Real-time stock availability table with safety reorder levels.
+- Click-to-copy badges for SKUs and warehouse rack locations.
+- Complete movement history ledger detailing every transaction origin.
+
+---
+
+## 🖨️ Barcode, Sticker & Print Template Specifications
+
+StockLine includes a dedicated print engine with zero external dependencies:
+
+```
+┌────────────────────────────────────────────────────────┐
+│  M/S. SHANTA REFRIGERATION                 BITZER OEM  │
+│  Bitzer 4EC Semi-Hermetic Compressor (কম্প্রেসার)      │
+│  [RECONDITIONED] • Mod: 4EC-4.2 • Lot #LOT-2026-55     │
+│                                                        │
+│         ||| | ||||| || |||| ||||| ||| ||||             │
+│                 * 202655001 *                          │
+│                                                        │
+│  [📍 LOC: A-02-01-1-A]                 ৳ 110,000.00    │
+│  CIPHER: [B: T-A-S-S | S: 95K | M: 100K]               │
+└────────────────────────────────────────────────────────┘
+```
+
+Supported Output Formats:
+1. **60 x 40 mm & 50 x 30 mm Thermal Barcode Labels:** Formatted for standard desktop thermal label printers (Xprinter, Zebra, TSC).
+2. **A4 Sheet (24-Up Sticker Grid):** Compatible with standard A4 adhesive label sheets.
+3. **80mm Roll Thermal POS Receipt:** Compact format for counter receipt printers.
+4. **Three-Part Commercial Invoicing (৩-কপি মেমো ও চালান):**
+   - **১ম কপি (গোলাপী/সাদা):** গ্রাহক ক্যাশ মেমো (Original Customer Cash Memo).
+   - **২য় কপি (হলুদ):** ডেলিভারী গেট পাস ও পরিবহন চালান (Delivery Gate Pass & Challan).
+   - **৩য় কপি (নীল):** হিসাব বিভাগ ও অফিস ফাইল কপি (Accounts & Audit Copy).
+
+---
+
+## 🧪 Automated Test Suite & Quality Verification
+
+The repository includes an automated integration test suite (`server/test_suite.js`) executing 40 continuous tests against the live API:
+
+```bash
+node server/test_suite.js
+```
+
+### Verification Matrix:
+- ✔ **Core Health:** Root endpoint (200 OK) and health check.
+- ✔ **Authentication:** JWT issuance, credential validation, demo access, role authorization.
+- ✔ **Taxonomy & Partners:** Categories, Suppliers, and Customers CRUD operations.
+- ✔ **Catalog Management:** Product creation, updates, and SKU lookups.
+- ✔ **Procurement Flow:** Purchase order creation, inventory stock-in, and balance verification.
+- ✔ **Point of Sale:** Sales invoice generation, automatic stock deduction, and due balance calculation.
+- ✔ **Quotations & RFQs:** Estimation creation and conversion to active sales orders.
+- ✔ **Storefront Orders:** Customer checkout and fulfillment status updates.
+- ✔ **Inventory Adjustments:** Manual stock counts and movement ledger tracking.
+- ✔ **Analytics & Reporting:** Live dashboard metrics and low-stock queries.
+- ✔ **System Settings:** Currency formatting, company profile, and tax rules.
+- ✔ **Data Cleanup:** Tear-down procedures that remove temporary test artifacts automatically.
+
+---
+
+## 🛠️ Installation & Local Deployment Guide
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) version 18.0.0 or higher
-- `npm` (bundled with Node.js) or `pnpm`/`yarn`
+- [Node.js](https://nodejs.org/) (Version 18.x, 20.x, or 24.x LTS)
+- [Git](https://git-scm.com/)
+- [MongoDB Atlas](https://www.mongodb.com/atlas) account or local MongoDB instance
 
-### Installation Steps
+### 1. Clone the Repository
+```bash
+git clone https://github.com/mmdrismail/inventory-se.git
+cd inventory-se
+```
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd "inventory se"
-   ```
+### 2. Setup the Backend API Server
+```bash
+cd server
+npm install
+```
 
-2. **Install project dependencies:**
-   ```bash
-   npm install
-   ```
+Configure your environment variables in `server/.env`:
+```env
+PORT=5000
+NODE_ENV=development
+MONGO_URI=your_mongodb_atlas_connection_string
+JWT_SECRET=your_jwt_private_secret_key_2026
+JWT_EXPIRES_IN=7d
+CLIENT_URL=http://localhost:5173
+```
 
-3. **Start the Frontend development server:**
-   ```bash
-   npm run dev
-   ```
-   Open your browser and navigate to `http://localhost:5173`.
+Start the backend daemon:
+```bash
+node server.js
+```
 
-4. **Start the Express.js & MongoDB Backend server:**
-   ```bash
-   npm run server
-   ```
-   Backend REST API starts on port 5000 at `http://localhost:5000/`. (For live hot-reload, use `npm run server:dev`).
+### 3. Setup the Frontend Client
+In a new terminal window:
+```bash
+npm install
+npm run dev
+```
 
-5. **Seed the MongoDB database (Optional):**
-   ```bash
-   npm run server:seed
-   ```
-   Populates MongoDB with the complete realistic demo dataset (products, categories, users, purchases, sales).
+The application will be live at `http://localhost:5173/`.
 
-6. **Build for production:**
-   ```bash
-   npm run build
-   ```
-   Assets will be compiled into the `dist/` directory ready for deployment.
-
-7. **Preview production build locally:**
-   ```bash
-   npm run preview
-   ```
+### 4. Build for Production
+```bash
+npm run build
+```
+Creates an optimized production bundle in the `dist/` directory.
 
 ---
 
-## 6. Folder Structure
+## 🐳 Docker Deployment
 
-```
-inventory se/
-├── index.html                   # HTML entry point with Inter font & SVG favicon
-├── package.json                 # Project dependencies & root npm scripts
-├── postcss.config.js            # PostCSS configuration for Tailwind
-├── tailwind.config.js           # Tailwind configuration (dark mode, brand colors)
-├── vite.config.js               # Vite build configuration
-│
-├── server/                      # Complete Express.js & MongoDB REST API Backend
-│   ├── package.json             # Backend dependencies (express, mongoose, bcryptjs, jwt, cors)
-│   ├── server.js                # Express entry point & route registration (port 5000)
-│   ├── seeder.js                # Database seeder (CLI & programmatic reset)
-│   ├── .env                     # Server environment variables
-│   ├── config/                  # Database connection (MongoDB with graceful fallback)
-│   ├── middleware/              # JWT auth guard, role-based access & central error handler
-│   ├── models/                  # 10 Mongoose schemas (User, Product, Category, Sale, Purchase, etc.)
-│   ├── controllers/             # Business logic controllers
-│   └── routes/                  # REST API routes (/api/auth, /api/products, /api/sales, etc.)
-│
-├── src/
-│   ├── main.jsx                 # Application bootstrapping & router mounts
-│   ├── App.jsx                  # Route definitions & protected route guards
-│   ├── index.css                # Global styles, scrollbar styling & print rules
-│   │
-│   ├── context/                 # Reactive state contexts
-│   │   ├── AuthContext.jsx      # Active user session, role matrix, 1-click switch
-│   │   └── AppDataContext.jsx   # Synchronized reactive state, cart, toasts, confirm modal
-│   │
-│   ├── services/                # Asynchronous data services (API-ready abstraction)
-│   │   ├── storageService.js    # LocalStorage versioning, seeding, hard reset
-│   │   ├── authService.js       # Auth tokens, credentials validation, password simulation
-│   │   ├── productService.js    # Product CRUD, SKU uniqueness, CSV import
-│   │   ├── inventoryService.js  # Central stock balance & movement audit logging
-│   │   ├── salesService.js      # Sales creation, stock validation, reversal
-│   │   ├── purchaseService.js   # PO workflow, automated stock intake on receive
-│   │   ├── orderService.js      # Storefront orders & single stock deduction logic
-│   │   ├── categoryService.js   # Category CRUD with dependency checks
-│   │   ├── supplierService.js   # Supplier CRUD with linked purchase checks
-│   │   ├── customerService.js   # Customer directory with sales link checks
-│   │   ├── reportService.js     # Valuation, sales aggregate, low stock reports
-│   │   ├── userService.js       # User accounts & admin self-lockout prevention
-│   │   └── settingsService.js   # Business profile, currency, reorder threshold
-│   │
-│   ├── utils/                   # Reusable calculation & formatting utilities
-│   │   ├── formatters.js        # Currency (৳ BDT), dates, stock badges, SKU generator
-│   │   ├── calculations.js      # Totals, tax, margin, Recharts aggregations
-│   │   └── csv.js               # RFC-4180 compliant CSV export and import parser
-│   │
-│   ├── data/
-│   │   └── seedData.js          # Realistic starter dataset (14 products, 6 categories,
-│   │                            # 5 suppliers, 10 customers, purchases, sales, orders)
-│   │
-│   ├── layouts/                 # Page wrappers
-│   │   ├── PublicLayout.jsx     # Header navbar, breadcrumbs, public footer
-│   │   └── DashboardLayout.jsx  # Collapsible sidebar, topbar, mobile drawer
-│   │
-│   ├── routes/
-│   │   └── ProtectedRoute.jsx   # Authentication & role-based permission gatekeeper
-│   │
-│   ├── components/              # Modular UI components
-│   │   ├── common/              # Buttons, Badges, Cards, Inputs, Modals, Pagination
-│   │   ├── navigation/          # Navbar, Sidebar, TopNav, Breadcrumbs, GlobalSearch
-│   │   ├── dashboard/           # KPICards, QuickActions, Recharts charts
-│   │   └── sales/               # PrintableReceiptModal (@media print formatted)
-│   │
-│   └── pages/                   # Application view screens
-│       ├── public/              # LandingPage, Features, Privacy, Terms
-│       ├── auth/                # Login, Register, ForgotPassword, AccessDenied
-│       ├── shop/                # ShopPage, ProductDetail, Cart, Checkout, MyOrders
-│       ├── dashboard/           # DashboardOverviewPage (KPIs, Charts, Activity)
-│       ├── products/            # ProductListPage, ProductFormPage, ProductDetailPage
-│       ├── categories/          # CategoryListPage
-│       ├── suppliers/           # SupplierListPage, SupplierDetailPage
-│       ├── customers/           # CustomerListPage, CustomerDetailPage
-│       ├── purchases/           # PurchaseListPage, PurchaseFormPage, PurchaseDetailPage
-│       ├── sales/               # SalesListPage, SalesFormPage, SaleDetailPage
-│       ├── inventory/           # InventoryPage (Stock balance & movement ledger)
-│       ├── orders/              # OrderListPage (Admin view), AdminOrderDetailPage
-│       ├── reports/             # ReportsPage (Valuation, Sales, Low stock, CSV)
-│       ├── users/               # UserManagementPage
-│       └── settings/            # SettingsPage, ProfilePage
+The application is fully containerized. To build and start with Docker:
+
+```bash
+# Build the production image
+docker build -t stockline-wms:latest .
+
+# Run the container
+docker run -p 5000:5000 -p 5173:5173 stockline-wms:latest
 ```
 
 ---
 
-## 7. System Modules & Feature Catalog
+## 🗺️ Project Roadmap & Future Enhancements
 
-### 7.1 Public & Storefront Experience
-- **Landing Page (`/`):** Hero section with interactive CTA, live feature showcase, dynamic statistics preview, and customer testimonials.
-- **Storefront Catalog (`/shop`):** Category pills, real-time search, price range filter, in-stock/out-of-stock badges, quick "Add to Cart".
-- **Cart & Checkout (`/cart`, `/checkout`):** Item quantity increments, line total computation, delivery fee calculation, shipping details form, and celebratory confetti upon order placement.
-- **Order Tracking (`/my-orders`):** Customers view their personal order history and live fulfillment stages (`pending` -> `confirmed` -> `shipped` -> `delivered`).
-
-### 7.2 Core Inventory & Back-Office
-- **Real-Time Analytics Dashboard (`/dashboard`):**
-  - 6 Key Performance Indicator (KPI) cards: Total Revenue, Inventory Valuation, Products In Catalog, Low Stock Alerts, Total Customers, Pending Orders.
-  - Recharts visualizations: Revenue Velocity Line Chart, Inventory Value by Category Donut Chart, Stock Level Distribution Bar Chart.
-  - Quick action shortcuts and recent activity feed.
-- **Product Management (`/products`):**
-  - High-performance data table with search, category filtering, stock status filtering, and column sorting.
-  - Complete CRUD with automatic SKU generation, barcode entry, cost price, selling price, reorder alert threshold, and supplier link.
-  - Bulk CSV Export and CSV Import modal with file upload simulation.
-- **Procurement & Purchase Orders (`/purchases`):**
-  - Multi-item Purchase Order creation with supplier selection and cost calculation.
-  - Status lifecycle: `draft` -> `received` -> `cancelled`.
-  - Automatic inventory stock intake upon marking an order as `received`.
-- **Point of Sale (POS) & Sales Invoicing (`/sales`):**
-  - Quick sale billing interface with customer lookup, item search, quantity guards (cannot sell more than available on-hand stock), discount rates, and tax calculations.
-  - Instant generation of printable, professional tax receipts / invoices with browser print trigger (`@media print`).
-- **Stock Movements & Audit Ledger (`/inventory`):**
-  - Real-time stock status table (In Stock, Low Stock, Out of Stock).
-  - Manual Stock Adjustment modal (Add stock, Reduce stock, Set explicit balance) with mandatory audit reason logging.
-  - Complete chronological movement history (`purchase_in`, `sale_out`, `adjustment`).
-- **Reports & Business Intelligence (`/reports`):**
-  - Inventory Valuation Breakdown by Category.
-  - Sales Revenue & Profit Margin Summary.
-  - Procurement Expenditure Summary.
-  - Low Stock Reorder List with 1-click CSV download.
+- [x] Full MERN Stack integration with MongoDB Atlas cloud persistence.
+- [x] Ship scrap and bulk auction lot dismantling workflow.
+- [x] Multi-tier secret cost-cipher price masking (`B-CODE`, `S-CODE`, `M-CODE`).
+- [x] 5-Tier physical warehouse coordinate tracking (`Z-A-R-S-B`).
+- [x] Synthesized Web Audio API barcode scanner sound engine.
+- [x] Trilingual localization (বাংলা, English, Banglish/Avro).
+- [x] 40/40 Automated regression test suite.
+- [ ] Integration with hardware handheld Android barcode / RFID terminals.
+- [ ] Automated SMS notification gateway for delivery challans and due reminders.
+- [ ] Multi-branch warehouse inter-transfer ledger.
 
 ---
 
-## 8. Data Layer & LocalStorage State Persistence
+## 👨‍💻 Author & Ownership Information
 
-All demo data is stored under versioned LocalStorage keys prefixed with `stockline_demo_v1_`:
+This project is created, engineered, and maintained by:
 
-| LocalStorage Key | Description | Initial Count |
-| :--- | :--- | :---: |
-| `stockline_demo_v1_products` | Product catalog with prices, SKUs, and stock levels | 14 |
-| `stockline_demo_v1_categories` | Product category taxonomy | 6 |
-| `stockline_demo_v1_suppliers` | Vendor directory with contact records | 5 |
-| `stockline_demo_v1_customers` | Retail & wholesale customer database | 10 |
-| `stockline_demo_v1_purchases` | Purchase orders & receiving status | 3 |
-| `stockline_demo_v1_sales` | POS sales invoices & payment methods | 3 |
-| `stockline_demo_v1_movements` | Immutable stock movement ledger | 6 |
-| `stockline_demo_v1_orders` | Storefront customer online orders | 3 |
-| `stockline_demo_v1_users` | Demo accounts with hashed role credentials | 4 |
-| `stockline_demo_v1_settings` | Business profile, currency, and reorder levels | 1 |
+**Mohammad Ismail**  
+- **GitHub Profile:** [@mmdrismail](https://github.com/mmdrismail)  
+- **Repository:** [https://github.com/mmdrismail/inventory-se](https://github.com/mmdrismail/inventory-se)  
+- **Project Board:** [Trello Workspace](https://trello.com/b/B7EZLSFY/my-trello-board/power-ups/enabled)  
+- **Documentation & Blueprint:** [Google Drive Specifications](https://drive.google.com/drive/folders/1RSdDB6fA89jpvnct8NMtRMaNM40lvIwA)
 
-### Resetting Demo Data
-To reset all records back to their pristine factory state:
-1. Navigate to **Settings** (`/settings`) from the admin sidebar.
-2. Scroll to the **Danger Zone** at the bottom.
-3. Click **Reset All Demo Data** and confirm the prompt.
-4. *Alternative:* Open browser DevTools Console (`F12`) and run:
-   ```javascript
-   localStorage.clear();
-   location.reload();
-   ```
-
----
-
-## 9. MERN Backend Integration Roadmap (Express + MongoDB)
-
-StockLine was purposefully built with an asynchronous service layer to make migrating from `LocalStorage` to a real **Node.js + Express.js + MongoDB** backend as straightforward as swapping internal service implementations.
-
-### 9.1 Architecture Transition Diagram
-
-```
-CURRENT (Frontend-Only Prototype):
-[React UI Components]
-       │
-       ▼
-[React Context (AppDataContext / AuthContext)]
-       │
-       ▼
-[Service Layer (productService.js, salesService.js, etc.)]
-       │
-       ▼
-[storageService.js] ──► Browser LocalStorage (`stockline_demo_v1_*`)
-
-
-FUTURE (Full MERN Stack):
-[React UI Components]
-       │
-       ▼
-[React Context (AppDataContext / AuthContext)]
-       │
-       ▼
-[Service Layer (productService.js, salesService.js, etc.)]
-       │ (axios / fetch with JWT Bearer Token)
-       ▼
-[Express.js REST API Server] (`http://localhost:5000/api/...`)
-       │
-       ▼
-[Mongoose ODM Models]
-       │
-       ▼
-[MongoDB Database] (`mongodb://localhost:27017/stockline_db`)
-```
-
-### 9.2 Express.js REST API Endpoint Mapping
-
-| Frontend Service Method | HTTP Verb | Express Route | MongoDB / Mongoose Operation |
-| :--- | :---: | :--- | :--- |
-| `authService.login()` | `POST` | `/api/auth/login` | Compare bcrypt password hash; sign JWT token |
-| `productService.getProducts()` | `GET` | `/api/products` | `Product.find().populate('category supplier')` |
-| `productService.createProduct()` | `POST` | `/api/products` | `new Product(req.body).save()` |
-| `productService.updateProduct()` | `PUT` | `/api/products/:id` | `Product.findByIdAndUpdate(id, req.body)` |
-| `salesService.createSale()` | `POST` | `/api/sales` | MongoDB Transaction: create Sale + deduct Product stock + create Movement |
-| `purchaseService.receivePurchase()` | `PUT` | `/api/purchases/:id/receive`| MongoDB Transaction: update PO + increment stock + create Movement |
-| `orderService.updateOrderStatus()` | `PUT` | `/api/orders/:id/status` | Update status; handle conditional stock deduction if status becomes `confirmed` |
-| `reportService.getInventoryReport()` | `GET` | `/api/reports/inventory` | `Product.aggregate([...])` valuation pipeline |
-
-### 9.3 Recommended MongoDB Mongoose Schemas
-
-#### 1. Product Schema (`models/Product.js`)
-```javascript
-const mongoose = require('mongoose');
-
-const productSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true },
-  sku: { type: String, required: true, unique: true, uppercase: true },
-  barcode: { type: String, default: '' },
-  category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
-  supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
-  costPrice: { type: Number, required: true, min: 0 },
-  sellingPrice: { type: Number, required: true, min: 0 },
-  stock: { type: Number, required: true, default: 0, min: 0 },
-  minStockLevel: { type: Number, default: 5 },
-  unit: { type: String, default: 'pcs' },
-  status: { type: String, enum: ['active', 'inactive'], default: 'active' },
-  description: { type: String, default: '' },
-  image: { type: String, default: '' }
-}, { timestamps: true });
-
-module.exports = mongoose.model('Product', productSchema);
-```
-
-#### 2. Stock Movement Schema (`models/StockMovement.js`)
-```javascript
-const mongoose = require('mongoose');
-
-const movementSchema = new mongoose.Schema({
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  type: { 
-    type: String, 
-    enum: ['purchase_in', 'sale_out', 'adjustment', 'order_hold', 'reversal'], 
-    required: true 
-  },
-  quantity: { type: Number, required: true }, // Positive for additions, negative for deductions
-  balanceAfter: { type: Number, required: true },
-  reference: { type: String, required: true }, // e.g. "INV-2026-0001", "PO-2026-0002"
-  reason: { type: String, default: '' },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
-}, { timestamps: true });
-
-module.exports = mongoose.model('StockMovement', movementSchema);
-```
-
-### 9.4 How to Migrate Service Code
-To transition any service (e.g. `productService.js`), simply change the implementation to use `fetch` or `axios`:
-
-```javascript
-// BEFORE (LocalStorage):
-export const getProducts = async () => {
-  return storageService.get(STORAGE_KEYS.PRODUCTS) || [];
-};
-
-// AFTER (Express REST API):
-import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-export const getProducts = async () => {
-  const response = await axios.get(`${API_URL}/products`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-  });
-  return response.data;
-};
-```
-Because all frontend UI components already `await` service promises, **no page or component code needs to change** during backend migration!
-
----
-
-## 10. Authors & Academic Disclaimer
-
-- **Course:** Software Engineering Lab (CSE)
-- **Project Name:** StockLine Inventory Management System
-- **Year / Semester:** 2026
-
-*Academic Notice: This software is developed for educational purposes to demonstrate software engineering best practices including component modularity, state synchronization, role-based access control, responsive design, and robust data flow architecture.*
+### 📄 License
+This project is licensed under the **MIT License**. You are free to use, modify, and distribute this software with attribution.

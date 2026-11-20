@@ -23,11 +23,23 @@ exports.getProducts = async (req, res, next) => {
     const { search, category, status, stockStatus, isPublic } = req.query;
     const query = {};
 
-    if (search) {
+    if (search && String(search).trim()) {
+      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { sku: { $regex: search, $options: 'i' } },
-        { barcode: { $regex: search, $options: 'i' } },
+        { name: { $regex: safeSearch, $options: 'i' } },
+        { sku: { $regex: safeSearch, $options: 'i' } },
+        { barcode: { $regex: safeSearch, $options: 'i' } },
+        { brand: { $regex: safeSearch, $options: 'i' } },
+        { modelNumber: { $regex: safeSearch, $options: 'i' } },
+        { compatibleModels: { $regex: safeSearch, $options: 'i' } },
+        { impaCode: { $regex: safeSearch, $options: 'i' } },
+        { oemPartNumber: { $regex: safeSearch, $options: 'i' } },
+        { condition: { $regex: safeSearch, $options: 'i' } },
+        { 'warehouseLocation.code': { $regex: safeSearch, $options: 'i' } },
+        { 'warehouseLocation.rack': { $regex: safeSearch, $options: 'i' } },
+        { 'warehouseLocation.zone': { $regex: safeSearch, $options: 'i' } },
+        { 'variants.name': { $regex: safeSearch, $options: 'i' } },
+        { lotNumber: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -93,16 +105,17 @@ exports.createProduct = async (req, res, next) => {
       sku,
       barcode,
       description,
-      categoryId,
-      supplierId,
-      costPrice,
-      sellingPrice,
-      quantity,
-      reorderLevel,
       unit,
       imageUrl,
       isPublic,
     } = req.body;
+
+    const resolvedCost = Number(req.body.costPrice !== undefined ? req.body.costPrice : req.body.purchasePrice) || 0;
+    const resolvedPrice = Number(req.body.sellingPrice) || 0;
+    const resolvedQty = Number(req.body.quantity !== undefined ? req.body.quantity : (req.body.currentStock !== undefined ? req.body.currentStock : req.body.stock)) || 0;
+    const resolvedReorder = Number(req.body.reorderLevel !== undefined ? req.body.reorderLevel : req.body.minStockThreshold) || 10;
+    const resolvedCategory = req.body.categoryId || req.body.category || null;
+    const resolvedSupplier = req.body.supplierId || req.body.supplier || null;
 
     const formattedSku = (sku || `SKU-${Date.now().toString().slice(-6)}`).toUpperCase().trim();
 
@@ -115,16 +128,30 @@ exports.createProduct = async (req, res, next) => {
     }
 
     const product = await Product.create({
-      name: name.trim(),
+      name: (name || 'Unnamed Product').trim(),
       sku: formattedSku,
       barcode: barcode || '',
+      brand: req.body.brand || '',
+      modelNumber: req.body.modelNumber || '',
+      compatibleModels: Array.isArray(req.body.compatibleModels) ? req.body.compatibleModels : [],
+      condition: req.body.condition || 'new',
+      dimensions: req.body.dimensions || '',
+      impaCode: req.body.impaCode || '',
+      oemPartNumber: req.body.oemPartNumber || '',
+      warehouseLocation: req.body.warehouseLocation || {},
+      variants: Array.isArray(req.body.variants) ? req.body.variants : [],
+      alternatives: Array.isArray(req.body.alternatives) ? req.body.alternatives : [],
+      lotId: req.body.lotId || null,
+      lotNumber: req.body.lotNumber || '',
+      sourceShip: req.body.sourceShip || '',
+      sourceLotCost: Number(req.body.sourceLotCost) || 0,
       description: description || '',
-      categoryId: categoryId || null,
-      supplierId: supplierId || null,
-      costPrice: Number(costPrice) || 0,
-      sellingPrice: Number(sellingPrice) || 0,
-      quantity: Number(quantity) || 0,
-      reorderLevel: Number(reorderLevel) || 10,
+      categoryId: resolvedCategory,
+      supplierId: resolvedSupplier,
+      costPrice: resolvedCost,
+      sellingPrice: resolvedPrice,
+      quantity: resolvedQty,
+      reorderLevel: resolvedReorder,
       unit: unit || 'pcs',
       imageUrl: imageUrl || '',
       isPublic: isPublic !== undefined ? isPublic : true,
@@ -178,7 +205,24 @@ exports.updateProduct = async (req, res, next) => {
       req.body.sku = formattedSku;
     }
 
-    const updated = await Product.findByIdAndUpdate(product._id, req.body, {
+    const updateData = { ...req.body };
+    if (updateData.currentStock !== undefined && updateData.quantity === undefined) {
+      updateData.quantity = Number(updateData.currentStock);
+    }
+    if (updateData.purchasePrice !== undefined && updateData.costPrice === undefined) {
+      updateData.costPrice = Number(updateData.purchasePrice);
+    }
+    if (updateData.minStockThreshold !== undefined && updateData.reorderLevel === undefined) {
+      updateData.reorderLevel = Number(updateData.minStockThreshold);
+    }
+    if (updateData.category && !updateData.categoryId) {
+      updateData.categoryId = updateData.category;
+    }
+    if (updateData.supplier && !updateData.supplierId) {
+      updateData.supplierId = updateData.supplier;
+    }
+
+    const updated = await Product.findByIdAndUpdate(product._id, updateData, {
       new: true,
       runValidators: true,
     });

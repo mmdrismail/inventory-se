@@ -51,12 +51,26 @@ exports.createPurchase = async (req, res, next) => {
     }
 
     const count = await Purchase.countDocuments();
-    const purchaseNumber = `PO-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    const purchaseNumber = req.body.purchaseNumber || req.body.poNumber || req.body.referenceNo || `PO-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+
+    const normalizedItems = (items || []).map((it) => {
+      const quantity = Number(it.quantity) || 1;
+      const unitCost = Number(it.unitCost !== undefined ? it.unitCost : (it.unitPrice !== undefined ? it.unitPrice : it.costPrice)) || 0;
+      const lineTotal = Number(it.lineTotal !== undefined ? it.lineTotal : (it.total !== undefined ? it.total : quantity * unitCost)) || 0;
+      return {
+        productId: it.productId || it.id,
+        productName: it.productName || it.name || '',
+        sku: it.sku || '',
+        quantity,
+        unitCost,
+        lineTotal,
+      };
+    });
 
     const purchase = await Purchase.create({
       purchaseNumber,
       supplierId,
-      items,
+      items: normalizedItems,
       subtotal: Number(subtotal) || 0,
       tax: Number(tax) || 0,
       totalAmount: Number(totalAmount) || 0,
@@ -67,8 +81,8 @@ exports.createPurchase = async (req, res, next) => {
 
     // If marked received upon creation, immediately intake stock
     if (status === 'received') {
-      for (const item of items) {
-        const prod = await Product.findById(item.productId);
+      for (const item of normalizedItems) {
+        const prod = (await Product.findById(item.productId)) || (item.sku ? await Product.findOne({ sku: item.sku }) : null);
         if (prod) {
           const newQty = prod.quantity + Number(item.quantity);
           prod.quantity = newQty;
@@ -126,7 +140,7 @@ exports.receivePurchase = async (req, res, next) => {
 
     // Increment stock for each item and log movement
     for (const item of purchase.items) {
-      const prod = await Product.findById(item.productId);
+      const prod = (await Product.findById(item.productId)) || (item.sku ? await Product.findOne({ sku: item.sku }) : null);
       if (prod) {
         const newQty = prod.quantity + Number(item.quantity);
         prod.quantity = newQty;

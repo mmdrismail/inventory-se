@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { StockBadge } from '../../components/common/Badge';
@@ -21,16 +22,21 @@ import {
   Package,
   ArrowUpDown,
   FileSpreadsheet,
+  Barcode,
+  MapPin,
 } from 'lucide-react';
+import { BarcodeLabelModal } from '../../components/products/BarcodeLabelModal';
 
 export const ProductListPage = () => {
   const { products, categories, deleteProduct, importProductsCSV, reloadState, confirmAction, settings } = useAppData();
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [labelModalProduct, setLabelModalProduct] = useState(null);
   const pageSize = 8;
 
   // CSV Import Modal state
@@ -165,26 +171,26 @@ export const ProductListPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Products Catalog
+            {t('products_title', 'Products Catalog')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Manage your inventory items, pricing margins, SKUs, and reorder levels.
+            {t('products_subtitle', 'Manage your inventory items, pricing margins, SKUs, and reorder levels.')}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={reloadState}>
-            Refresh
+            {t('btn_refresh', 'Refresh')}
           </Button>
           <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>
-            Export CSV
+            {t('btn_export_csv', 'Export CSV')}
           </Button>
           <Button variant="outline" size="sm" icon={Upload} onClick={() => setIsImportModalOpen(true)}>
-            Import CSV
+            {t('btn_import_csv', 'Import CSV')}
           </Button>
           <Link to="/products/new">
             <Button variant="primary" size="sm" icon={Plus}>
-              Add Product
+              {t('btn_add_product', '+ Add Product')}
             </Button>
           </Link>
         </div>
@@ -198,7 +204,7 @@ export const ProductListPage = () => {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by product name or SKU..."
+              placeholder={t('search_products_placeholder', 'Search by product name, model, barcode or SKU...')}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -218,7 +224,7 @@ export const ProductListPage = () => {
               }}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">All Categories ({categories.length})</option>
+              <option value="">{t('all_categories', 'All Categories')} ({categories.length})</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -237,10 +243,10 @@ export const ProductListPage = () => {
               }}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">All Stock Statuses</option>
-              <option value="in_stock">In Stock (&gt; reorder point)</option>
-              <option value="low_stock">Low Stock (≤ reorder point)</option>
-              <option value="out_of_stock">Out of Stock (0 units)</option>
+              <option value="">{t('all_stock_statuses', 'All Stock Statuses')}</option>
+              <option value="in_stock">{t('filter_in_stock', 'In Stock (> reorder point)')}</option>
+              <option value="low_stock">{t('filter_low_stock', 'Low Stock (≤ reorder point)')}</option>
+              <option value="out_of_stock">{t('filter_out_of_stock', 'Out of Stock (0 units)')}</option>
             </select>
           </div>
 
@@ -258,7 +264,7 @@ export const ProductListPage = () => {
                 }}
                 className="text-xs"
               >
-                Reset Filters
+                {t('btn_reset_filters', 'Reset Filters')}
               </Button>
             )}
             <span className="text-xs text-slate-400 ml-auto font-medium">
@@ -272,9 +278,9 @@ export const ProductListPage = () => {
       <Card className="overflow-hidden">
         {filteredProducts.length === 0 ? (
           <EmptyState
-            title="No products found"
+            title={t('no_products_found', 'No products found')}
             description="No items match your search and filter criteria. You can create a new product or reset your search."
-            actionText="Add New Product"
+            actionText={t('btn_add_product', 'Add New Product')}
             onAction={() => navigate('/products/new')}
           />
         ) : (
@@ -282,38 +288,38 @@ export const ProductListPage = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase text-[10px] tracking-wider select-none">
                 <tr>
-                  <th className="py-3 px-4">Product Details</th>
+                  <th className="py-3 px-4">{t('col_product_details', 'Product Details')}</th>
                   <th
                     className="py-3 px-3 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200"
                     onClick={() => handleSort('sku')}
                   >
                     <div className="flex items-center gap-1">
-                      <span>SKU</span>
+                      <span>{t('col_sku', 'SKU')}</span>
                       <ArrowUpDown className="h-3 w-3" />
                     </div>
                   </th>
-                  <th className="py-3 px-3">Category</th>
+                  <th className="py-3 px-3">{t('col_category', 'Category')}</th>
                   <th
                     className="py-3 px-3 text-right cursor-pointer hover:text-slate-800 dark:hover:text-slate-200"
                     onClick={() => handleSort('sellingPrice')}
                   >
                     <div className="flex items-center justify-end gap-1">
-                      <span>Sell Price</span>
+                      <span>{t('col_selling_price', 'Sell Price')}</span>
                       <ArrowUpDown className="h-3 w-3" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 text-right">Cost Price</th>
+                  <th className="py-3 px-3 text-right">{t('col_cost_price', 'Cost Price')}</th>
                   <th
                     className="py-3 px-3 text-center cursor-pointer hover:text-slate-800 dark:hover:text-slate-200"
                     onClick={() => handleSort('quantity')}
                   >
                     <div className="flex items-center justify-center gap-1">
-                      <span>On Hand</span>
+                      <span>{t('col_on_hand', 'On Hand')}</span>
                       <ArrowUpDown className="h-3 w-3" />
                     </div>
                   </th>
-                  <th className="py-3 px-3 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-3 text-center">{t('col_status_label', 'Status')}</th>
+                  <th className="py-3 px-4 text-right">{t('col_actions_label', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -341,9 +347,17 @@ export const ProductListPage = () => {
                       </div>
                     </td>
 
-                    {/* SKU */}
-                    <td className="py-3 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {p.sku}
+                    {/* SKU & Rack Location */}
+                    <td className="py-3 px-3">
+                      <div className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {p.sku}
+                      </div>
+                      {p.warehouseLocation?.code && (
+                        <span className="inline-flex items-center gap-0.5 text-[9.5px] font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded mt-0.5">
+                          <MapPin className="h-2.5 w-2.5" />
+                          <span>{p.warehouseLocation.code}</span>
+                        </span>
+                      )}
                     </td>
 
                     {/* Category */}
@@ -374,6 +388,14 @@ export const ProductListPage = () => {
                     {/* Actions */}
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setLabelModalProduct(p)}
+                          title="বারকোড ও র‍্যাক লেবেল প্রিন্ট করুন"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                        >
+                          <Barcode className="h-4 w-4" />
+                        </button>
                         <Link to={`/products/${p.id}`} title="View Product Details">
                           <button className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                             <Eye className="h-4 w-4" />
@@ -477,6 +499,13 @@ export const ProductListPage = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Barcode Label Modal */}
+      <BarcodeLabelModal
+        isOpen={!!labelModalProduct}
+        onClose={() => setLabelModalProduct(null)}
+        product={labelModalProduct}
+      />
     </div>
   );
 };

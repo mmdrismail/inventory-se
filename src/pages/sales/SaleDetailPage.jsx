@@ -13,8 +13,21 @@ export const SaleDetailPage = () => {
   const { sales, customers, completeSale, cancelSale, confirmAction, settings } = useAppData();
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
-  const sale = sales.find((s) => s.id === id);
-  const customer = customers.find((c) => c.id === sale?.customerId);
+  // Single-line column & total visibility controls ("eta ek line e thakbe eigula")
+  const [showRate, setShowRate] = useState(true);
+  const [showLineTotal, setShowLineTotal] = useState(true);
+  const [showGrandTotal, setShowGrandTotal] = useState(true);
+
+  const sale = sales.find((s) => s.id === id || s._id === id);
+  const customer = customers.find((c) => c.id === sale?.customerId || c._id === sale?.customerId);
+
+  React.useEffect(() => {
+    if (sale) {
+      if (sale.showRate !== undefined) setShowRate(sale.showRate);
+      if (sale.showLineTotal !== undefined) setShowLineTotal(sale.showLineTotal);
+      if (sale.showGrandTotal !== undefined) setShowGrandTotal(sale.showGrandTotal);
+    }
+  }, [sale]);
 
   if (!sale) {
     return (
@@ -27,9 +40,13 @@ export const SaleDetailPage = () => {
     );
   }
 
+  const invoiceNumber = sale.invoiceNo || sale.invoiceNumber || (sale.id ? `INV-${sale.id.slice(-4)}` : 'INV-2026');
+  const totalAmount = Number(sale.total !== undefined ? sale.total : (sale.totalAmount !== undefined ? sale.totalAmount : 0));
+  const saleDate = sale.date || sale.createdAt || new Date();
+
   const handleComplete = () => {
     confirmAction({
-      title: `Complete Invoice ${sale.invoiceNo}?`,
+      title: `Complete Invoice ${invoiceNumber}?`,
       message: 'This will decrease on-hand inventory quantities for all sold items and record movements.',
       confirmText: 'Complete Sale',
       onConfirm: () => {
@@ -40,7 +57,7 @@ export const SaleDetailPage = () => {
 
   const handleCancel = () => {
     confirmAction({
-      title: `Cancel Sale Invoice ${sale.invoiceNo}?`,
+      title: `Cancel Sale Invoice ${invoiceNumber}?`,
       message: sale.status === 'completed'
         ? 'Warning: This sale has already deducted items from stock. Cancelling it will safely restore those quantities.'
         : 'Are you sure you want to cancel this draft sale invoice?',
@@ -66,7 +83,7 @@ export const SaleDetailPage = () => {
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" icon={Printer} onClick={() => setIsReceiptOpen(true)}>
-            Print Receipt
+            Print Invoice / Challan
           </Button>
 
           {sale.status === 'draft' && (
@@ -88,7 +105,7 @@ export const SaleDetailPage = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
-                {sale.invoiceNo}
+                {invoiceNumber}
               </h1>
               <span
                 className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -106,14 +123,14 @@ export const SaleDetailPage = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Issued on {formatDateTime(sale.date)}
+              Issued on {formatDateTime(saleDate)}
             </p>
           </div>
 
           <div className="text-right">
             <span className="text-[10px] uppercase font-bold text-slate-400 block">Grand Total</span>
             <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-              {formatCurrency(sale.total, settings.currency)}
+              {formatCurrency(totalAmount, settings.currency)}
             </div>
             <span
               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase mt-1 ${
@@ -157,8 +174,49 @@ export const SaleDetailPage = () => {
           </div>
         </div>
 
+        {/* Single Line Column & Total Visibility Controls ("eta ek line e thakbe eigula") */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/60 my-4 text-xs">
+          <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
+            <span className="text-[11px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-extrabold flex items-center gap-1.5">
+              <span>👁️ কলাম ও মোট মূল্য নিয়ন্ত্রণ:</span>
+            </span>
+          </div>
+
+          <div className="inline-flex items-center gap-4 flex-wrap">
+            <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 transition-colors select-none">
+              <input
+                type="checkbox"
+                checked={showRate}
+                onChange={(e) => setShowRate(e.target.checked)}
+                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+              />
+              <span>দর / Rate কলাম</span>
+            </label>
+
+            <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 transition-colors select-none">
+              <input
+                type="checkbox"
+                checked={showLineTotal}
+                onChange={(e) => setShowLineTotal(e.target.checked)}
+                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+              />
+              <span>মোট টাকা / Amount কলাম</span>
+            </label>
+
+            <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 transition-colors select-none">
+              <input
+                type="checkbox"
+                checked={showGrandTotal}
+                onChange={(e) => setShowGrandTotal(e.target.checked)}
+                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+              />
+              <span>সর্বমোট মূল্য / Grand Total</span>
+            </label>
+          </div>
+        </div>
+
         {/* Itemized Table */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+        <div className="pt-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
             Billed Items
           </h3>
@@ -168,8 +226,8 @@ export const SaleDetailPage = () => {
                 <tr>
                   <th className="py-2.5 px-4">Product Name</th>
                   <th className="py-2.5 px-3 text-center">Quantity</th>
-                  <th className="py-2.5 px-3 text-right">Unit Price</th>
-                  <th className="py-2.5 px-4 text-right">Line Total</th>
+                  {showRate && <th className="py-2.5 px-3 text-right">Unit Price</th>}
+                  {showLineTotal && <th className="py-2.5 px-4 text-right">Line Total</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -181,12 +239,16 @@ export const SaleDetailPage = () => {
                     <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                       {item.quantity}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-600 dark:text-slate-400">
-                      {formatCurrency(item.unitPrice, settings.currency)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(item.total, settings.currency)}
-                    </td>
+                    {showRate && (
+                      <td className="py-3 px-3 text-right font-mono text-slate-600 dark:text-slate-400">
+                        {formatCurrency(item.unitPrice !== undefined ? item.unitPrice : item.price, settings.currency)}
+                      </td>
+                    )}
+                    {showLineTotal && (
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(item.total !== undefined ? item.total : (item.lineTotal || (item.quantity * (item.unitPrice || 0))), settings.currency)}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -195,31 +257,48 @@ export const SaleDetailPage = () => {
         </div>
 
         {/* Totals Breakdown */}
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col items-end gap-1.5 text-xs">
-          <div className="flex justify-between w-64 text-slate-500">
-            <span>Subtotal:</span>
-            <span className="font-mono">{formatCurrency(sale.subtotal, settings.currency)}</span>
-          </div>
-          {Number(sale.discount) > 0 && (
-            <div className="flex justify-between w-64 text-emerald-600 font-semibold">
-              <span>Discount Applied:</span>
-              <span className="font-mono">-{formatCurrency(sale.discount, settings.currency)}</span>
+        {showGrandTotal ? (
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col items-end gap-1.5 text-xs">
+            <div className="flex justify-between w-64 text-slate-500">
+              <span>Subtotal:</span>
+              <span className="font-mono">{formatCurrency(sale.subtotal !== undefined ? sale.subtotal : totalAmount, settings.currency)}</span>
             </div>
-          )}
-          <div className="flex justify-between w-64 text-base font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-100 dark:border-slate-800">
-            <span>Grand Total:</span>
-            <span className="font-mono text-emerald-600 dark:text-emerald-400">
-              {formatCurrency(sale.total, settings.currency)}
-            </span>
+            {Number(sale.discount) > 0 && (
+              <div className="flex justify-between w-64 text-emerald-600 font-semibold">
+                <span>Discount Applied:</span>
+                <span className="font-mono">-{formatCurrency(sale.discount, settings.currency)}</span>
+              </div>
+            )}
+            <div className="flex justify-between w-64 text-base font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span>Grand Total:</span>
+              <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                {formatCurrency(totalAmount, settings.currency)}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowGrandTotal(true)}
+              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+            >
+              + সর্বমোট মূল্য দেখুন (Show Grand Total)
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* Receipt Modal */}
       <PrintableReceiptModal
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}
-        sale={sale}
+        sale={{
+          ...sale,
+          showRate,
+          showLineTotal,
+          showGrandTotal,
+        }}
       />
     </div>
   );

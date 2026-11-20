@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "test": "node server/test_suite.js",
     "server": "node server/server.js",
     "server:dev": "node --watch server/server.js",
     "server:seed": "node server/seeder.js -i",

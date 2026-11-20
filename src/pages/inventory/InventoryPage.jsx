@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { CopyBadge } from '../../components/common/CopyBadge';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { StockBadge } from '../../components/common/Badge';
@@ -27,6 +29,7 @@ import {
 
 export const InventoryPage = () => {
   const { products, categories, inventoryMovements, adjustStock, reloadState, settings } = useAppData();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' or 'movements'
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -166,22 +169,22 @@ export const InventoryPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Inventory & Stock Control
+            {t('inventory_title', 'Inventory & Stock Control')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Real-time on-hand stock quantities, reorder thresholds, and complete audit movement history.
+            {t('inventory_subtitle', 'Real-time on-hand stock quantities, reorder thresholds, and complete audit movement history.')}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={reloadState}>
-            Refresh
+            {t('btn_refresh', 'Refresh')}
           </Button>
           <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>
-            Export CSV
+            {t('btn_export_csv', 'Export CSV')}
           </Button>
           <Button variant="primary" size="sm" icon={SlidersHorizontal} onClick={() => handleOpenAdjust()}>
-            Stock Adjustment
+            {t('btn_stock_adjustment', 'Stock Adjustment')}
           </Button>
         </div>
       </div>
@@ -197,7 +200,7 @@ export const InventoryPage = () => {
           }`}
         >
           <Boxes className="h-4 w-4" />
-          <span>Current Stock Levels ({products.length})</span>
+          <span>{t('tab_current_stock', 'Current Stock Levels')} ({products.length})</span>
         </button>
 
         <button
@@ -209,7 +212,7 @@ export const InventoryPage = () => {
           }`}
         >
           <History className="h-4 w-4" />
-          <span>Movement Audit Ledger ({inventoryMovements.length})</span>
+          <span>{t('tab_movement_ledger', 'Movement Audit Ledger')} ({inventoryMovements.length})</span>
         </button>
       </div>
 
@@ -280,30 +283,30 @@ export const InventoryPage = () => {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase text-[10px] tracking-wider select-none">
                     <tr>
-                      <th className="py-3 px-4">Product / SKU</th>
-                      <th className="py-3 px-3">Category</th>
+                      <th className="py-3 px-4">{t('col_product', 'Product / SKU')}</th>
+                      <th className="py-3 px-3">{t('col_category', 'Category')}</th>
                       <th
                         className="py-3 px-3 text-center cursor-pointer hover:text-slate-800 dark:hover:text-slate-200"
                         onClick={() => handleSort('quantity')}
                       >
                         <div className="flex items-center justify-center gap-1">
-                          <span>Available Qty</span>
+                          <span>{t('col_stock_level', 'Available Qty')}</span>
                           <ArrowUpDown className="h-3 w-3" />
                         </div>
                       </th>
-                      <th className="py-3 px-3 text-center">Safety Level</th>
-                      <th className="py-3 px-3 text-center">Stock Status</th>
+                      <th className="py-3 px-3 text-center">{t('col_reorder_point', 'Safety Level')}</th>
+                      <th className="py-3 px-3 text-center">{t('col_status_label', 'Stock Status')}</th>
                       <th
                         className="py-3 px-3 text-right cursor-pointer hover:text-slate-800 dark:hover:text-slate-200"
                         onClick={() => handleSort('costPrice')}
                       >
                         <div className="flex items-center justify-end gap-1">
-                          <span>Inventory Value</span>
+                          <span>{t('col_valuation', 'Inventory Value')}</span>
                           <ArrowUpDown className="h-3 w-3" />
                         </div>
                       </th>
-                      <th className="py-3 px-3">Last Movement</th>
-                      <th className="py-3 px-4 text-right">Adjust</th>
+                      <th className="py-3 px-3">{t('col_last_movement', 'Last Movement')}</th>
+                      <th className="py-3 px-4 text-right">{t('col_actions_label', 'Adjust')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -328,9 +331,9 @@ export const InventoryPage = () => {
                                 >
                                   {p.name}
                                 </Link>
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {p.sku}
-                                </span>
+                                <div className="mt-0.5">
+                                  <CopyBadge text={p.sku} label="SKU" />
+                                </div>
                               </div>
                             </div>
                           </td>

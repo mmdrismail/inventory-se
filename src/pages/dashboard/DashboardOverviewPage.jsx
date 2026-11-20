@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { KPICard } from '../../components/dashboard/KPICard';
 import { QuickActions } from '../../components/dashboard/QuickActions';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
@@ -35,6 +36,7 @@ import {
 export const DashboardOverviewPage = () => {
   const [dateRangeDays, setDateRangeDays] = useState(7);
   const { products, categories, sales, purchases, customers, orders, inventoryMovements, settings } = useAppData();
+  const { t } = useLanguage();
 
   // Dynamic calculations from actual local demo records
   const inventoryMetrics = useMemo(() => calculateInventoryMetrics(products), [products]);
@@ -80,17 +82,17 @@ export const DashboardOverviewPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Inventory & Sales Dashboard
+            {t('dashboard_title', 'Inventory & Sales Dashboard')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Real-time performance metrics computed from current local records.
+            {t('dashboard_subtitle', 'Real-time performance metrics computed from current local records.')}
           </p>
         </div>
 
         {/* Date Filter selector */}
         <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm self-start sm:self-auto text-xs">
           <Calendar className="h-4 w-4 text-slate-400 ml-2" />
-          <span className="text-slate-400 font-medium px-1">Range:</span>
+          <span className="text-slate-400 font-medium px-1">{t('dashboard_range', 'Range:')}</span>
           {[7, 14, 30].map((days) => (
             <button
               key={days}
@@ -101,7 +103,7 @@ export const DashboardOverviewPage = () => {
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {days} Days
+              {days} {t('days_count', 'Days')}
             </button>
           ))}
         </div>
@@ -115,44 +117,44 @@ export const DashboardOverviewPage = () => {
       {/* 6 KPI CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPICard
-          title="Total Products"
+          title={t('kpi_total_products', 'Total Products')}
           value={formatNumber(inventoryMetrics.totalItemsCount)}
-          subtext={`${inventoryMetrics.totalStockQuantity} units in stock`}
+          subtext={`${inventoryMetrics.totalStockQuantity} ${t('kpi_total_products_sub', 'units in stock')}`}
           icon={Package}
           variant="emerald"
         />
         <KPICard
-          title="Stock Valuation"
+          title={t('kpi_stock_valuation', 'Stock Valuation')}
           value={formatCurrency(inventoryMetrics.totalCostValue, settings.currency)}
-          subtext="Total cost value"
+          subtext={t('kpi_stock_valuation_sub', 'Total cost value')}
           icon={CircleDollarSign}
           variant="blue"
         />
         <KPICard
-          title="Low Stock Items"
+          title={t('kpi_low_stock', 'Low Stock Items')}
           value={formatNumber(inventoryMetrics.lowStockCount + inventoryMetrics.outOfStockCount)}
-          subtext={`${inventoryMetrics.outOfStockCount} out of stock`}
+          subtext={`${inventoryMetrics.outOfStockCount} ${t('kpi_low_stock_sub', 'out of stock')}`}
           icon={AlertTriangle}
           variant={inventoryMetrics.lowStockCount > 0 ? 'amber' : 'emerald'}
         />
         <KPICard
-          title="Today's Sales"
+          title={t('kpi_today_sales', "Today's Sales")}
           value={formatCurrency(todaySalesTotal, settings.currency)}
-          subtext="Completed invoices"
+          subtext={t('kpi_today_sales_sub', 'Completed invoices')}
           icon={Receipt}
           variant="purple"
         />
         <KPICard
-          title="Customers"
+          title={t('kpi_customers', 'Customers')}
           value={formatNumber(customers.length)}
-          subtext="Retail & corporate"
+          subtext={t('kpi_customers_sub', 'Retail & corporate')}
           icon={Users2}
           variant="emerald"
         />
         <KPICard
-          title="Pending Orders"
+          title={t('kpi_pending_orders', 'Pending Orders')}
           value={formatNumber(pendingOrdersCount)}
-          subtext="Storefront checkout"
+          subtext={t('kpi_pending_orders_sub', 'Storefront checkout')}
           icon={ClipboardList}
           variant={pendingOrdersCount > 0 ? 'red' : 'emerald'}
         />
@@ -164,14 +166,14 @@ export const DashboardOverviewPage = () => {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle>Sales Revenue Velocity</CardTitle>
+              <CardTitle>{t('chart_sales_velocity', 'Sales Revenue Velocity')}</CardTitle>
               <p className="text-xs text-slate-400 mt-0.5">
-                Daily completed sales total over the selected {dateRangeDays} days
+                {t('chart_sales_velocity_sub', 'Daily completed sales total')} ({dateRangeDays} {t('days_count', 'Days')})
               </p>
             </div>
             <Link to="/sales">
               <Button variant="ghost" size="sm" icon={ArrowRight} iconPosition="right">
-                View All
+                {t('btn_view_all', 'View All')}
               </Button>
             </Link>
           </CardHeader>
@@ -183,9 +185,9 @@ export const DashboardOverviewPage = () => {
         {/* Category Stock Distribution (1 Column) */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>Inventory by Category</CardTitle>
+            <CardTitle>{t('chart_category_dist', 'Category Distribution')}</CardTitle>
             <p className="text-xs text-slate-400 mt-0.5">
-              Units breakdown across active product departments
+              {t('chart_category_dist_sub', 'Stock count by product category')}
             </p>
           </CardHeader>
           <CardContent className="pt-2">
@@ -200,14 +202,14 @@ export const DashboardOverviewPage = () => {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle>Supplier Procurement Intake</CardTitle>
+              <CardTitle>{t('chart_procurement', 'Procurement Expenditures')}</CardTitle>
               <p className="text-xs text-slate-400 mt-0.5">
-                Purchases received over the last {dateRangeDays} days
+                {t('chart_procurement_sub', 'Purchases received over the last')} ({dateRangeDays} {t('days_count', 'Days')})
               </p>
             </div>
             <Link to="/purchases">
               <Button variant="ghost" size="sm" icon={ArrowRight} iconPosition="right">
-                View All
+                {t('btn_view_all', 'View All')}
               </Button>
             </Link>
           </CardHeader>
@@ -220,14 +222,14 @@ export const DashboardOverviewPage = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle>Low Stock Alerts</CardTitle>
+              <CardTitle>{t('alert_low_stock_title', 'Low Stock Alerts')}</CardTitle>
               <p className="text-xs text-slate-400 mt-0.5">
-                Items requiring replenishment
+                {t('alert_low_stock_sub', 'Items requiring replenishment')}
               </p>
             </div>
             <Link to="/inventory">
               <Button variant="ghost" size="sm">
-                Inventory →
+                {t('tab_rep_inventory', 'Inventory')} →
               </Button>
             </Link>
           </CardHeader>
