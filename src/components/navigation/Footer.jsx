@@ -92,13 +92,16 @@ export const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {currentYear} StockLine. All rights reserved. Built with React & Tailwind.</p>
+          <p>© {currentYear} StockLine Enterprise. Maintained by <a href="https://github.com/mmdrismail" target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-semibold hover:underline">Mohammad Ismail</a>.</p>
           <div className="flex items-center gap-6">
+            <a href="https://trello.com/b/B7EZLSFY/my-trello-board" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors">
+              Trello Board
+            </a>
+            <a href="https://github.com/mmdrismail/inventory-se" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition-colors">
+              GitHub Repo
+            </a>
             <Link to="/privacy" className="hover:text-slate-300 transition-colors">
               Privacy Policy
-            </Link>
-            <Link to="/terms" className="hover:text-slate-300 transition-colors">
-              Terms of Service
             </Link>
           </div>
         </div>

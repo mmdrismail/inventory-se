@@ -21,6 +21,8 @@ import {
   LogOut,
   ShoppingBag,
   FileSpreadsheet,
+  Kanban,
+  ExternalLink,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
@@ -119,6 +121,28 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
           <ShoppingBag className="h-5 w-5 shrink-0" />
           {!isCollapsed && <span>{t('nav_customer_shop', 'Customer Shop')}</span>}
         </NavLink>
+
+        {/* Project Workspace & Agile Tracking */}
+        <div className="pt-4 px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {!isCollapsed ? 'Project Workspace' : '•••'}
+        </div>
+        <a
+          href="https://trello.com/b/B7EZLSFY/my-trello-board"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 ${
+            isCollapsed ? 'justify-center px-2' : ''
+          }`}
+          title={isCollapsed ? 'Trello Agile Board' : undefined}
+        >
+          <Kanban className="h-5 w-5 shrink-0" />
+          {!isCollapsed && (
+            <span className="flex items-center justify-between flex-1">
+              <span>Trello Board</span>
+              <ExternalLink className="h-3.5 w-3.5 opacity-60" />
+            </span>
+          )}
+        </a>
       </div>
 
       {/* User Footer Card */}
