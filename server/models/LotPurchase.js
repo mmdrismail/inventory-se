@@ -158,5 +158,9 @@ const lotPurchaseSchema = new mongoose.Schema(
 );
 
 lotPurchaseSchema.index({ status: 1, createdAt: -1 });
+lotPurchaseSchema.index({ supplierId: 1, createdAt: -1 });
+lotPurchaseSchema.index({ purchaseDate: -1 });
+lotPurchaseSchema.index({ createdAt: -1 });
+lotPurchaseSchema.index({ 'items.productId': 1 });
 
 module.exports = mongoose.model('LotPurchase', lotPurchaseSchema);

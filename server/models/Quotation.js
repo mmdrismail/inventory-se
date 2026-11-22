@@ -65,7 +65,8 @@ const quotationSchema = new mongoose.Schema(
     },
     customerName: {
       type: String,
-      required: true,
+      required: false,
+      default: 'Direct Client',
       trim: true,
     },
     customerCompany: {
@@ -150,7 +151,13 @@ const quotationSchema = new mongoose.Schema(
   { timestamps: true, strict: false }
 );
 
+// High-speed quotation search, expiration alerts & reporting indexes
 quotationSchema.index({ customerId: 1, createdAt: -1 });
-quotationSchema.index({ status: 1 });
+quotationSchema.index({ status: 1, createdAt: -1 });
+quotationSchema.index({ createdAt: -1 });
+quotationSchema.index({ validUntil: 1 });
+quotationSchema.index({ requisitionRef: 1 });
+quotationSchema.index({ convertedSaleId: 1 });
+quotationSchema.index({ 'items.productId': 1 });
 
 module.exports = mongoose.model('Quotation', quotationSchema);

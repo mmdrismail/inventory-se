@@ -15,12 +15,12 @@ const findProduct = async (idOrSku) => {
   return await Product.findOne({ sku: String(idOrSku).toUpperCase().trim() });
 };
 
-// @desc    Get all products with filtering & search
+// @desc    Get all products with filtering, search & pagination
 // @route   GET /api/products
 // @access  Public
 exports.getProducts = async (req, res, next) => {
   try {
-    const { search, category, status, stockStatus, isPublic } = req.query;
+    const { search, category, status, stockStatus, isPublic, page, limit } = req.query;
     const query = {};
 
     if (search && String(search).trim()) {
@@ -55,17 +55,40 @@ exports.getProducts = async (req, res, next) => {
       query.isPublic = isPublic === 'true';
     }
 
-    let products = await Product.find(query).sort({ createdAt: -1 });
-
     if (stockStatus) {
       if (stockStatus === 'out') {
-        products = products.filter((p) => p.quantity <= 0);
+        query.quantity = { $lte: 0 };
       } else if (stockStatus === 'low') {
-        products = products.filter((p) => p.quantity > 0 && p.quantity <= p.reorderLevel);
+        query.$expr = {
+          $and: [{ $gt: ['$quantity', 0] }, { $lte: ['$quantity', '$reorderLevel'] }],
+        };
       } else if (stockStatus === 'in') {
-        products = products.filter((p) => p.quantity > p.reorderLevel);
+        query.$expr = { $gt: ['$quantity', '$reorderLevel'] };
       }
     }
+
+    // High-performance pagination for heavy catalog data
+    if (page && limit) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 20;
+      const skip = (pageNum - 1) * limitNum;
+
+      const [products, total] = await Promise.all([
+        Product.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+        Product.countDocuments(query),
+      ]);
+
+      return res.json({
+        success: true,
+        count: products.length,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: products,
+      });
+    }
+
+    const products = await Product.find(query).sort({ createdAt: -1 }).lean();
 
     res.json({
       success: true,

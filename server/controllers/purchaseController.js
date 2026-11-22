@@ -7,7 +7,33 @@ const StockMovement = require('../models/StockMovement');
 // @access  Private (Admin, Manager)
 exports.getPurchases = async (req, res, next) => {
   try {
-    const purchases = await Purchase.find().sort({ createdAt: -1 });
+    const { supplierId, status, page, limit } = req.query;
+    const query = {};
+
+    if (supplierId) query.supplierId = supplierId;
+    if (status && status !== 'all') query.status = status;
+
+    if (page && limit) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 20;
+      const skip = (pageNum - 1) * limitNum;
+
+      const [purchases, total] = await Promise.all([
+        Purchase.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+        Purchase.countDocuments(query),
+      ]);
+
+      return res.json({
+        success: true,
+        count: purchases.length,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: purchases,
+      });
+    }
+
+    const purchases = await Purchase.find(query).sort({ createdAt: -1 }).lean();
     res.json({
       success: true,
       count: purchases.length,

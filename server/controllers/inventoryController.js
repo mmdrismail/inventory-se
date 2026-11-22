@@ -16,13 +16,41 @@ const findProduct = async (idOrSku) => {
 // @access  Private (Admin, Manager)
 exports.getMovements = async (req, res, next) => {
   try {
-    const { productId, type } = req.query;
+    const { productId, type, reference, page, limit } = req.query;
     const query = {};
 
-    if (productId && mongoose.Types.ObjectId.isValid(productId)) query.productId = productId;
+    if (productId) {
+      if (mongoose.Types.ObjectId.isValid(productId)) {
+        query.productId = productId;
+      } else {
+        const prod = await findProduct(productId);
+        if (prod) query.productId = prod._id;
+      }
+    }
     if (type && type !== 'all') query.type = type;
+    if (reference) query.reference = reference;
 
-    const movements = await StockMovement.find(query).sort({ createdAt: -1 });
+    if (page && limit) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 50;
+      const skip = (pageNum - 1) * limitNum;
+
+      const [movements, total] = await Promise.all([
+        StockMovement.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+        StockMovement.countDocuments(query),
+      ]);
+
+      return res.json({
+        success: true,
+        count: movements.length,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: movements,
+      });
+    }
+
+    const movements = await StockMovement.find(query).sort({ createdAt: -1 }).lean();
 
     res.json({
       success: true,

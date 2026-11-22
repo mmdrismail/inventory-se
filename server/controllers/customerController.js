@@ -6,7 +6,44 @@ const Sale = require('../models/Sale');
 // @access  Private
 exports.getCustomers = async (req, res, next) => {
   try {
-    const customers = await Customer.find().sort({ name: 1 });
+    const { search, type, page, limit } = req.query;
+    const query = {};
+
+    if (search && String(search).trim()) {
+      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { name: { $regex: safeSearch, $options: 'i' } },
+        { companyName: { $regex: safeSearch, $options: 'i' } },
+        { phone: { $regex: safeSearch, $options: 'i' } },
+        { email: { $regex: safeSearch, $options: 'i' } },
+      ];
+    }
+
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+
+    if (page && limit) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 20;
+      const skip = (pageNum - 1) * limitNum;
+
+      const [customers, total] = await Promise.all([
+        Customer.find(query).sort({ name: 1 }).skip(skip).limit(limitNum).lean(),
+        Customer.countDocuments(query),
+      ]);
+
+      return res.json({
+        success: true,
+        count: customers.length,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: customers,
+      });
+    }
+
+    const customers = await Customer.find(query).sort({ name: 1 }).lean();
     res.json({
       success: true,
       count: customers.length,

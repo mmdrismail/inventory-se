@@ -151,5 +151,9 @@ const saleSchema = new mongoose.Schema(
 // High-speed sales history & reporting indexes
 saleSchema.index({ customerId: 1, createdAt: -1 });
 saleSchema.index({ status: 1, createdAt: -1 });
+saleSchema.index({ createdAt: -1 });
+saleSchema.index({ paymentStatus: 1, createdAt: -1 });
+saleSchema.index({ quotationId: 1 });
+saleSchema.index({ 'items.productId': 1 });
 
 module.exports = mongoose.model('Sale', saleSchema);

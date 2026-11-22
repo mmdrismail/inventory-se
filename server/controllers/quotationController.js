@@ -9,18 +9,40 @@ const Customer = require('../models/Customer');
 // @access  Private
 exports.getQuotations = async (req, res, next) => {
   try {
-    const { status, search } = req.query;
+    const { status, search, page, limit } = req.query;
     const filter = {};
-    if (status) filter.status = status;
-    if (search) {
+    if (status && status !== 'all') filter.status = status;
+    if (search && String(search).trim()) {
+      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { quotationNumber: { $regex: search, $options: 'i' } },
-        { customerName: { $regex: search, $options: 'i' } },
-        { customerCompany: { $regex: search, $options: 'i' } },
-        { requisitionRef: { $regex: search, $options: 'i' } },
+        { quotationNumber: { $regex: safeSearch, $options: 'i' } },
+        { customerName: { $regex: safeSearch, $options: 'i' } },
+        { customerCompany: { $regex: safeSearch, $options: 'i' } },
+        { requisitionRef: { $regex: safeSearch, $options: 'i' } },
       ];
     }
-    const quotations = await Quotation.find(filter).sort({ createdAt: -1 });
+
+    if (page && limit) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 20;
+      const skip = (pageNum - 1) * limitNum;
+
+      const [quotations, total] = await Promise.all([
+        Quotation.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+        Quotation.countDocuments(filter),
+      ]);
+
+      return res.json({
+        success: true,
+        count: quotations.length,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: quotations,
+      });
+    }
+
+    const quotations = await Quotation.find(filter).sort({ createdAt: -1 }).lean();
     res.json({
       success: true,
       count: quotations.length,

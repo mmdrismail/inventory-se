@@ -68,4 +68,11 @@ const purchaseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// High-speed procurement & supplier ledger indexes
+purchaseSchema.index({ supplierId: 1, createdAt: -1 });
+purchaseSchema.index({ status: 1, createdAt: -1 });
+purchaseSchema.index({ createdAt: -1 });
+purchaseSchema.index({ receivedDate: 1 });
+purchaseSchema.index({ 'items.productId': 1 });
+
 module.exports = mongoose.model('Purchase', purchaseSchema);

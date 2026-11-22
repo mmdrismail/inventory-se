@@ -85,4 +85,17 @@ const customerSchema = new mongoose.Schema(
   { timestamps: true, strict: false }
 );
 
+// High-speed customer search and corporate debt management indexes
+customerSchema.index({ phone: 1 });
+customerSchema.index({ email: 1 });
+customerSchema.index({ name: 1 });
+customerSchema.index({ companyName: 1 });
+customerSchema.index({ status: 1, createdAt: -1 });
+customerSchema.index({ totalDue: -1 });
+customerSchema.index({
+  name: 'text',
+  companyName: 'text',
+  phone: 'text',
+});
+
 module.exports = mongoose.model('Customer', customerSchema);

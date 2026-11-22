@@ -115,6 +115,7 @@ const productSchema = new mongoose.Schema(
     // Bulk Lot / Scrap Auction tracking
     lotId: {
       type: mongoose.Schema.Types.Mixed,
+      ref: 'LotPurchase',
       default: null,
     },
     lotNumber: {
@@ -207,12 +208,24 @@ const productSchema = new mongoose.Schema(
 );
 
 // High-speed query & search indexes
+productSchema.index({ barcode: 1 });
 productSchema.index({ categoryId: 1, status: 1 });
+productSchema.index({ supplierId: 1, status: 1 });
+productSchema.index({ lotId: 1 });
 productSchema.index({ status: 1, createdAt: -1 });
 productSchema.index({ brand: 1 });
 productSchema.index({ modelNumber: 1 });
 productSchema.index({ impaCode: 1 });
 productSchema.index({ oemPartNumber: 1 });
 productSchema.index({ lotNumber: 1 });
+productSchema.index({ quantity: 1, reorderLevel: 1 });
+productSchema.index({
+  name: 'text',
+  sku: 'text',
+  brand: 'text',
+  modelNumber: 'text',
+  oemPartNumber: 'text',
+  impaCode: 'text',
+});
 
 module.exports = mongoose.model('Product', productSchema);

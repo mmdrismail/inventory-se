@@ -40,5 +40,7 @@ const stockMovementSchema = new mongoose.Schema(
 // High-speed audit log lookup indexes
 stockMovementSchema.index({ productId: 1, createdAt: -1 });
 stockMovementSchema.index({ type: 1, createdAt: -1 });
+stockMovementSchema.index({ reference: 1 });
+stockMovementSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('StockMovement', stockMovementSchema);

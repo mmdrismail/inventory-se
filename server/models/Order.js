@@ -35,6 +35,11 @@ const orderSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    customerId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: 'Customer',
+      default: null,
+    },
     customerName: {
       type: String,
       required: [true, 'Customer name is required'],
@@ -103,6 +108,10 @@ const orderSchema = new mongoose.Schema(
 
 // High-speed order lookup and queue indexes
 orderSchema.index({ customerEmail: 1, createdAt: -1 });
+orderSchema.index({ customerId: 1, createdAt: -1 });
+orderSchema.index({ customerPhone: 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ 'items.productId': 1 });
 
 module.exports = mongoose.model('Order', orderSchema);

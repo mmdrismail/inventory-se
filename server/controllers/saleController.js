@@ -9,7 +9,49 @@ const Quotation = require('../models/Quotation');
 // @access  Private
 exports.getSales = async (req, res, next) => {
   try {
-    const sales = await Sale.find().sort({ createdAt: -1 });
+    const { customerId, status, paymentStatus, search, page, limit, startDate, endDate } = req.query;
+    const query = {};
+
+    if (customerId) query.customerId = customerId;
+    if (status && status !== 'all') query.status = status;
+    if (paymentStatus && paymentStatus !== 'all') query.paymentStatus = paymentStatus;
+
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
+
+    if (search && String(search).trim()) {
+      const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { invoiceNumber: { $regex: safeSearch, $options: 'i' } },
+        { customerName: { $regex: safeSearch, $options: 'i' } },
+        { customerPhone: { $regex: safeSearch, $options: 'i' } },
+      ];
+    }
+
+    if (page && limit) {
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 20;
+      const skip = (pageNum - 1) * limitNum;
+
+      const [sales, total] = await Promise.all([
+        Sale.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+        Sale.countDocuments(query),
+      ]);
+
+      return res.json({
+        success: true,
+        count: sales.length,
+        total,
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        data: sales,
+      });
+    }
+
+    const sales = await Sale.find(query).sort({ createdAt: -1 }).lean();
     res.json({
       success: true,
       count: sales.length,

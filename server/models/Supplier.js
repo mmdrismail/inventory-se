@@ -33,4 +33,10 @@ const supplierSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// High-speed supplier indexing
+supplierSchema.index({ name: 1 });
+supplierSchema.index({ phone: 1 });
+supplierSchema.index({ email: 1 });
+supplierSchema.index({ status: 1 });
+
 module.exports = mongoose.model('Supplier', supplierSchema);
