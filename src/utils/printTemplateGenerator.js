@@ -304,6 +304,21 @@ export const I18N = {
 };
 
 /**
+ * Checks if a quotation terms string is a standard default template
+ */
+export const isStandardDefaultTerms = (terms) => {
+  if (!terms || typeof terms !== 'string' || !terms.trim()) return true;
+  const t = terms.trim();
+  for (const langKey of Object.keys(I18N)) {
+    if (I18N[langKey]?.defaultTerms?.trim() === t) return true;
+  }
+  if (t.includes('সকল মালামাল') || t.includes('মালামাল প্রাপ্যতা')) return true;
+  if (t.includes('All items are subject') || t.includes('subject to stock availability')) return true;
+  if (t.includes('Shokol malamal') || t.includes('prapyota shapekkhe')) return true;
+  return false;
+};
+
+/**
  * Resolves normalized settings and language parameters
  * Guarantees STRICT SINGLE-LANGUAGE PURITY per mode:
  *   - 'bn' -> 100% Bangla (No English subtitle)
@@ -1110,7 +1125,7 @@ export const generateOfficialPadHtml = (sale, settings = {}, options = {}) => {
         </div>
         <div class="customer-row" style="margin-top: 3px;">
           <span class="customer-label">${p.t.address}</span>
-          <span class="customer-dotted-line">${sale.customerAddress || sale.customerPhone || p.address}</span>
+          <span class="customer-dotted-line">${sale.customerAddress || (sale.customerPhone ? sale.customerPhone : 'N/A')}</span>
         </div>
       </div>
 
@@ -1327,12 +1342,23 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
   const showLineTotal = options.showLineTotal !== undefined ? options.showLineTotal : (quotation.showLineTotal !== undefined ? quotation.showLineTotal : true);
   const showGrandTotal = options.showGrandTotal !== undefined ? options.showGrandTotal : (quotation.showGrandTotal !== undefined ? quotation.showGrandTotal : true);
 
-  const roleText =
-    quotation.customerRole === 'owner' ? 'কোম্পানির মালিক / স্বত্বাধিকারী' :
-    quotation.customerRole === 'agent' ? 'কোম্পানির প্রতিনিধি / এজেন্ট' :
-    quotation.customerRole === 'purchaser' ? 'ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার' :
-    quotation.customerRole === 'supplier_rep' ? 'সরবরাহকারী / ভেন্ডর প্রতিনিধি' :
-    quotation.customerRole === 'wholesale' ? 'পাইকারি ডিলার' : 'গ্রাহক';
+  const getRoleText = (role, lang) => {
+    const roles = {
+      owner: { bn: 'কোম্পানির মালিক / স্বত্বাধিকারী', en: 'Owner / Proprietor', obro: 'Owner', bilingual: 'মালিক / Owner' },
+      agent: { bn: 'কোম্পানির প্রতিনিধি / এজেন্ট', en: 'Agent / Representative', obro: 'Agent', bilingual: 'এজেন্ট / Agent' },
+      purchaser: { bn: 'ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার', en: 'Procurement / Purchase Officer', obro: 'Purchaser', bilingual: 'ক্রয় কর্মকর্তা / Purchaser' },
+      supplier_rep: { bn: 'সরবরাহকারী / ভেন্ডর প্রতিনিধি', en: 'Supplier / Vendor Rep', obro: 'Supplier Rep', bilingual: 'সরবরাহকারী / Supplier Rep' },
+      wholesale: { bn: 'পাইকারি ডিলার', en: 'Wholesale Dealer', obro: 'Wholesale Dealer', bilingual: 'পাইকারি / Wholesale' },
+      retail: { bn: 'খুচরা গ্রাহক', en: 'Retail Customer', obro: 'Retail Customer', bilingual: 'খুচরা / Retail' },
+    };
+    const entry = roles[role] || { bn: 'গ্রাহক', en: 'Customer', obro: 'Customer', bilingual: 'গ্রাহক / Customer' };
+    return entry[lang] || entry.en || 'Customer';
+  };
+  const roleText = getRoleText(quotation.customerRole, p.lang);
+
+  const resolvedTerms = (!quotation.termsAndConditions || isStandardDefaultTerms(quotation.termsAndConditions))
+    ? p.t.defaultTerms
+    : quotation.termsAndConditions;
 
   return `
 <!DOCTYPE html>
@@ -1398,12 +1424,12 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
     <div style="display: flex; justify-content: space-between; align-items: center; margin: 6px 0; font-size: 11.5px; font-weight: 600;">
       <div>
         <span style="color: #dc2626; font-size: 14px; font-weight: 800; margin-right: 12px;">${cleanSerial}</span>
-        <span>সূত্রঃ </span>
+        <span>${p.t.refNo} </span>
         <span class="font-mono" style="color: #1e3a8a; font-weight: 700;">#${quotationNumber}</span>
         ${quotation.requisitionRef ? `<span style="font-size: 10px; color: #64748b; margin-left: 6px;">(Req: ${quotation.requisitionRef})</span>` : ''}
       </div>
       <div>
-        <span>তারিখ :</span>
+        <span>${p.t.date} </span>
         <span class="date-box">${day}</span>
         <span class="date-box">${month}</span>
         <span class="date-box" style="min-width: 38px;">${year}</span>
@@ -1436,7 +1462,7 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
             </div>
             <div>
               <span style="font-weight: 700; color: #0f172a;">${p.t.address} </span>
-              <span>${quotation.customerAddress || quotation.customerLocation || p.address}</span>
+              <span>${quotation.customerAddress || quotation.customerLocation || 'N/A'}</span>
             </div>
           </div>
         </div>
@@ -1515,7 +1541,7 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
         <div style="margin-top: 10px; font-size: 10.5px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 4px; padding: 6px 10px; line-height: 1.45;">
           <strong style="color: #0f172a; text-decoration: underline;">${p.t.termsTitle}</strong>
           <div style="white-space: pre-line; color: #334155; margin-top: 2px;">
-            ${quotation.termsAndConditions || p.t.defaultTerms}
+            ${resolvedTerms}
           </div>
         </div>
 

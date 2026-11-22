@@ -29,6 +29,7 @@ import {
   generateThermalReceiptHtml,
   generateQuotationHtml,
   resolveStationeryProfile,
+  isStandardDefaultTerms,
 } from '../../utils/printTemplateGenerator';
 
 export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType }) => {
@@ -138,6 +139,13 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
   const profile = useMemo(() => {
     return resolveStationeryProfile(settings, options);
   }, [settings, options]);
+
+  const resolvedTerms = useMemo(() => {
+    if (!sale?.termsAndConditions || isStandardDefaultTerms(sale.termsAndConditions)) {
+      return profile.t.defaultTerms;
+    }
+    return sale.termsAndConditions;
+  }, [sale?.termsAndConditions, profile.t.defaultTerms]);
 
   // Generate HTML for current template
   const currentHtml = useMemo(() => {
@@ -957,7 +965,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-800 w-14 flex-shrink-0">{profile.t.address}</span>
                   <span className="flex-1 border-b border-dotted border-slate-400 font-medium text-slate-700">
-                    {sale.customerAddress || sale.customerPhone || profile.address}
+                    {sale.customerAddress || (sale.customerPhone ? sale.customerPhone : 'N/A')}
                   </span>
                 </div>
               </div>
@@ -1103,7 +1111,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                   </div>
                   <div>
                     <span className="font-bold text-slate-800">{profile.t.address} </span>
-                    <span>{sale.customerAddress || sale.customerLocation || profile.address}</span>
+                    <span>{sale.customerAddress || sale.customerLocation || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -1174,7 +1182,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
               <div className="bg-slate-50 border border-dashed border-slate-300 p-2 rounded text-[10.5px] text-slate-600">
                 <span className="font-bold underline text-slate-800 block mb-0.5">{profile.t.termsTitle}</span>
                 <p className="whitespace-pre-line leading-relaxed">
-                  {sale.termsAndConditions || profile.t.defaultTerms}
+                  {resolvedTerms}
                 </p>
               </div>
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import { formatCurrency } from '../../utils/formatters';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
@@ -12,22 +12,25 @@ import {
   Plus,
   Trash2,
   Building2,
-  UserCheck,
-  MapPin,
-  Phone,
-  Mail,
   ArrowLeft,
   Printer,
   Save,
   CheckCircle2,
   Calendar,
   Sparkles,
-  HelpCircle,
+  Check,
 } from 'lucide-react';
+
+const DEFAULT_TERMS = {
+  bn: '১. সকল মালামাল প্রাপ্যতা সাপেক্ষে সরবরাহ করা হইবে।\n২. ডেলিভারি সময়: কার্যাদেশ প্রাপ্তির ৩ কার্যদিবসের মধ্যে।\n৩. এই কোটেশনের মেয়াদ জারির তারিখ হইতে ১৫ দিন পর্যন্ত বৈধ।',
+  en: '1. All items are subject to stock availability.\n2. Delivery time: Within 3 working days upon work order confirmation.\n3. Quotation validity: 15 calendar days from the date of issuance.',
+  obro: '1. Shokol malamal prapyota shapekkhe shorboraho kora hoibe.\n2. Delivery shomoy: Karjadesh praptir 3 karjodibosher moddhe.\n3. Ei quotation er meyadh jarir tarikh hoite 15 din porjonto boidho.',
+};
 
 export const QuotationFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const {
     products,
     customers,
@@ -36,6 +39,16 @@ export const QuotationFormPage = () => {
     updateQuotation,
     settings,
   } = useAppData();
+
+  // Multi-Language content selector:
+  // - 'en'   -> Pure English
+  // - 'bn'   -> Pure Bangla
+  // - 'obro' -> Avro / Banglish (Bangla + English bilingual format)
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
 
   const isEditing = !!id;
   const existingQuote = useMemo(() => {
@@ -67,6 +80,8 @@ export const QuotationFormPage = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+
+  // Auto-save Customer Option (ALWAYS ON BY DEFAULT as requested)
   const [autoSaveCustomer, setAutoSaveCustomer] = useState(true);
 
   // Line items state
@@ -82,7 +97,7 @@ export const QuotationFormPage = () => {
     },
   ]);
 
-  // Column and Total visibility controls ("eta ek line e thakbe eigula")
+  // Column and Total visibility controls
   const [showRate, setShowRate] = useState(true);
   const [showLineTotal, setShowLineTotal] = useState(true);
   const [showGrandTotal, setShowGrandTotal] = useState(true);
@@ -92,21 +107,30 @@ export const QuotationFormPage = () => {
   const [tax, setTax] = useState(0);
   const [status, setStatus] = useState('draft');
   const [termsAndConditions, setTermsAndConditions] = useState(
-    '১. সকল মালামাল প্রাপ্যতা সাপেক্ষে সরবরাহ করা হইবে।\n২. ডেলিভারি সময়: কার্যাদেশ প্রাপ্তির ৩ কার্যদিবসের মধ্যে।\n৩. এই কোটেশনের মেয়াদ জারির তারিখ হইতে ১৫ দিন পর্যন্ত বৈধ।'
+    DEFAULT_TERMS[language] || DEFAULT_TERMS.bn
   );
   const [notes, setNotes] = useState('');
 
   // Modal print preview
   const [printQuotationData, setPrintQuotationData] = useState(null);
 
-  // Populate data if editing
+  // Dynamically update default terms if language changes and terms haven't been customized
+  useEffect(() => {
+    if (!existingQuote) {
+      const cur = termsAndConditions?.trim();
+      const isAnyDefault = !cur || Object.values(DEFAULT_TERMS).some((d) => d.trim() === cur);
+      if (isAnyDefault && DEFAULT_TERMS[language]) {
+        setTermsAndConditions(DEFAULT_TERMS[language]);
+      }
+    }
+  }, [language, existingQuote]);
+
+  // Load existing quote if editing
   useEffect(() => {
     if (existingQuote) {
       setQuotationNumber(existingQuote.quotationNumber || '');
       setQuotationDate(
-        existingQuote.date
-          ? new Date(existingQuote.date).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0]
+        existingQuote.date ? new Date(existingQuote.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
       );
       setValidUntil(
         existingQuote.validUntil
@@ -120,11 +144,10 @@ export const QuotationFormPage = () => {
       setCustomerRole(existingQuote.customerRole || 'owner');
       setCustomerPhone(existingQuote.customerPhone || '');
       setCustomerEmail(existingQuote.customerEmail || '');
-      setCustomerAddress(existingQuote.customerAddress || '');
-
-      if (existingQuote.showRate !== undefined) setShowRate(existingQuote.showRate);
-      if (existingQuote.showLineTotal !== undefined) setShowLineTotal(existingQuote.showLineTotal);
-      if (existingQuote.showGrandTotal !== undefined) setShowGrandTotal(existingQuote.showGrandTotal);
+      setCustomerAddress(existingQuote.customerAddress || existingQuote.customerLocation || '');
+      if (existingQuote.autoSaveCustomer !== undefined) {
+        setAutoSaveCustomer(existingQuote.autoSaveCustomer);
+      }
 
       if (existingQuote.items && existingQuote.items.length > 0) {
         setItems(
@@ -134,15 +157,20 @@ export const QuotationFormPage = () => {
             name: it.name || it.productName || '',
             quantity: Number(it.quantity) || 1,
             unit: it.unit || 'pc',
-            unitPrice: Number(it.unitPrice) || 0,
-            lineTotal: Number(it.lineTotal) || 0,
+            unitPrice: Number(it.unitPrice || it.rate || it.price) || 0,
+            lineTotal: Number(it.lineTotal || it.amount || 0),
           }))
         );
       }
+
+      if (existingQuote.showRate !== undefined) setShowRate(existingQuote.showRate);
+      if (existingQuote.showLineTotal !== undefined) setShowLineTotal(existingQuote.showLineTotal);
+      if (existingQuote.showGrandTotal !== undefined) setShowGrandTotal(existingQuote.showGrandTotal);
+
       setDiscount(Number(existingQuote.discount) || 0);
       setTax(Number(existingQuote.tax) || 0);
       setStatus(existingQuote.status || 'draft');
-      setTermsAndConditions(existingQuote.termsAndConditions || '');
+      setTermsAndConditions(existingQuote.termsAndConditions || DEFAULT_TERMS[language] || DEFAULT_TERMS.bn);
       setNotes(existingQuote.notes || '');
     } else {
       setQuotationNumber(generatedQuotationNo);
@@ -192,13 +220,13 @@ export const QuotationFormPage = () => {
     setItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // Quick load standard sample items from handwritten photo
+  // Quick load standard sample items
   const loadShantaSampleItems = () => {
-    setCustomerName('মোসাদ্দেক হোসেন');
-    setCustomerCompany('কর্ণফুলী কোল্ড স্টোরেজ লিমিটেড');
+    setCustomerName(l({ bn: 'মোসাদ্দেক হোসেন', en: 'Mosaddek Hossain', obro: 'Mosaddek Hossain' }));
+    setCustomerCompany(l({ bn: 'কর্ণফুলী কোল্ড স্টোরেজ লিমিটেড', en: 'Karnafuli Cold Storage Ltd.', obro: 'Karnafuli Cold Storage Ltd.' }));
     setCustomerRole('purchaser');
     setCustomerPhone('01819-234567');
-    setCustomerAddress('কালুরঘাট শিল্প এলাকা, চট্টগ্রাম');
+    setCustomerAddress(l({ bn: 'কালুরঘাট শিল্প এলাকা, চট্টগ্রাম', en: 'Kalurghat Industrial Area, Chattogram', obro: 'Kalurghat Heavy Area, Chattogram' }));
     setRequisitionRef('RFQ-WHATSAPP-KCS-08');
 
     setItems([
@@ -258,14 +286,21 @@ export const QuotationFormPage = () => {
 
   // Handle Save
   const handleSave = (andPrint = false) => {
-    if (!customerName.trim()) {
-      alert('অনুগ্রহ করে কাস্টমার বা ক্লায়েন্টের নাম লিখুন (Customer Name is required).');
-      return;
-    }
+    // Customer Name is now OPTIONAL! If omitted, provide friendly default.
+    const trimmedCustomerName = customerName.trim();
+    const finalCustomerName = trimmedCustomerName || l({
+      bn: 'সাধারণ ক্লায়েন্ট',
+      en: 'Direct Client',
+      obro: 'Direct Client (সাধারণ গ্রাহক)',
+    });
 
     const validItems = items.filter((it) => it.name.trim() !== '');
     if (validItems.length === 0) {
-      alert('কমপক্ষে একটি পণ্যের বিবরণ লিখুন (At least 1 item is required).');
+      alert(l({
+        bn: 'কমপক্ষে একটি পণ্যের বিবরণ লিখুন (At least 1 item is required).',
+        en: 'Please enter at least 1 line item description.',
+        obro: 'Kompekkhe 1-ti item er biboron likhun (At least 1 item is required).',
+      }));
       return;
     }
 
@@ -275,13 +310,14 @@ export const QuotationFormPage = () => {
       validUntil: validUntil ? new Date(validUntil).toISOString() : null,
       requisitionRef: requisitionRef.trim(),
       customerId: selectedCustomerId || null,
-      customerName: customerName.trim(),
+      customerName: finalCustomerName,
       customerCompany: customerCompany.trim(),
       customerRole,
       customerPhone: customerPhone.trim(),
       customerEmail: customerEmail.trim(),
       customerAddress: customerAddress.trim(),
       customerLocation: customerAddress.trim(),
+      autoSaveCustomer,
       items: validItems,
       subtotal,
       discount: Number(discount) || 0,
@@ -326,10 +362,18 @@ export const QuotationFormPage = () => {
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               <FileSpreadsheet className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-              <span>{isEditing ? 'দরপত্র সংশোধন (Edit Quotation)' : 'নতুন দরপত্র তৈরি (New Quotation)'}</span>
+              <span>
+                {isEditing
+                  ? l({ bn: 'দরপত্র সংশোধন', en: 'Edit Quotation', obro: 'দরপত্র সংশোধন (Edit Quotation)' })
+                  : l({ bn: 'নতুন দরপত্র তৈরি', en: 'New Quotation', obro: 'নতুন দরপত্র তৈরি (New Quotation)' })}
+              </span>
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Generate quotation against client requisition or RFQ and print on M/S. Shanta Refrigeration official pad.
+              {l({
+                bn: 'ক্লায়েন্টের রিক্যুইজিশন বা আরএফকিউ অনুযায়ী দরপত্র তৈরি করুন এবং মেসার্স শান্তা রেফ্রিজারেশন অফিশিয়াল প্যাডে প্রিন্ট করুন।',
+                en: 'Generate quotation against client requisition or RFQ and print on M/S. Shanta Refrigeration official pad.',
+                obro: 'Client requisition ba RFQ onujayi quotation toiri korun ebong M/S. Shanta Refrigeration official pad e print korun.',
+              })}
             </p>
           </div>
         </div>
@@ -342,9 +386,13 @@ export const QuotationFormPage = () => {
               size="sm"
               icon={Sparkles}
               onClick={loadShantaSampleItems}
-              title="শান্তর বাস্তব হ্যান্ডরিটেন কোটেশনের ২২টি যন্ত্রাংশ প্রি-লোড করুন"
+              title={l({
+                bn: 'শান্তার বাস্তব হ্যান্ডরিটেন কোটেশনের যন্ত্রাংশ প্রি-লোড করুন',
+                en: 'Pre-load authentic spare parts sample items',
+                obro: 'Shantar sample items load korun',
+              })}
             >
-              Load Sample Spare Parts
+              {l({ bn: 'নমুনা যন্ত্রাংশ লোড করুন', en: 'Load Sample Spare Parts', obro: 'Load Sample Spare Parts' })}
             </Button>
           )}
 
@@ -355,7 +403,7 @@ export const QuotationFormPage = () => {
             icon={Printer}
             onClick={() => handleSave(true)}
           >
-            Save & Print Pad
+            {l({ bn: 'সংরক্ষণ ও প্রিন্ট প্যাড', en: 'Save & Print Pad', obro: 'Save & Print Pad' })}
           </Button>
 
           <Button
@@ -365,7 +413,9 @@ export const QuotationFormPage = () => {
             icon={Save}
             onClick={() => handleSave(false)}
           >
-            {isEditing ? 'Update Quotation' : 'Save Quotation'}
+            {isEditing
+              ? l({ bn: 'কোটেশন আপডেট করুন', en: 'Update Quotation', obro: 'Update Quotation' })
+              : l({ bn: 'কোটেশন সংরক্ষণ করুন', en: 'Save Quotation', obro: 'Save Quotation' })}
           </Button>
         </div>
       </div>
@@ -375,7 +425,7 @@ export const QuotationFormPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Quotation Number (নং) *
+              {l({ bn: 'কোটেশন নম্বর *', en: 'Quotation Number *', obro: 'Quotation Number (নং) *' })}
             </label>
             <input
               type="text"
@@ -388,7 +438,7 @@ export const QuotationFormPage = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Quotation Date (তারিখ)
+              {l({ bn: 'কোটেশনের তারিখ', en: 'Quotation Date', obro: 'Quotation Date (তারিখ)' })}
             </label>
             <input
               type="date"
@@ -400,7 +450,7 @@ export const QuotationFormPage = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Valid Until (মেয়াদ)
+              {l({ bn: 'মেয়াদ উত্তীর্ণের তারিখ', en: 'Valid Until', obro: 'Valid Until (মেয়াদ)' })}
             </label>
             <input
               type="date"
@@ -412,7 +462,11 @@ export const QuotationFormPage = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Requisition Ref / সূত্র (WhatsApp/RFQ)
+              {l({
+                bn: 'রিক্যুইজিশন সূত্র (হোয়াটসঅ্যাপ/আরএফকিউ)',
+                en: 'Requisition Ref (WhatsApp/RFQ)',
+                obro: 'Requisition Ref / সূত্র (WhatsApp/RFQ)',
+              })}
             </label>
             <input
               type="text"
@@ -427,86 +481,192 @@ export const QuotationFormPage = () => {
 
       {/* Customer Corporate Profile Section */}
       <Card className="p-5 border-l-4 border-l-purple-500">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Building2 className="h-4 w-4 text-purple-600" />
-              <span>Customer / Corporate Client Profile (গ্রাহকের প্রাতিষ্ঠানিক তথ্য)</span>
+              <span>
+                {l({
+                  bn: 'গ্রাহক ও করপোরেট ক্লায়েন্ট প্রোফাইল',
+                  en: 'Customer / Corporate Client Profile',
+                  obro: 'Customer / Corporate Client Profile (গ্রাহকের প্রাতিষ্ঠানিক তথ্য)',
+                })}
+              </span>
             </h2>
             <p className="text-[11px] text-slate-400">
-              Select existing client or enter new company details. Will auto-create/update customer records.
+              {l({
+                bn: 'বিদ্যমান ক্লায়েন্ট নির্বাচন করুন বা নতুন তথ্য দিন।',
+                en: 'Select existing client or enter new company details.',
+                obro: 'Select existing client or enter new company details.',
+              })}
             </p>
           </div>
 
-          {/* Quick Picker */}
-          <div className="w-full sm:w-64">
-            <select
-              value={selectedCustomerId}
-              onChange={(e) => {
-                const found = customers.find((c) => c.id === e.target.value);
-                handleSelectCustomer(found || null);
-              }}
-              className="w-full px-3 py-1.5 text-xs rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-medium focus:outline-none"
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {/* Auto-Save Customer Toggle Button (Always ON by default) */}
+            <button
+              type="button"
+              onClick={() => setAutoSaveCustomer(!autoSaveCustomer)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all select-none ${
+                autoSaveCustomer
+                  ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+              }`}
+              title={l({
+                bn: 'ক্লিক করে গ্রাহকের তথ্য ডাটাবেজে সংরক্ষণ চালু/বন্ধ করুন (ডিফল্ট: চালু)',
+                en: 'Toggle auto-saving client information to customer directory (Default: ON)',
+                obro: 'Customer info directory te auto-save kora on/off korun',
+              })}
             >
-              <option value="">-- Quick Pick Registered Client --</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} {c.companyName ? `(${c.companyName})` : ''}
+              <span
+                className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black transition-colors ${
+                  autoSaveCustomer ? 'bg-purple-600 text-white' : 'bg-slate-300 dark:bg-slate-600 text-transparent'
+                }`}
+              >
+                ✓
+              </span>
+              <span>
+                {autoSaveCustomer
+                  ? l({ bn: 'গ্রাহক সংরক্ষণ: চালু', en: 'Save Customer: ON', obro: 'Save Customer: ON' })
+                  : l({ bn: 'গ্রাহক সংরক্ষণ: বন্ধ', en: 'Save Customer: OFF', obro: 'Save Customer: OFF' })}
+              </span>
+            </button>
+
+            {/* Quick Picker */}
+            <div className="w-full sm:w-64">
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => {
+                  const found = customers.find((c) => c.id === e.target.value);
+                  handleSelectCustomer(found || null);
+                }}
+                className="w-full px-3 py-1.5 text-xs rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-medium focus:outline-none"
+              >
+                <option value="">
+                  {l({
+                    bn: '-- নিবন্ধিত ক্লায়েন্ট দ্রুত নির্বাচন করুন --',
+                    en: '-- Quick Pick Registered Client --',
+                    obro: '-- Quick Pick Registered Client --',
+                  })}
                 </option>
-              ))}
-            </select>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.companyName ? `(${c.companyName})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Client Contact Person (নাম) *
+              {l({
+                bn: 'ক্লায়েন্ট যোগাযোগকারীর নাম (ঐচ্ছিক)',
+                en: 'Client Contact Person (Optional)',
+                obro: 'Client Contact Person (নাম - ঐচ্ছিক)',
+              })}
             </label>
             <input
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="e.g. ইঞ্জিঃ কামরুল ইসলাম"
+              placeholder={l({
+                bn: 'যেমনঃ ইঞ্জিঃ কামরুল ইসলাম (খালি থাকলে সাধারণ ক্লায়েন্ট)',
+                en: 'e.g. Engr. Kamrul Islam (Optional)',
+                obro: 'e.g. Engr. Kamrul Islam',
+              })}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-              required
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Company Name (প্রতিষ্ঠানের নাম)
+              {l({
+                bn: 'প্রতিষ্ঠানের নাম',
+                en: 'Company Name',
+                obro: 'Company Name (প্রতিষ্ঠানের নাম)',
+              })}
             </label>
             <input
               type="text"
               value={customerCompany}
               onChange={(e) => setCustomerCompany(e.target.value)}
-              placeholder="e.g. সোনারগাঁও টেক্সটাইল মিলস লিঃ"
+              placeholder={l({
+                bn: 'যেমনঃ সোনারগাঁও টেক্সটাইল মিলস লিঃ',
+                en: 'e.g. Sonargaon Textile Mills Ltd.',
+                obro: 'e.g. Sonargaon Textile Mills Ltd.',
+              })}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Designation / Role (কাস্টমার স্ট্যাটাস)
+              {l({
+                bn: 'কাস্টমার পদবি / স্ট্যাটাস',
+                en: 'Designation / Role',
+                obro: 'Designation / Role (কাস্টমার স্ট্যাটাস)',
+              })}
             </label>
             <select
               value={customerRole}
               onChange={(e) => setCustomerRole(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
             >
-              <option value="owner">কোম্পানির মালিক / স্বত্বাধিকারী (Owner)</option>
-              <option value="agent">কোম্পানির এজেন্ট / প্রতিনিধি (Agent)</option>
-              <option value="purchaser">ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার (Purchaser)</option>
-              <option value="supplier_rep">সরবরাহকারী / ভেন্ডর প্রতিনিধি (Supplier Rep)</option>
-              <option value="wholesale">পাইকারি ডিলার / মার্চেন্ট (Wholesale Dealer)</option>
-              <option value="retail">সাধারণ খুচরা গ্রাহক (Retail Customer)</option>
+              <option value="owner">
+                {l({
+                  bn: 'কোম্পানির মালিক / স্বত্বাধিকারী',
+                  en: 'Company Owner / Proprietor',
+                  obro: 'কোম্পানির মালিক / স্বত্বাধিকারী (Owner)',
+                })}
+              </option>
+              <option value="agent">
+                {l({
+                  bn: 'কোম্পানির এজেন্ট / প্রতিনিধি',
+                  en: 'Company Agent / Representative',
+                  obro: 'কোম্পানির এজেন্ট / প্রতিনিধি (Agent)',
+                })}
+              </option>
+              <option value="purchaser">
+                {l({
+                  bn: 'ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার',
+                  en: 'Procurement / Purchase Officer',
+                  obro: 'ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার (Purchaser)',
+                })}
+              </option>
+              <option value="supplier_rep">
+                {l({
+                  bn: 'সরবরাহকারী / ভেন্ডর প্রতিনিধি',
+                  en: 'Supplier / Vendor Representative',
+                  obro: 'সরবরাহকারী / ভেন্ডর প্রতিনিধি (Supplier Rep)',
+                })}
+              </option>
+              <option value="wholesale">
+                {l({
+                  bn: 'পাইকারি ডিলার / মার্চেন্ট',
+                  en: 'Wholesale Dealer / Merchant',
+                  obro: 'পাইকারি ডিলার / মার্চেন্ট (Wholesale Dealer)',
+                })}
+              </option>
+              <option value="retail">
+                {l({
+                  bn: 'সাধারণ খুচরা গ্রাহক',
+                  en: 'Retail Customer',
+                  obro: 'সাধারণ খুচরা গ্রাহক (Retail Customer)',
+                })}
+              </option>
             </select>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Contact Phone (মোবাইল)
+              {l({
+                bn: 'মোবাইল নম্বর',
+                en: 'Contact Phone',
+                obro: 'Contact Phone (মোবাইল)',
+              })}
             </label>
             <input
               type="text"
@@ -519,7 +679,11 @@ export const QuotationFormPage = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Email Address (ইমেইল)
+              {l({
+                bn: 'ইমেইল ঠিকানা',
+                en: 'Email Address',
+                obro: 'Email Address (ইমেইল)',
+              })}
             </label>
             <input
               type="email"
@@ -532,13 +696,21 @@ export const QuotationFormPage = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Location / Factory Address (ঠিকানা)
+              {l({
+                bn: 'ঠিকানা / অবস্থান',
+                en: 'Location / Factory Address',
+                obro: 'Location / Factory Address (ঠিকানা)',
+              })}
             </label>
             <input
               type="text"
               value={customerAddress}
               onChange={(e) => setCustomerAddress(e.target.value)}
-              placeholder="প্লট নং ১২, নাসিরাবাদ বায়েজিদ, চট্টগ্রাম"
+              placeholder={l({
+                bn: 'প্লট নং ১২, নাসিরাবাদ বায়েজিদ, চট্টগ্রাম',
+                en: 'Plot 12, Nasirabad Bayezid, Chattogram',
+                obro: 'Plot 12, Nasirabad Bayezid, Chattogram',
+              })}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
             />
           </div>
@@ -550,13 +722,23 @@ export const QuotationFormPage = () => {
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <span>Quotation Line Items (পণ্যের বিবরণ ও দর তালিকা)</span>
+              <span>
+                {l({
+                  bn: 'পণ্যের বিবরণ ও দর তালিকা',
+                  en: 'Quotation Line Items',
+                  obro: 'Quotation Line Items (পণ্যের বিবরণ ও দর তালিকা)',
+                })}
+              </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-mono">
-                {items.length} items
+                {items.length} {l({ bn: 'টি আইটেম', en: 'items', obro: 'items' })}
               </span>
             </CardTitle>
             <p className="text-[11px] text-slate-400">
-              Type custom equipment / spare parts directly, or pick from inventory catalog.
+              {l({
+                bn: 'কাস্টম যন্ত্রাংশের বিবরণ সরাসরি লিখুন বা ক্যাটালগ থেকে নির্বাচন করুন।',
+                en: 'Type custom equipment / spare parts directly, or pick from inventory catalog.',
+                obro: 'Type custom equipment / spare parts directly, or pick from inventory catalog.',
+              })}
             </p>
           </div>
 
@@ -567,15 +749,21 @@ export const QuotationFormPage = () => {
             icon={Plus}
             onClick={addItemRow}
           >
-            Add Item Line
+            {l({ bn: 'নতুন আইটেম যোগ করুন', en: 'Add Item Line', obro: 'Add Item Line' })}
           </Button>
         </CardHeader>
 
-        {/* Single Line Column & Total Visibility Controls ("eta ek line e thakbe eigula") */}
+        {/* Single Line Column & Total Visibility Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-100/90 dark:bg-slate-800/80 border-y border-slate-200 dark:border-slate-800 text-xs">
           <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
             <span className="text-[11px] uppercase tracking-wider text-purple-700 dark:text-purple-400 font-extrabold flex items-center gap-1.5">
-              <span>👁️ কলাম ও মোট মূল্য নিয়ন্ত্রণ (Visibility Controls):</span>
+              <span>
+                {l({
+                  bn: '👁️ কলাম ও মোট মূল্য নিয়ন্ত্রণ:',
+                  en: '👁️ Visibility Controls:',
+                  obro: '👁️ কলাম ও মোট মূল্য নিয়ন্ত্রণ (VISIBILITY CONTROLS):',
+                })}
+              </span>
             </span>
           </div>
 
@@ -587,7 +775,7 @@ export const QuotationFormPage = () => {
                 onChange={(e) => setShowRate(e.target.checked)}
                 className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
               />
-              <span>দর / Rate কলাম</span>
+              <span>{l({ bn: 'দর কলাম', en: 'Rate Column', obro: 'দর / Rate কলাম' })}</span>
             </label>
 
             <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 hover:text-purple-600 transition-colors select-none">
@@ -597,7 +785,7 @@ export const QuotationFormPage = () => {
                 onChange={(e) => setShowLineTotal(e.target.checked)}
                 className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
               />
-              <span>আইটেম মোট / Total কলাম</span>
+              <span>{l({ bn: 'আইটেম মোট কলাম', en: 'Total Column', obro: 'আইটেম মোট / Total কলাম' })}</span>
             </label>
 
             <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 hover:text-purple-600 transition-colors select-none">
@@ -607,7 +795,7 @@ export const QuotationFormPage = () => {
                 onChange={(e) => setShowGrandTotal(e.target.checked)}
                 className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
               />
-              <span>সর্বমোট মূল্য / Grand Total</span>
+              <span>{l({ bn: 'সর্বমোট মূল্য', en: 'Grand Total', obro: 'সর্বমোট মূল্য / Grand Total' })}</span>
             </label>
           </div>
         </div>
@@ -618,11 +806,29 @@ export const QuotationFormPage = () => {
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-y border-slate-200 dark:border-slate-800 text-slate-500 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
-                  <th className="py-2.5 px-3 min-w-[260px]">Product / Spare Part Description</th>
-                  <th className="py-2.5 px-2 w-24 text-center">Unit</th>
-                  <th className="py-2.5 px-2 w-24 text-center">Qty</th>
-                  {showRate && <th className="py-2.5 px-3 w-32 text-right">Unit Rate (BDT)</th>}
-                  {showLineTotal && <th className="py-2.5 px-3 w-32 text-right">Total (BDT)</th>}
+                  <th className="py-2.5 px-3 min-w-[260px]">
+                    {l({
+                      bn: 'পণ্য বা যন্ত্রাংশের বিবরণ',
+                      en: 'Product / Spare Part Description',
+                      obro: 'Product / Spare Part Description',
+                    })}
+                  </th>
+                  <th className="py-2.5 px-2 w-24 text-center">
+                    {l({ bn: 'একক', en: 'Unit', obro: 'একক (Unit)' })}
+                  </th>
+                  <th className="py-2.5 px-2 w-24 text-center">
+                    {l({ bn: 'পরিমাণ', en: 'Qty', obro: 'পরিমাণ (Qty)' })}
+                  </th>
+                  {showRate && (
+                    <th className="py-2.5 px-3 w-32 text-right">
+                      {l({ bn: 'একক দর (টাকা)', en: 'Unit Rate (BDT)', obro: 'Unit Rate (BDT)' })}
+                    </th>
+                  )}
+                  {showLineTotal && (
+                    <th className="py-2.5 px-3 w-32 text-right">
+                      {l({ bn: 'মোট টাকা', en: 'Total (BDT)', obro: 'Total (BDT)' })}
+                    </th>
+                  )}
                   <th className="py-2.5 px-2 w-10 text-center"></th>
                 </tr>
               </thead>
@@ -648,9 +854,15 @@ export const QuotationFormPage = () => {
                           value={it.productId || ''}
                           onChange={(e) => handleItemChange(idx, 'productId', e.target.value)}
                           className="w-36 shrink-0 px-2 py-1.5 text-[11px] rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-                          title="Pick from existing inventory catalog"
+                          title={l({
+                            bn: 'ইনভেন্টরি ক্যাটালগ থেকে বাছাই করুন',
+                            en: 'Pick from existing inventory catalog',
+                            obro: 'Catalog theke select korun',
+                          })}
                         >
-                          <option value="">Stock Catalog...</option>
+                          <option value="">
+                            {l({ bn: 'ক্যাটালগ...', en: 'Stock Catalog...', obro: 'Stock Catalog...' })}
+                          </option>
                           {products.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name}
@@ -667,13 +879,13 @@ export const QuotationFormPage = () => {
                         onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
                         className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center"
                       >
-                        <option value="pc">pc (পিস)</option>
-                        <option value="set">set (সেট)</option>
-                        <option value="kg">kg (কেজি)</option>
-                        <option value="can">can (ক্যান)</option>
-                        <option value="cylinder">cylinder (সিলিন্ডার)</option>
-                        <option value="drum">drum (ড্রাম)</option>
-                        <option value="box">box (বক্স)</option>
+                        <option value="pc">{l({ bn: 'পিস (pc)', en: 'pc', obro: 'pc (পিস)' })}</option>
+                        <option value="set">{l({ bn: 'সেট (set)', en: 'set', obro: 'set (সেট)' })}</option>
+                        <option value="kg">{l({ bn: 'কেজি (kg)', en: 'kg', obro: 'kg (কেজি)' })}</option>
+                        <option value="can">{l({ bn: 'ক্যান (can)', en: 'can', obro: 'can (ক্যান)' })}</option>
+                        <option value="cylinder">{l({ bn: 'সিলিন্ডার (cylinder)', en: 'cylinder', obro: 'cylinder (সিলিন্ডার)' })}</option>
+                        <option value="drum">{l({ bn: 'ড্রাম (drum)', en: 'drum', obro: 'drum (ড্রাম)' })}</option>
+                        <option value="box">{l({ bn: 'বক্স (box)', en: 'box', obro: 'box (বক্স)' })}</option>
                       </select>
                     </td>
 
@@ -731,27 +943,43 @@ export const QuotationFormPage = () => {
             <div className="flex-1 space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Terms & Conditions (শর্তাবলী)
+                  {l({
+                    bn: 'শর্তাবলী',
+                    en: 'Terms & Conditions',
+                    obro: 'Terms & Conditions (শর্তাবলী)',
+                  })}
                 </label>
                 <textarea
                   rows={3}
                   value={termsAndConditions}
                   onChange={(e) => setTermsAndConditions(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  placeholder="ডেলিভারি সময়, পেমেন্ট শর্ত ইত্যাদি..."
+                  placeholder={l({
+                    bn: 'ডেলিভারি সময়, পেমেন্ট শর্ত ইত্যাদি...',
+                    en: 'Delivery terms, payment milestones, validity period...',
+                    obro: 'Delivery shomoy, payment terms ityadi...',
+                  })}
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Internal Remarks / Notes
+                  {l({
+                    bn: 'অভ্যন্তরীণ নোট / মন্তব্য',
+                    en: 'Internal Remarks / Notes',
+                    obro: 'Internal Remarks / Notes',
+                  })}
                 </label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
-                  placeholder="Special client preferences or reference info"
+                  placeholder={l({
+                    bn: 'বিশেষ ক্লায়েন্ট তথ্য বা রেফারেন্স',
+                    en: 'Special client preferences or reference info',
+                    obro: 'Special client preferences or reference info',
+                  })}
                 />
               </div>
             </div>
@@ -761,14 +989,19 @@ export const QuotationFormPage = () => {
               {showGrandTotal ? (
                 <>
                   <div className="flex justify-between py-1 border-b border-slate-200 dark:border-slate-800">
-                    <span className="text-slate-500">Subtotal ({items.length} items):</span>
+                    <span className="text-slate-500">
+                      {l({ bn: 'উপ-মোট', en: 'Subtotal', obro: 'Subtotal' })} ({items.length}{' '}
+                      {l({ bn: 'টি আইটেম', en: 'items', obro: 'items' })}):
+                    </span>
                     <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
                       {formatCurrency(subtotal, settings.currency)}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between py-1 border-b border-slate-200 dark:border-slate-800">
-                    <span className="text-slate-500">Discount (BDT):</span>
+                    <span className="text-slate-500">
+                      {l({ bn: 'বিশেষ ছাড় (টাকা):', en: 'Discount (BDT):', obro: 'Discount (BDT):' })}
+                    </span>
                     <input
                       type="number"
                       min="0"
@@ -779,7 +1012,9 @@ export const QuotationFormPage = () => {
                   </div>
 
                   <div className="flex items-center justify-between py-1 border-b border-slate-200 dark:border-slate-800">
-                    <span className="text-slate-500">Tax / VAT (BDT):</span>
+                    <span className="text-slate-500">
+                      {l({ bn: 'ভ্যাট / ট্যাক্স (টাকা):', en: 'Tax / VAT (BDT):', obro: 'Tax / VAT (BDT):' })}
+                    </span>
                     <input
                       type="number"
                       min="0"
@@ -790,7 +1025,9 @@ export const QuotationFormPage = () => {
                   </div>
 
                   <div className="flex justify-between py-2 border-b-2 border-purple-500">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">Grand Total Quoted:</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {l({ bn: 'সর্বমোট প্রস্তাবিত মূল্য:', en: 'Grand Total Quoted:', obro: 'Grand Total Quoted:' })}
+                    </span>
                     <span className="font-mono font-black text-lg text-purple-600 dark:text-purple-400">
                       {formatCurrency(grandTotal, settings.currency)}
                     </span>
@@ -799,32 +1036,48 @@ export const QuotationFormPage = () => {
               ) : (
                 <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 border border-dashed border-amber-300 dark:border-amber-700/60 rounded-xl space-y-1.5 text-center">
                   <div className="text-amber-800 dark:text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5">
-                    <span>🚫 সর্বমোট মূল্য (Grand Total) বন্ধ রাখা হয়েছে</span>
+                    <span>
+                      {l({
+                        bn: '🚫 সর্বমোট মূল্য বন্ধ রাখা হয়েছে',
+                        en: '🚫 Grand Total Hidden',
+                        obro: '🚫 সর্বমোট মূল্য (Grand Total) বন্ধ রাখা হয়েছে',
+                      })}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                    নন-প্রাইসড স্পেসিফিকেশন মোড: ক্লায়েন্টকে পাঠানো কোটেশনে ও প্যাডে সর্বমোট মূল্য সম্পূর্ণ লুকানো থাকবে।
+                    {l({
+                      bn: 'নন-প্রাইসড স্পেসিফিকেশন মোড: ক্লায়েন্টকে পাঠানো কোটেশনে ও প্যাডে সর্বমোট মূল্য লুকানো থাকবে।',
+                      en: 'Non-priced specification mode: Grand total will remain hidden on the printed quotation pad.',
+                      obro: 'Non-priced specification mode: Grand total pad e lukano thakbe.',
+                    })}
                   </p>
                   <button
                     type="button"
                     onClick={() => setShowGrandTotal(true)}
                     className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline pt-0.5 inline-block"
                   >
-                    পুনরায় Grand Total অন করুন
+                    {l({
+                      bn: 'পুনরায় সর্বমোট মূল্য চালু করুন',
+                      en: 'Turn Grand Total Back On',
+                      obro: 'পুনরায় Grand Total অন করুন',
+                    })}
                   </button>
                 </div>
               )}
 
               {/* Status Select */}
               <div className="pt-2 flex items-center justify-between">
-                <span className="text-slate-500 font-medium">Initial Status:</span>
+                <span className="text-slate-500 font-medium">
+                  {l({ bn: 'কোটেশন স্ট্যাটাস:', en: 'Initial Status:', obro: 'Initial Status:' })}
+                </span>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
                   className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                 >
-                  <option value="draft">Draft (খসড়া)</option>
-                  <option value="sent">Sent to Client (প্রেরিত)</option>
-                  <option value="approved">Approved (অনুমোদিত)</option>
+                  <option value="draft">{l({ bn: 'খসড়া', en: 'Draft', obro: 'Draft (খসড়া)' })}</option>
+                  <option value="sent">{l({ bn: 'ক্লায়েন্টকে প্রেরিত', en: 'Sent to Client', obro: 'Sent to Client (প্রেরিত)' })}</option>
+                  <option value="approved">{l({ bn: 'অনুমোদিত', en: 'Approved', obro: 'Approved (অনুমোদিত)' })}</option>
                 </select>
               </div>
             </div>
@@ -835,13 +1088,15 @@ export const QuotationFormPage = () => {
       {/* Floating or Bottom Action Bar */}
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
         <Button variant="outline" onClick={() => navigate('/quotations')}>
-          Cancel
+          {l({ bn: 'বাতিল', en: 'Cancel', obro: 'Cancel' })}
         </Button>
         <Button variant="secondary" icon={Printer} onClick={() => handleSave(true)}>
-          Save & Print Quotation Pad
+          {l({ bn: 'সংরক্ষণ ও প্রিন্ট প্যাড', en: 'Save & Print Quotation Pad', obro: 'Save & Print Quotation Pad' })}
         </Button>
         <Button variant="primary" icon={Save} onClick={() => handleSave(false)}>
-          {isEditing ? 'Update Quotation' : 'Create Quotation'}
+          {isEditing
+            ? l({ bn: 'কোটেশন আপডেট করুন', en: 'Update Quotation', obro: 'Update Quotation' })
+            : l({ bn: 'কোটেশন তৈরি করুন', en: 'Create Quotation', obro: 'Create Quotation' })}
         </Button>
       </div>
 

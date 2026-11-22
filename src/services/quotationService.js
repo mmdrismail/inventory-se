@@ -41,9 +41,28 @@ class QuotationService {
     const tax = Number(data.tax) || 0;
     const totalAmount = subtotal - discount + tax;
 
-    // Auto-upsert customer if customer information provided
+    // Auto-upsert customer if customer information provided and autoSave is enabled
     let customerId = data.customerId;
-    if (data.customerName && data.customerName.trim() && data.customerName !== 'Walk-in Retail Customer') {
+    const isGenericClientName = (name) => {
+      if (!name) return true;
+      const n = String(name).trim().toLowerCase();
+      return (
+        n === 'walk-in retail customer' ||
+        n === 'direct client' ||
+        n === 'valued client' ||
+        n === 'client representative' ||
+        n === 'সাধারণ ক্লায়েন্ট' ||
+        n === 'সাধারণ গ্রাহক' ||
+        n.includes('direct client')
+      );
+    };
+
+    if (
+      data.autoSaveCustomer !== false &&
+      data.customerName &&
+      data.customerName.trim() &&
+      !isGenericClientName(data.customerName)
+    ) {
       const cust = customerService.upsertCustomer({
         id: data.customerId,
         name: data.customerName,
