@@ -731,6 +731,25 @@ const getDateParts = (dateInput) => {
 };
 
 /**
+ * Strips internal system markers like "(CUSTOM)" or "(কাস্টম)" from item descriptions
+ * for professional, client-facing final prints.
+ */
+export const cleanItemName = (name) => {
+  if (!name) return '';
+  return String(name).replace(/\s*\((?:custom|কাস্টম)\)/gi, '').trim();
+};
+
+/**
+ * Filters out internal placeholder SKUs like 'CUSTOM', 'NONE', 'N/A' from client prints.
+ */
+export const cleanItemSku = (sku) => {
+  if (!sku) return '';
+  const s = String(sku).trim();
+  if (/^(custom|none|n\/a|undefined|null)$/i.test(s)) return '';
+  return s;
+};
+
+/**
  * 1. CASH MEMO (ক্যাশ মেমো - ১ম কপি)
  * Supports live customizable info & English/Bangla switching
  */
@@ -838,8 +857,8 @@ export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
             <tr>
               <td class="col-sl font-mono">${idx + 1}</td>
               <td class="col-desc font-semibold">
-                ${it.productName || it.name}
-                ${it.sku ? `<span style="font-size: 9.5px; color: #64748b; font-weight: normal; margin-left: 4px;">(${it.sku})</span>` : ''}
+                ${cleanItemName(it.productName || it.name)}
+                ${cleanItemSku(it.sku) ? `<span style="font-size: 9.5px; color: #64748b; font-weight: normal; margin-left: 4px;">(${cleanItemSku(it.sku)})</span>` : ''}
               </td>
               <td class="col-qty font-mono font-bold">${qty}</td>
               ${showRate ? `<td class="col-rate font-mono">${formatCurrency(rate, p.currencySymbol)}</td>` : ''}
@@ -991,8 +1010,8 @@ export const generateChallanHtml = (sale, settings = {}, options = {}) => {
             <tr>
               <td class="col-sl font-mono font-semibold">${idx + 1}</td>
               <td class="col-desc font-semibold">
-                ${it.productName || it.name}
-                ${it.sku ? `<span style="font-size: 10px; color: #64748b; font-weight: normal; margin-left: 6px;">[SKU: ${it.sku}]</span>` : ''}
+                ${cleanItemName(it.productName || it.name)}
+                ${cleanItemSku(it.sku) ? `<span style="font-size: 10px; color: #64748b; font-weight: normal; margin-left: 6px;">[SKU: ${cleanItemSku(it.sku)}]</span>` : ''}
               </td>
               <td class="col-qty font-mono font-bold" style="font-size: 13px; color: #0369a1;">${qty} pcs</td>
             </tr>
@@ -1149,8 +1168,8 @@ export const generateOfficialPadHtml = (sale, settings = {}, options = {}) => {
                 <tr>
                   <td class="col-sl font-mono">${idx + 1}</td>
                   <td class="col-desc font-semibold">
-                    ${it.productName || it.name}
-                    ${it.sku ? `<div style="font-size: 9px; color: #64748b; font-weight: normal;">SKU: ${it.sku}</div>` : ''}
+                    ${cleanItemName(it.productName || it.name)}
+                    ${cleanItemSku(it.sku) ? `<div style="font-size: 9px; color: #64748b; font-weight: normal;">SKU: ${cleanItemSku(it.sku)}</div>` : ''}
                   </td>
                   <td class="col-qty font-mono font-bold">${qty}</td>
                   ${showRate ? `<td class="col-rate font-mono">${formatCurrency(rate, p.currencySymbol)}</td>` : ''}
@@ -1278,10 +1297,10 @@ export const generateThermalReceiptHtml = (sale, settings = {}, options = {}) =>
             const amt = Number(it.lineTotal !== undefined ? it.lineTotal : it.total || qty * rate);
             return `
             <tr>
-              <td colspan="3" style="padding-top: 3px; font-weight: 700;">${it.productName || it.name}</td>
+              <td colspan="3" style="padding-top: 3px; font-weight: 700;">${cleanItemName(it.productName || it.name)}</td>
             </tr>
             <tr style="border-bottom: 1px dotted #e2e8f0;">
-              <td style="font-size: 9px; color: #64748b;">${it.sku || ''}</td>
+              <td style="font-size: 9px; color: #64748b;">${cleanItemSku(it.sku)}</td>
               <td style="text-align: center;">${qty} x ${rate}</td>
               <td style="text-align: right; font-weight: 700;">${formatCurrency(amt, p.currencySymbol)}</td>
             </tr>
@@ -1488,7 +1507,8 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
                 <tr>
                   <td class="col-sl font-mono">${idx + 1}</td>
                   <td class="col-desc font-semibold">
-                    ${it.name || it.productName}
+                    ${cleanItemName(it.name || it.productName)}
+                    ${cleanItemSku(it.sku) ? `<span style="font-size: 9.5px; color: #64748b; font-weight: normal; margin-left: 4px;">(${cleanItemSku(it.sku)})</span>` : ''}
                     ${it.description ? `<div style="font-size: 9.5px; color: #64748b; font-weight: normal;">${it.description}</div>` : ''}
                   </td>
                   <td class="col-qty font-mono font-bold">${qty} ${unit}</td>

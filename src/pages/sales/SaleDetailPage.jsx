@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/commo
 import { Button } from '../../components/common/Button';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
+import { cleanItemName } from '../../utils/printTemplateGenerator';
 import { ArrowLeft, Printer, CheckCircle2, XCircle, Clock, Users2 } from 'lucide-react';
 
 export const SaleDetailPage = () => {
@@ -234,7 +235,7 @@ export const SaleDetailPage = () => {
                 {(sale.items || []).map((item, i) => (
                   <tr key={i}>
                     <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
-                      {item.productName || item.productId}
+                      {cleanItemName(item.productName || item.productId)}
                     </td>
                     <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                       {item.quantity}

@@ -6,7 +6,7 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
-import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
+import { DOCUMENT_TYPES, cleanItemName } from '../../utils/printTemplateGenerator';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import {
   FileSpreadsheet,
@@ -495,7 +495,7 @@ export const QuotationDetailPage = () => {
                     {idx + 1}.
                   </td>
                   <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800">
-                    {it.name || it.productName}
+                    {cleanItemName(it.name || it.productName)}
                     {it.description && (
                       <span className="block text-[11px] text-slate-400 font-normal">
                         {it.description}

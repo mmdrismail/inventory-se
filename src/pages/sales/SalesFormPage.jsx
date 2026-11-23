@@ -222,7 +222,7 @@ export const SalesFormPage = () => {
     return {
       productId: prod?.id || 'custom',
       productName: item.productName || prod?.name || 'Equipment Part',
-      sku: prod?.sku || 'CUSTOM',
+      sku: prod?.sku || '',
       quantity: qty,
       unitPrice: price,
       availableStock: prod ? available : 999,

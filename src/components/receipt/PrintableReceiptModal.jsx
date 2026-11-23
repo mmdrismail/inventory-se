@@ -30,6 +30,8 @@ import {
   generateQuotationHtml,
   resolveStationeryProfile,
   isStandardDefaultTerms,
+  cleanItemName,
+  cleanItemSku,
 } from '../../utils/printTemplateGenerator';
 
 export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType }) => {
@@ -701,8 +703,8 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         <tr key={idx} className="border-b border-slate-300 text-xs">
                           <td className="py-1 px-1.5 text-center font-mono bg-[#faf5ff] border-x border-slate-300">{idx + 1}</td>
                           <td className="py-1 px-2 font-semibold bg-[#fffbeb] border-r border-slate-300">
-                            {it.productName || it.name}
-                            {it.sku && <span className="text-[10px] text-slate-500 font-normal ml-1">({it.sku})</span>}
+                            {cleanItemName(it.productName || it.name)}
+                            {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 font-normal ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
                           <td className="py-1 px-1.5 text-center font-mono font-bold bg-[#f0fdf4] border-r border-slate-300">{qty}</td>
                           {showRate && <td className="py-1 px-2 text-right font-mono bg-[#fdf2f8] border-r border-slate-300">{formatCurrency(rate, profile.currencySymbol)}</td>}
@@ -859,8 +861,8 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         <tr key={idx} className="border-b border-slate-300 text-xs">
                           <td className="py-1.5 px-2 text-center font-mono bg-[#faf5ff] border-x border-slate-300">{idx + 1}</td>
                           <td className="py-1.5 px-3 font-semibold bg-[#fffbeb] border-r border-slate-300">
-                            {it.productName || it.name}
-                            {it.sku && <span className="text-[10px] text-slate-500 font-normal ml-1">({it.sku})</span>}
+                            {cleanItemName(it.productName || it.name)}
+                            {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 font-normal ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
                           <td className="py-1.5 px-3 text-center font-mono font-bold text-sky-700 text-sm bg-[#f0fdf4] border-r border-slate-300">
                             {qty} pcs
@@ -991,8 +993,8 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         <tr key={idx}>
                           <td className="py-1 px-1.5 text-center font-mono text-slate-500">{idx + 1}</td>
                           <td className="py-1 px-2 font-semibold">
-                            {it.productName || it.name}
-                            {it.sku && <span className="text-[10px] text-slate-500 ml-1">({it.sku})</span>}
+                            {cleanItemName(it.productName || it.name)}
+                            {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
                           <td className="py-1 px-1.5 text-center font-mono font-bold">{qty}</td>
                           {showRate && <td className="py-1 px-2 text-right font-mono">{formatCurrency(rate, profile.currencySymbol)}</td>}
@@ -1137,8 +1139,8 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         <tr key={idx}>
                           <td className="py-1 px-1.5 text-center font-mono text-slate-500">{idx + 1}</td>
                           <td className="py-1 px-2 font-semibold">
-                            {it.productName || it.name}
-                            {it.sku && <span className="text-[10px] text-slate-500 ml-1">({it.sku})</span>}
+                            {cleanItemName(it.productName || it.name)}
+                            {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
                           <td className="py-1 px-1.5 text-center font-mono font-bold">{qty} {it.unit || 'pc'}</td>
                           {showRate && <td className="py-1 px-2 text-right font-mono">{formatCurrency(rate, profile.currencySymbol)}</td>}
@@ -1235,7 +1237,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                   const amt = Number(item.lineTotal !== undefined ? item.lineTotal : item.total || qty * rate);
                   return (
                     <div key={idx} className="border-b border-dotted border-slate-200 pb-1">
-                      <p className="font-bold font-['Hind_Siliguri']">{item.productName || item.name}</p>
+                      <p className="font-bold font-['Hind_Siliguri']">{cleanItemName(item.productName || item.name)}</p>
                       <div className="flex justify-between text-slate-600 text-[10px]">
                         <span>{qty} x {rate}</span>
                         <span className="font-bold text-slate-900">{formatCurrency(amt, profile.currencySymbol)}</span>
