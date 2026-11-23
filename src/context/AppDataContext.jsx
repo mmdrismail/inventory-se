@@ -484,6 +484,20 @@ export const AppDataProvider = ({ children }) => {
     return res;
   };
 
+  const updateSale = (id, data, performedBy) => {
+    const res = salesService.update(id, data, performedBy);
+    if (res.success) {
+      reloadState();
+      addToast({
+        title: 'Sale Updated',
+        message: `Invoice ${res.sale.invoiceNo} updated successfully.`,
+      });
+    } else {
+      addToast({ title: 'Update Failed', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
   const completeSale = (id, performedBy) => {
     const res = salesService.completeSale(id, performedBy);
     if (res.success) {
@@ -900,6 +914,7 @@ export const AppDataProvider = ({ children }) => {
     receivePurchase,
     cancelPurchase,
     createSale,
+    updateSale,
     completeSale,
     cancelSale,
     createQuotation,

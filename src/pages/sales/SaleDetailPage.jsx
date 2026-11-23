@@ -6,7 +6,7 @@ import { Button } from '../../components/common/Button';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import { cleanItemName } from '../../utils/printTemplateGenerator';
-import { ArrowLeft, Printer, CheckCircle2, XCircle, Clock, Users2 } from 'lucide-react';
+import { ArrowLeft, Printer, CheckCircle2, XCircle, Clock, Users2, Edit2 } from 'lucide-react';
 
 export const SaleDetailPage = () => {
   const { id } = useParams();
@@ -83,6 +83,12 @@ export const SaleDetailPage = () => {
         </Link>
 
         <div className="flex items-center gap-2">
+          <Link to={`/sales/${sale.id}/edit`}>
+            <Button variant="outline" size="sm" icon={Edit2}>
+              Edit Invoice
+            </Button>
+          </Link>
+
           <Button variant="outline" size="sm" icon={Printer} onClick={() => setIsReceiptOpen(true)}>
             Print Invoice / Challan
           </Button>

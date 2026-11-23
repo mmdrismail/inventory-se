@@ -15,6 +15,11 @@ import {
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
+  Plus,
+  Trash2,
+  Users2,
+  Package,
+  Building2,
 } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import { useAppData } from '../../context/AppDataContext';
@@ -35,7 +40,7 @@ import {
 } from '../../utils/printTemplateGenerator';
 
 export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType }) => {
-  const { settings, updateSettings, addToast } = useAppData();
+  const { settings, updateSettings, updateSale, updateQuotation, addToast } = useAppData();
   const { language: currentGlobalLang } = useLanguage();
 
   // Document format tab
@@ -64,8 +69,23 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
     }
   }, [sale]);
 
-  // Customization drawer open state
+  // Customization drawer open state & active drawer subtab
   const [isEditing, setIsEditing] = useState(false);
+  const [activeEditorTab, setActiveEditorTab] = useState('customer'); // 'customer' | 'items' | 'company'
+
+  // Editable customer data
+  const [customerData, setCustomerData] = useState({
+    name: '',
+    company: '',
+    role: 'owner',
+    phone: '',
+    email: '',
+    address: '',
+  });
+
+  // Editable items data (Description, Qty, Rate, Line Total)
+  const [editableItems, setEditableItems] = useState([]);
+  const [customDiscount, setCustomDiscount] = useState('0');
 
   // Editable stationery profile overrides
   const [customInfo, setCustomInfo] = useState({
@@ -84,6 +104,38 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
     disclaimerEn: settings.disclaimerEn || 'Notice: Received the above goods in good condition.',
     customSerial: '',
   });
+
+  // Populate editable customer, items, and discount when sale changes
+  useEffect(() => {
+    if (sale) {
+      setCustomerData({
+        name: sale.customerName || '',
+        company: sale.customerCompany || '',
+        role: sale.customerRole || 'owner',
+        phone: sale.customerPhone || '',
+        email: sale.customerEmail || '',
+        address: sale.customerAddress || sale.customerLocation || '',
+      });
+
+      const initialItems = (sale.items || []).map((it, idx) => {
+        const qty = Number(it.quantity) || 1;
+        const rate = Number(it.unitPrice !== undefined ? it.unitPrice : (it.rate !== undefined ? it.rate : it.price)) || 0;
+        return {
+          id: it.id || `it-${idx + 1}-${Date.now()}`,
+          productId: it.productId || '',
+          productName: it.productName || it.name || '',
+          sku: it.sku || '',
+          quantity: qty,
+          unit: it.unit || 'pc',
+          unitPrice: rate,
+          lineTotal: Number(it.lineTotal !== undefined ? it.lineTotal : (it.total || qty * rate)),
+          description: it.description || '',
+        };
+      });
+      setEditableItems(initialItems);
+      setCustomDiscount(sale.discount !== undefined ? String(sale.discount) : '0');
+    }
+  }, [sale, isOpen]);
 
   // Sync when settings change
   useEffect(() => {
@@ -106,19 +158,83 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
     }
   }, [settings]);
 
+  // Handle item change in live editor
+  const handleItemChange = (idx, field, value) => {
+    setEditableItems((prev) => {
+      const updated = [...prev];
+      const cur = { ...updated[idx], [field]: value };
+      if (field === 'quantity' || field === 'unitPrice') {
+        const q = Number(field === 'quantity' ? value : cur.quantity) || 0;
+        const r = Number(field === 'unitPrice' ? value : cur.unitPrice) || 0;
+        cur.lineTotal = Math.round(q * r * 100) / 100;
+      }
+      updated[idx] = cur;
+      return updated;
+    });
+  };
+
+  const handleAddItem = () => {
+    setEditableItems((prev) => [
+      ...prev,
+      {
+        id: `it-${Date.now()}-${prev.length + 1}`,
+        productId: 'custom',
+        productName: '',
+        sku: '',
+        quantity: 1,
+        unit: 'pc',
+        unitPrice: 0,
+        lineTotal: 0,
+        description: '',
+      },
+    ]);
+  };
+
+  const handleRemoveItem = (idx) => {
+    if (editableItems.length <= 1) return;
+    setEditableItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const isQuotation = docType === DOCUMENT_TYPES.QUOTATION || !!sale?.quotationNumber;
   const invoiceNumber = customInfo.customSerial || sale?.quotationNumber || sale?.invoiceNumber || sale?.invoiceNo || (isQuotation ? 'QT-2026-0541' : '376');
   const cleanSerial = isQuotation
     ? (invoiceNumber.replace(/\D/g, '').slice(-4) || '0541')
     : (invoiceNumber.replace(/\D/g, '').slice(-3) || '376');
-  const items = sale?.items || [];
-  const subtotal = Number(sale?.subtotal) || 0;
-  const discount = Number(sale?.discount) || 0;
-  const tax = Number(sale?.tax) || 0;
-  const total = Number(sale?.totalAmount || sale?.total) || subtotal - discount + tax;
-  const paid = sale?.paymentStatus === 'paid' ? total : Number(sale?.paidAmount) || 0;
-  const due = Math.max(0, total - paid);
-  const totalUnits = items.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
+
+  // Reactive Live Totals
+  const liveSubtotal = useMemo(() => {
+    return editableItems.reduce((sum, it) => sum + (Number(it.lineTotal) || 0), 0);
+  }, [editableItems]);
+
+  const discountVal = Number(customDiscount) || 0;
+  const taxVal = Number(sale?.tax) || 0;
+  const liveGrandTotal = Math.max(0, liveSubtotal - discountVal + taxVal);
+  const paidVal = sale?.paymentStatus === 'paid' ? liveGrandTotal : (Number(sale?.paidAmount) || 0);
+  const dueVal = Math.max(0, liveGrandTotal - paidVal);
+  const totalUnits = editableItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
+
+  // Consolidated effective sale reflecting all live customer and item edits
+  const effectiveSale = useMemo(() => {
+    if (!sale) return {};
+    return {
+      ...sale,
+      customerName: customerData.name,
+      customerCompany: customerData.company,
+      customerRole: customerData.role,
+      customerPhone: customerData.phone,
+      customerEmail: customerData.email,
+      customerAddress: customerData.address,
+      customerLocation: customerData.address,
+      items: editableItems,
+      subtotal: liveSubtotal,
+      discount: discountVal,
+      tax: taxVal,
+      totalAmount: liveGrandTotal,
+      total: liveGrandTotal,
+      paidAmount: paidVal,
+      dueAmount: dueVal,
+    };
+  }, [sale, customerData, editableItems, liveSubtotal, discountVal, taxVal, liveGrandTotal, paidVal, dueVal]);
 
   // Date parsing
   const saleDate = sale?.date ? new Date(sale.date) : sale?.createdAt ? new Date(sale.createdAt) : new Date();
@@ -149,23 +265,23 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
     return sale.termsAndConditions;
   }, [sale?.termsAndConditions, profile.t.defaultTerms]);
 
-  // Generate HTML for current template
+  // Generate HTML for current template using effectiveSale
   const currentHtml = useMemo(() => {
-    if (!sale) return '';
+    if (!effectiveSale) return '';
     switch (docType) {
       case DOCUMENT_TYPES.CHALLAN:
-        return generateChallanHtml(sale, settings, options);
+        return generateChallanHtml(effectiveSale, settings, options);
       case DOCUMENT_TYPES.OFFICIAL_PAD:
-        return generateOfficialPadHtml(sale, settings, options);
+        return generateOfficialPadHtml(effectiveSale, settings, options);
       case DOCUMENT_TYPES.QUOTATION:
-        return generateQuotationHtml(sale, settings, options);
+        return generateQuotationHtml(effectiveSale, settings, options);
       case DOCUMENT_TYPES.THERMAL:
-        return generateThermalReceiptHtml(sale, settings, options);
+        return generateThermalReceiptHtml(effectiveSale, settings, options);
       case DOCUMENT_TYPES.CASH_MEMO:
       default:
-        return generateCashMemoHtml(sale, settings, options);
+        return generateCashMemoHtml(effectiveSale, settings, options);
     }
-  }, [sale, settings, docType, options]);
+  }, [effectiveSale, settings, docType, options]);
 
   if (!sale) return null;
 
@@ -232,6 +348,69 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
       customSerial: '',
     });
     setDocLanguage(DOCUMENT_LANGUAGES.BANGLA);
+  };
+
+  const handleSaveToRecord = () => {
+    try {
+      if (isQuotation && sale?.id) {
+        const payload = {
+          ...effectiveSale,
+          customerName: customerData.name,
+          customerCompany: customerData.company,
+          customerRole: customerData.role,
+          customerPhone: customerData.phone,
+          customerEmail: customerData.email,
+          customerAddress: customerData.address,
+          customerLocation: customerData.address,
+          items: editableItems,
+          subtotal: liveSubtotal,
+          discount: discountVal,
+          totalAmount: liveGrandTotal,
+          total: liveGrandTotal,
+        };
+        const res = updateQuotation(sale.id, payload);
+        if (res && res.success !== false) {
+          addToast({
+            title: 'কোটেশন রেকর্ড আপডেট সম্পন্ন',
+            message: `কোটেশন #${sale.quotationNumber || invoiceNumber}-এর তথ্য সফলভাবে ডেটাবেসে সেভ হয়েছে।`,
+            type: 'success',
+          });
+        }
+      } else if (sale?.id) {
+        const payload = {
+          ...effectiveSale,
+          customerName: customerData.name,
+          customerCompany: customerData.company,
+          customerRole: customerData.role,
+          customerPhone: customerData.phone,
+          customerEmail: customerData.email,
+          customerAddress: customerData.address,
+          customerLocation: customerData.address,
+          items: editableItems,
+          subtotal: liveSubtotal,
+          discount: discountVal,
+          totalAmount: liveGrandTotal,
+          total: liveGrandTotal,
+          paidAmount: paidVal,
+          dueAmount: dueVal,
+        };
+        const res = updateSale(sale.id, payload, 'Sales Executive');
+        if (res && res.success !== false) {
+          addToast({
+            title: 'ইনভয়েস রেকর্ড আপডেট সম্পন্ন',
+            message: `ইনভয়েস #${sale.invoiceNo || invoiceNumber}-এর তথ্য সফলভাবে ডেটাবেসে সেভ হয়েছে।`,
+            type: 'success',
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save record:', err);
+      addToast({
+        title: 'সেভ ব্যর্থ',
+        message: err.message || 'রেকর্ড সংরক্ষণ করা যায়নি।',
+        type: 'error',
+      });
+    }
   };
 
   const getDocTitle = () => {
@@ -433,15 +612,16 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
 
         {/* Accordion / Drawer: Live Customization Panel */}
         {isEditing && (
-          <div className="bg-amber-50/70 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-300 dark:border-amber-800/60 space-y-3 text-xs animate-in fade-in slide-in-from-top-2 duration-200">
-            <div className="flex items-center justify-between border-b border-amber-200 dark:border-amber-800/40 pb-2">
+          <div className="bg-amber-50/70 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-300 dark:border-amber-800/60 space-y-3.5 text-xs animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Drawer Header with Title and Action Buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-amber-200 dark:border-amber-800/40 pb-2.5 gap-2">
               <div className="flex items-center gap-2">
-                <Edit3 className="h-4 w-4 text-amber-600" />
+                <Edit3 className="h-4 w-4 text-amber-600 flex-shrink-0" />
                 <span className="font-bold text-amber-900 dark:text-amber-200 text-sm">
-                  যেকোনো প্রতিষ্ঠানের তথ্য ও শর্ত কাস্টমাইজ করুন (Live Customizer)
+                  গ্রাহক, পণ্যের দর ও প্রতিষ্ঠানের তথ্য লাইভ এডিটর (Live Customizer)
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={handleResetToSeed}
@@ -450,148 +630,412 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                   <RotateCcw className="h-3 w-3" />
                   <span>রিসেট</span>
                 </button>
+                {activeEditorTab === 'company' && (
+                  <button
+                    type="button"
+                    onClick={handleSaveAsDefault}
+                    className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs font-bold shadow-xs transition-colors"
+                  >
+                    <Save className="h-3 w-3" />
+                    <span>কোম্পানি ডিফল্ট সেভ করুন</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={handleSaveAsDefault}
-                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-xs font-bold shadow-xs transition-colors"
+                  onClick={handleSaveToRecord}
+                  className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs font-bold shadow-xs transition-colors"
+                  title="এই ইনভয়েস বা কোটেশনের মূল রেকর্ডে গ্রাহক ও আইটেম ডেটাবেসে সংরক্ষণ করুন"
                 >
-                  <Save className="h-3 w-3" />
-                  <span>কোম্পানি ডিফল্ট সেভ করুন</span>
+                  <Save className="h-3.5 w-3.5" />
+                  <span>রেকর্ডে সেভ করুন (Save to DB)</span>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  প্রতিষ্ঠানের নাম (বাংলা):
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.companyName}
-                  onChange={(e) => setCustomInfo({ ...customInfo, companyName: e.target.value })}
-                  placeholder="যেমন: মেসার্স শান্তা রেফ্রিজারেশন"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
-                />
-              </div>
+            {/* Subtabs Navigation */}
+            <div className="flex items-center gap-1.5 border-b border-amber-200/80 dark:border-amber-800/30 pb-2">
+              <button
+                type="button"
+                onClick={() => setActiveEditorTab('customer')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                  activeEditorTab === 'customer'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-white'
+                }`}
+              >
+                <Users2 className="h-3.5 w-3.5" />
+                <span>গ্রাহক / কাস্টমার তথ্য</span>
+              </button>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  Company Name (English):
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.companyNameEn}
-                  onChange={(e) => setCustomInfo({ ...customInfo, companyNameEn: e.target.value })}
-                  placeholder="e.g. M/S. SHANTA REFRIGERATION"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveEditorTab('items')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                  activeEditorTab === 'items'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-white'
+                }`}
+              >
+                <Package className="h-3.5 w-3.5" />
+                <span>পণ্য ও মূল্য তালিকা ({editableItems.length})</span>
+              </button>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  স্বত্বাধিকারী / প্রোপ্রাইটর:
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.proprietor}
-                  onChange={(e) => setCustomInfo({ ...customInfo, proprietor: e.target.value })}
-                  placeholder="মোঃ রুহুল আমিন (লিটন)"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  মোবাইল / ফোন নম্বর:
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.companyPhone}
-                  onChange={(e) => setCustomInfo({ ...customInfo, companyPhone: e.target.value })}
-                  placeholder="01711-169875"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  ইমেইল এড্রেস:
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.companyEmail}
-                  onChange={(e) => setCustomInfo({ ...customInfo, companyEmail: e.target.value })}
-                  placeholder="shanta.refrigeration@gmail.com"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  BIN / ভ্যাট নিবন্ধন নং:
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.bin}
-                  onChange={(e) => setCustomInfo({ ...customInfo, bin: e.target.value })}
-                  placeholder="BIN-001651149-0505"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  প্রতিষ্ঠানের পূর্ণ ঠিকানা:
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.companyAddress}
-                  onChange={(e) => setCustomInfo({ ...customInfo, companyAddress: e.target.value })}
-                  placeholder="৪০৬, সি.ডি.এ মার্কেট (মসজিদের বিপরীতে), পাহাড়তলী, চট্টগ্রাম।"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  মেমো নম্বর ওভাররাইড (Memo Serial):
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.customSerial}
-                  onChange={(e) => setCustomInfo({ ...customInfo, customSerial: e.target.value })}
-                  placeholder={invoiceNumber}
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-red-600"
-                />
-              </div>
-
-              <div className="sm:col-span-3">
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  ব্যবসার বিবরণী ও পণ্যের তালিকা (Business Scope & Product Scope):
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.businessScope}
-                  onChange={(e) => setCustomInfo({ ...customInfo, businessScope: e.target.value })}
-                  placeholder="এখানে সকল প্রকারের রেফ্রিজারেশন কোল্ড স্টোর, এয়ার কন্ডিশন..."
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
-                />
-              </div>
-
-              <div className="sm:col-span-3">
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
-                  ফুটার শর্ত ও নোটিশ (Disclaimer & Return Policy):
-                </label>
-                <input
-                  type="text"
-                  value={customInfo.disclaimer}
-                  onChange={(e) => setCustomInfo({ ...customInfo, disclaimer: e.target.value })}
-                  placeholder="বিঃদ্রঃ উপরোক্ত মালামাল ভালো অবস্থায় বুঝিয়া পাইলাম।"
-                  className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={() => setActiveEditorTab('company')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                  activeEditorTab === 'company'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-white'
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                <span>প্রতিষ্ঠান প্যাড ও শর্ত</span>
+              </button>
             </div>
+
+            {/* TAB 1: CUSTOMER PROFILE */}
+            {activeEditorTab === 'customer' && (
+              <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      গ্রাহক / প্রাপকের নাম (Customer / Contact Person):
+                    </label>
+                    <input
+                      type="text"
+                      value={customerData.name}
+                      onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
+                      placeholder="যেমন: ইঞ্জিঃ কামরুল ইসলাম / মোঃ রুবেল"
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      প্রতিষ্ঠান / কোম্পানির নাম (Company / Firm):
+                    </label>
+                    <input
+                      type="text"
+                      value={customerData.company}
+                      onChange={(e) => setCustomerData({ ...customerData, company: e.target.value })}
+                      placeholder="যেমন: সোনারগাঁও টেক্সটাইল মিলস লিঃ"
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      পদবী / কাস্টমার স্ট্যাটাস (Role / Designation):
+                    </label>
+                    <select
+                      value={customerData.role}
+                      onChange={(e) => setCustomerData({ ...customerData, role: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                    >
+                      <option value="owner">কোম্পানির মালিক / স্বত্বাধিকারী (Owner)</option>
+                      <option value="managing_director">ম্যানেজিং ডিরেক্টর / এমডি (MD)</option>
+                      <option value="purchase_manager">পারচেজ ম্যানেজার (Purchase Manager)</option>
+                      <option value="project_director">প্রজেক্ট ডিরেক্টর (Project Director)</option>
+                      <option value="contractor">ঠিকাদার / কন্ট্রাক্টর (Contractor)</option>
+                      <option value="retail_customer">খুচরা ক্রেতা (Retail Customer)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      মোবাইল নম্বর (Contact Phone):
+                    </label>
+                    <input
+                      type="text"
+                      value={customerData.phone}
+                      onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
+                      placeholder="01711-xxxxxx"
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      ইমেইল এড্রেস (Email Address):
+                    </label>
+                    <input
+                      type="email"
+                      value={customerData.email}
+                      onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
+                      placeholder="client@company.com"
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                      ঠিকানা / লোকেশন (Location / Address):
+                    </label>
+                    <input
+                      type="text"
+                      value={customerData.address}
+                      onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
+                      placeholder="প্লট নং ১২, নাসিরাবাদ বায়েজিদ, চট্টগ্রাম"
+                      className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: ITEMS & PRICING */}
+            {activeEditorTab === 'items' && (
+              <div className="space-y-3 pt-1">
+                <div className="overflow-x-auto rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-b border-slate-300 dark:border-slate-700 font-bold">
+                        <th className="py-2 px-2 text-center w-10">#</th>
+                        <th className="py-2 px-3">পণ্যের নাম ও বিবরণ (Product Description)</th>
+                        <th className="py-2 px-2 text-center w-24">পরিমাণ (Qty)</th>
+                        <th className="py-2 px-2 text-center w-20">একক (Unit)</th>
+                        <th className="py-2 px-3 text-right w-32">দর / রেট (৳ Rate)</th>
+                        <th className="py-2 px-3 text-right w-36">মোট মূল্য (৳ Total)</th>
+                        <th className="py-2 px-2 text-center w-12">মুছুন</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {editableItems.map((it, idx) => (
+                        <tr key={it.id || idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <td className="py-1.5 px-2 text-center font-mono text-slate-500 font-bold">
+                            {idx + 1}
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="text"
+                              value={it.productName}
+                              onChange={(e) => handleItemChange(idx, 'productName', e.target.value)}
+                              placeholder="পণ্যের নাম ও স্পেসিফিকেশন"
+                              className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="any"
+                              value={it.quantity}
+                              onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                              className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-center"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="text"
+                              value={it.unit || 'pc'}
+                              onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                              placeholder="pc / set"
+                              className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-center"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={it.unitPrice}
+                              onChange={(e) => handleItemChange(idx, 'unitPrice', e.target.value)}
+                              className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-right text-emerald-700 dark:text-emerald-400"
+                            />
+                          </td>
+                          <td className="py-1.5 px-3 text-right font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
+                            ৳ {Number(it.lineTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-1.5 px-2 text-center">
+                            <button
+                              type="button"
+                              disabled={editableItems.length <= 1}
+                              onClick={() => handleRemoveItem(idx)}
+                              className="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="এই লাইন আইটেমটি মুছুন"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Items Actions & Totals */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>+ নতুন পণ্য / আইটেম যোগ করুন (Add Line Item)</span>
+                  </button>
+
+                  <div className="flex items-center gap-4 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 font-mono text-xs">
+                    <div>
+                      <span className="text-slate-500 font-sans mr-1">সাবটোটাল:</span>
+                      <strong>৳ {liveSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+
+                    <div className="flex items-center gap-1 font-sans">
+                      <label className="text-slate-500 text-[11px] font-bold">ছাড় / ডিসকাউন্ট (৳):</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={customDiscount}
+                        onChange={(e) => setCustomDiscount(e.target.value)}
+                        className="w-20 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 font-mono text-xs font-bold text-right"
+                      />
+                    </div>
+
+                    <div className="text-emerald-700 dark:text-emerald-400 font-bold">
+                      <span className="font-sans mr-1">সর্বমোট (Net):</span>
+                      <span>৳ {liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: COMPANY & PAD OVERRIDES */}
+            {activeEditorTab === 'company' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    প্রতিষ্ঠানের নাম (বাংলা):
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.companyName}
+                    onChange={(e) => setCustomInfo({ ...customInfo, companyName: e.target.value })}
+                    placeholder="যেমন: মেসার্স শান্তা রেফ্রিজারেশন"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    Company Name (English):
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.companyNameEn}
+                    onChange={(e) => setCustomInfo({ ...customInfo, companyNameEn: e.target.value })}
+                    placeholder="e.g. M/S. SHANTA REFRIGERATION"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    স্বত্বাধিকারী / প্রোপ্রাইটর:
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.proprietor}
+                    onChange={(e) => setCustomInfo({ ...customInfo, proprietor: e.target.value })}
+                    placeholder="মোঃ রুহুল আমিন (লিটন)"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    মোবাইল / ফোন নম্বর:
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.companyPhone}
+                    onChange={(e) => setCustomInfo({ ...customInfo, companyPhone: e.target.value })}
+                    placeholder="01711-169875"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    ইমেইল এড্রেস:
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.companyEmail}
+                    onChange={(e) => setCustomInfo({ ...customInfo, companyEmail: e.target.value })}
+                    placeholder="shanta.refrigeration@gmail.com"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    BIN / ভ্যাট নিবন্ধন নং:
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.bin}
+                    onChange={(e) => setCustomInfo({ ...customInfo, bin: e.target.value })}
+                    placeholder="BIN-001651149-0505"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    প্রতিষ্ঠানের পূর্ণ ঠিকানা:
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.companyAddress}
+                    onChange={(e) => setCustomInfo({ ...customInfo, companyAddress: e.target.value })}
+                    placeholder="৪০৬, সি.ডি.এ মার্কেট (মসজিদের বিপরীতে), পাহাড়তলী, চট্টগ্রাম।"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    মেমো নম্বর ওভাররাইড (Memo Serial):
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.customSerial}
+                    onChange={(e) => setCustomInfo({ ...customInfo, customSerial: e.target.value })}
+                    placeholder={invoiceNumber}
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-red-600"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    ব্যবসার বিবরণী ও পণ্যের তালিকা (Business Scope & Product Scope):
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.businessScope}
+                    onChange={(e) => setCustomInfo({ ...customInfo, businessScope: e.target.value })}
+                    placeholder="এখানে সকল প্রকারের রেফ্রিজারেশন কোল্ড স্টোর, এয়ার কন্ডিশন..."
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                    ফুটার শর্ত ও নোটিশ (Disclaimer & Return Policy):
+                  </label>
+                  <input
+                    type="text"
+                    value={customInfo.disclaimer}
+                    onChange={(e) => setCustomInfo({ ...customInfo, disclaimer: e.target.value })}
+                    placeholder="বিঃদ্রঃ উপরোক্ত মালামাল ভালো অবস্থায় বুঝিয়া পাইলাম।"
+                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -661,13 +1105,13 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-800 w-14 flex-shrink-0">{profile.t.name}</span>
                   <span className="flex-1 border-b border-dotted border-slate-400 font-semibold text-slate-900">
-                    {sale.customerName || profile.t.walkInBuyer}
+                    {effectiveSale.customerName || profile.t.walkInBuyer}
                   </span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-800 w-14 flex-shrink-0">{profile.t.address}</span>
                   <span className="flex-1 border-b border-dotted border-slate-400 font-medium text-slate-700">
-                    {sale.customerAddress || sale.customerPhone || profile.t.counterSale}
+                    {effectiveSale.customerAddress || effectiveSale.customerPhone || profile.t.counterSale}
                   </span>
                 </div>
               </div>
@@ -695,7 +1139,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((it, idx) => {
+                    {editableItems.map((it, idx) => {
                       const qty = Number(it.quantity) || 1;
                       const rate = Number(it.unitPrice !== undefined ? it.unitPrice : it.price) || 0;
                       const amt = Number(it.lineTotal !== undefined ? it.lineTotal : it.total || qty * rate);
@@ -712,9 +1156,9 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         </tr>
                       );
                     })}
-                    {Array.from({ length: Math.max(0, 5 - items.length) }).map((_, i) => (
+                    {Array.from({ length: Math.max(0, 5 - editableItems.length) }).map((_, i) => (
                       <tr key={`empty-${i}`} className="border-b border-slate-200 text-xs h-6">
-                        <td className="py-1 px-1.5 text-center font-mono text-slate-300 bg-[#faf5ff] border-x border-slate-300">{items.length + i + 1}</td>
+                        <td className="py-1 px-1.5 text-center font-mono text-slate-300 bg-[#faf5ff] border-x border-slate-300">{editableItems.length + i + 1}</td>
                         <td className="bg-[#fffbeb] border-r border-slate-300"></td>
                         <td className="bg-[#f0fdf4] border-r border-slate-300"></td>
                         {showRate && <td className="bg-[#fdf2f8] border-r border-slate-300"></td>}
@@ -732,16 +1176,16 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     <tbody>
                       <tr className="border-b border-slate-300 bg-slate-50">
                         <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{profile.t.total}</td>
-                        <td className="py-1 px-2 font-mono font-bold text-right bg-blue-50/50">{formatCurrency(total, profile.currencySymbol)}</td>
+                        <td className="py-1 px-2 font-mono font-bold text-right bg-blue-50/50">{formatCurrency(liveGrandTotal, profile.currencySymbol)}</td>
                       </tr>
                       <tr className="border-b border-slate-300 bg-slate-50">
                         <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{profile.t.paid}</td>
-                        <td className="py-1 px-2 font-mono font-bold text-right text-emerald-700 bg-blue-50/50">{formatCurrency(paid, profile.currencySymbol)}</td>
+                        <td className="py-1 px-2 font-mono font-bold text-right text-emerald-700 bg-blue-50/50">{formatCurrency(paidVal, profile.currencySymbol)}</td>
                       </tr>
                       <tr className="bg-slate-50">
                         <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{profile.t.due}</td>
-                        <td className={`py-1 px-2 font-mono font-bold text-right bg-blue-50/50 ${due > 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                          {formatCurrency(due, profile.currencySymbol)}
+                        <td className={`py-1 px-2 font-mono font-bold text-right bg-blue-50/50 ${dueVal > 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                          {formatCurrency(dueVal, profile.currencySymbol)}
                         </td>
                       </tr>
                     </tbody>
@@ -833,13 +1277,13 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-800 w-14 flex-shrink-0">{profile.t.name}</span>
                   <span className="flex-1 border-b border-dotted border-slate-400 font-semibold text-slate-900">
-                    {sale.customerName || profile.t.consigneeDefault}
+                    {effectiveSale.customerName || profile.t.consigneeDefault}
                   </span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-800 w-14 flex-shrink-0">{profile.t.address}</span>
                   <span className="flex-1 border-b border-dotted border-slate-400 font-medium text-slate-700">
-                    {sale.customerAddress || sale.customerPhone || profile.t.deliverySiteDefault}
+                    {effectiveSale.customerAddress || effectiveSale.customerPhone || profile.t.deliverySiteDefault}
                   </span>
                 </div>
               </div>
@@ -855,7 +1299,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((it, idx) => {
+                    {editableItems.map((it, idx) => {
                       const qty = Number(it.quantity) || 1;
                       return (
                         <tr key={idx} className="border-b border-slate-300 text-xs">
@@ -870,9 +1314,9 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         </tr>
                       );
                     })}
-                    {Array.from({ length: Math.max(0, 6 - items.length) }).map((_, i) => (
+                    {Array.from({ length: Math.max(0, 6 - editableItems.length) }).map((_, i) => (
                       <tr key={`empty-chl-${i}`} className="border-b border-slate-200 text-xs h-6">
-                        <td className="py-1.5 px-2 text-center font-mono text-slate-300 bg-[#faf5ff] border-x border-slate-300">{items.length + i + 1}</td>
+                        <td className="py-1.5 px-2 text-center font-mono text-slate-300 bg-[#faf5ff] border-x border-slate-300">{editableItems.length + i + 1}</td>
                         <td className="bg-[#fffbeb] border-r border-slate-300"></td>
                         <td className="bg-[#f0fdf4] border-r border-slate-300"></td>
                       </tr>
@@ -961,13 +1405,13 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-800 w-14 flex-shrink-0">{profile.t.name}</span>
                   <span className="flex-1 border-b border-dotted border-slate-400 font-semibold text-slate-900">
-                    {sale.customerName || profile.t.walkInBuyer}
+                    {effectiveSale.customerName || profile.t.walkInBuyer}
                   </span>
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="font-bold text-slate-800 w-14 flex-shrink-0">{profile.t.address}</span>
                   <span className="flex-1 border-b border-dotted border-slate-400 font-medium text-slate-700">
-                    {sale.customerAddress || (sale.customerPhone ? sale.customerPhone : 'N/A')}
+                    {effectiveSale.customerAddress || (effectiveSale.customerPhone ? effectiveSale.customerPhone : 'N/A')}
                   </span>
                 </div>
               </div>
@@ -985,7 +1429,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {items.map((it, idx) => {
+                    {editableItems.map((it, idx) => {
                       const qty = Number(it.quantity) || 1;
                       const rate = Number(it.unitPrice !== undefined ? it.unitPrice : it.price) || 0;
                       const amt = Number(it.lineTotal !== undefined ? it.lineTotal : it.total || qty * rate);
@@ -1012,17 +1456,17 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                   <div className="w-60 space-y-1 text-xs border-t-2 border-slate-800 pt-1">
                     <div className="flex justify-between">
                       <span className="text-slate-600">{profile.t.subtotal}</span>
-                      <span className="font-mono font-bold">{formatCurrency(subtotal, profile.currencySymbol)}</span>
+                      <span className="font-mono font-bold">{formatCurrency(liveSubtotal, profile.currencySymbol)}</span>
                     </div>
-                    {discount > 0 && (
+                    {discountVal > 0 && (
                       <div className="flex justify-between text-emerald-700">
                         <span>{profile.t.discount}</span>
-                        <span className="font-mono">-{formatCurrency(discount, profile.currencySymbol)}</span>
+                        <span className="font-mono">-{formatCurrency(discountVal, profile.currencySymbol)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm font-extrabold text-slate-900 border-t border-slate-300 pt-1">
                       <span>{profile.t.netPayable}</span>
-                      <span className="font-mono text-emerald-700">{formatCurrency(total, profile.currencySymbol)}</span>
+                      <span className="font-mono text-emerald-700">{formatCurrency(liveGrandTotal, profile.currencySymbol)}</span>
                     </div>
                   </div>
                 </div>
@@ -1101,19 +1545,19 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="font-bold text-slate-800">{profile.t.recipient} </span>
-                    <strong className="text-emerald-700">{sale.customerName || profile.t.walkInBuyer}</strong>
+                    <strong className="text-emerald-700">{effectiveSale.customerName || profile.t.walkInBuyer}</strong>
                   </div>
                   <div>
                     <span className="font-bold text-slate-800">{profile.t.company} </span>
-                    <strong>{sale.customerCompany || (profile.lang === 'en' ? 'Direct Client' : 'ব্যক্তিগত / রিটেইল')}</strong>
+                    <strong>{effectiveSale.customerCompany || (profile.lang === 'en' ? 'Direct Client' : 'ব্যক্তিগত / রিটেইল')}</strong>
                   </div>
                   <div>
                     <span className="font-bold text-slate-800">{profile.t.mobile} </span>
-                    <span className="font-mono">{sale.customerPhone || 'N/A'}</span>
+                    <span className="font-mono">{effectiveSale.customerPhone || 'N/A'}</span>
                   </div>
                   <div>
                     <span className="font-bold text-slate-800">{profile.t.address} </span>
-                    <span>{sale.customerAddress || sale.customerLocation || 'N/A'}</span>
+                    <span>{effectiveSale.customerAddress || effectiveSale.customerLocation || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -1131,7 +1575,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
-                    {items.map((it, idx) => {
+                    {editableItems.map((it, idx) => {
                       const qty = Number(it.quantity) || 1;
                       const rate = Number(it.unitPrice !== undefined ? it.unitPrice : (it.rate !== undefined ? it.rate : it.price)) || 0;
                       const amt = Number(it.lineTotal !== undefined ? it.lineTotal : (it.total || qty * rate));
@@ -1158,23 +1602,23 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                   <div className="w-60 space-y-1 text-xs border-t-2 border-slate-800 pt-1">
                     <div className="flex justify-between">
                       <span className="text-slate-600">{profile.t.subtotal}</span>
-                      <span className="font-mono font-bold">{formatCurrency(subtotal, profile.currencySymbol)}</span>
+                      <span className="font-mono font-bold">{formatCurrency(liveSubtotal, profile.currencySymbol)}</span>
                     </div>
-                    {discount > 0 && (
+                    {discountVal > 0 && (
                       <div className="flex justify-between text-emerald-700">
                         <span>{profile.t.discount}</span>
-                        <span className="font-mono">-{formatCurrency(discount, profile.currencySymbol)}</span>
+                        <span className="font-mono">-{formatCurrency(discountVal, profile.currencySymbol)}</span>
                       </div>
                     )}
-                    {tax > 0 && (
+                    {taxVal > 0 && (
                       <div className="flex justify-between text-slate-700">
                         <span>{profile.t.tax || 'Tax:'}</span>
-                        <span className="font-mono">+{formatCurrency(tax, profile.currencySymbol)}</span>
+                        <span className="font-mono">+{formatCurrency(taxVal, profile.currencySymbol)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm font-extrabold text-slate-900 border-t border-slate-300 pt-1">
                       <span>{profile.t.netPayable}</span>
-                      <span className="font-mono text-emerald-700">{formatCurrency(total, profile.currencySymbol)}</span>
+                      <span className="font-mono text-emerald-700">{formatCurrency(liveGrandTotal, profile.currencySymbol)}</span>
                     </div>
                   </div>
                 </div>
@@ -1224,14 +1668,14 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
               <div className="border-t border-dashed border-slate-400" />
 
               <div className="text-[10px] space-y-0.5 font-['Hind_Siliguri']">
-                <p>{profile.t.name} <strong className="text-slate-900">{sale.customerName || profile.t.walkInBuyer}</strong></p>
-                {sale.customerPhone && <p>{profile.t.phone} {sale.customerPhone}</p>}
+                <p>{profile.t.name} <strong className="text-slate-900">{effectiveSale.customerName || profile.t.walkInBuyer}</strong></p>
+                {effectiveSale.customerPhone && <p>{profile.t.phone} {effectiveSale.customerPhone}</p>}
               </div>
 
               <div className="border-t border-dashed border-slate-400" />
 
               <div className="space-y-1.5 text-[11px]">
-                {items.map((item, idx) => {
+                {editableItems.map((item, idx) => {
                   const qty = Number(item.quantity) || 1;
                   const rate = Number(item.unitPrice !== undefined ? item.unitPrice : item.price) || 0;
                   const amt = Number(item.lineTotal !== undefined ? item.lineTotal : item.total || qty * rate);
@@ -1250,17 +1694,17 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
               <div className="border-t border-dashed border-slate-400 pt-2 space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span>{profile.t.total}</span>
-                  <span>{formatCurrency(subtotal, profile.currencySymbol)}</span>
+                  <span>{formatCurrency(liveSubtotal, profile.currencySymbol)}</span>
                 </div>
-                {discount > 0 && (
+                {discountVal > 0 && (
                   <div className="flex justify-between text-emerald-700">
                     <span>{profile.t.discount}</span>
-                    <span>-{formatCurrency(discount, profile.currencySymbol)}</span>
+                    <span>-{formatCurrency(discountVal, profile.currencySymbol)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-extrabold text-sm border-t border-slate-900 pt-1 mt-1">
                   <span>{profile.t.netPayable}</span>
-                  <span className="text-emerald-700">{formatCurrency(total, profile.currencySymbol)}</span>
+                  <span className="text-emerald-700">{formatCurrency(liveGrandTotal, profile.currencySymbol)}</span>
                 </div>
               </div>
 

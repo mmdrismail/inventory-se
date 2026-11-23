@@ -4,6 +4,7 @@ const {
   getSales,
   getSaleById,
   createSale,
+  updateSale,
   cancelSale,
 } = require('../controllers/saleController');
 const { protect } = require('../middleware/auth');
@@ -16,7 +17,8 @@ router.route('/')
   .post(authorize('admin', 'manager', 'staff'), createSale);
 
 router.route('/:id')
-  .get(getSaleById);
+  .get(getSaleById)
+  .put(authorize('admin', 'manager', 'staff'), updateSale);
 
 router.put('/:id/cancel', authorize('admin', 'manager'), cancelSale);
 

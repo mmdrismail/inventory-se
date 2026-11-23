@@ -275,6 +275,50 @@ exports.createSale = async (req, res, next) => {
   }
 };
 
+// @desc    Update sale invoice
+// @route   PUT /api/sales/:id
+// @access  Private (Admin, Manager, Staff)
+exports.updateSale = async (req, res, next) => {
+  try {
+    const sale = await Sale.findById(req.params.id);
+    if (!sale) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sale invoice not found.',
+      });
+    }
+
+    if (req.body.items && Array.isArray(req.body.items)) {
+      req.body.items = req.body.items.map((it) => {
+        const quantity = Number(it.quantity) || 1;
+        const unitPrice = Number(it.unitPrice !== undefined ? it.unitPrice : (it.price !== undefined ? it.price : it.sellingPrice)) || 0;
+        const lineTotal = Number(it.lineTotal !== undefined ? it.lineTotal : (it.subtotal !== undefined ? it.subtotal : (it.total !== undefined ? it.total : quantity * unitPrice))) || 0;
+        return {
+          productId: it.productId || it.id || null,
+          productName: it.productName || it.name || '',
+          sku: it.sku || '',
+          quantity,
+          unitPrice,
+          lineTotal,
+        };
+      });
+    }
+
+    const updated = await Sale.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.json({
+      success: true,
+      message: `Sale invoice ${updated.invoiceNumber} updated successfully.`,
+      data: updated,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Cancel a sale invoice (Restores deducted stock)
 // @route   PUT /api/sales/:id/cancel
 // @access  Private (Admin, Manager)

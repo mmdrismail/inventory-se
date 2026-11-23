@@ -192,6 +192,7 @@ export default function App() {
               <Route path="/sales" element={<SalesListPage />} />
               <Route path="/sales/new" element={<SalesFormPage />} />
               <Route path="/sales/:id" element={<SaleDetailPage />} />
+              <Route path="/sales/:id/edit" element={<SalesFormPage />} />
 
               {/* Quotations (দরপত্র) */}
               <Route path="/quotations" element={<QuotationListPage />} />

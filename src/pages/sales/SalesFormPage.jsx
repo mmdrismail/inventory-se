@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, Link, useLocation, useParams } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -19,13 +19,17 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Barcode,
+  Edit2,
+  Save,
 } from 'lucide-react';
 import { playBarcodeBeep, playSuccessChime, playErrorTone } from '../../utils/soundEffects';
 
 export const SalesFormPage = () => {
-  const { customers, products, createSale, settings } = useAppData();
+  const { customers, products, sales, createSale, updateSale, settings } = useAppData();
   const navigate = useNavigate();
   const location = useLocation();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
 
   // Requisition / Quotation prefill if routed from quotation
   const prefill = location.state?.fromQuotation || null;
@@ -61,6 +65,53 @@ export const SalesFormPage = () => {
 
   // Completed sale for immediate receipt modal preview
   const [completedSale, setCompletedSale] = useState(null);
+
+  // Load existing sale if in edit mode
+  const existingSale = useMemo(() => {
+    if (!isEditing || !sales) return null;
+    return sales.find((s) => s.id === id || s._id === id) || null;
+  }, [isEditing, id, sales]);
+
+  useEffect(() => {
+    if (existingSale) {
+      setInvoiceNo(existingSale.invoiceNo || existingSale.invoiceNumber || '');
+      setDate(
+        existingSale.date
+          ? new Date(existingSale.date).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0]
+      );
+      setCustomerId(existingSale.customerId || '');
+      setCustomerName(existingSale.customerName || '');
+      setCustomerCompany(existingSale.customerCompany || '');
+      setCustomerRole(existingSale.customerRole || 'owner');
+      setCustomerPhone(existingSale.customerPhone || '');
+      setCustomerEmail(existingSale.customerEmail || '');
+      setCustomerAddress(existingSale.customerAddress || '');
+      setCustomerLocation(existingSale.customerLocation || '');
+      setPaymentStatus(existingSale.paymentStatus || 'paid');
+      setPaidAmountInput(
+        existingSale.paidAmount !== undefined ? String(existingSale.paidAmount) : ''
+      );
+      setDiscount(existingSale.discount !== undefined ? String(existingSale.discount) : '0');
+      setNotes(existingSale.notes || '');
+      setRequisitionRef(existingSale.requisitionRef || '');
+      setQuotationId(existingSale.quotationId || null);
+      if (existingSale.showRate !== undefined) setShowRate(existingSale.showRate);
+      if (existingSale.showLineTotal !== undefined) setShowLineTotal(existingSale.showLineTotal);
+      if (existingSale.showGrandTotal !== undefined) setShowGrandTotal(existingSale.showGrandTotal);
+      if (existingSale.items && existingSale.items.length > 0) {
+        setItems(
+          existingSale.items.map((it) => ({
+            productId: it.productId || 'custom',
+            productName: it.productName || it.name || '',
+            sku: it.sku || '',
+            quantity: it.quantity || 1,
+            unitPrice: it.unitPrice !== undefined ? it.unitPrice : it.price || 0,
+          }))
+        );
+      }
+    }
+  }, [existingSale]);
 
   // Available in-stock products
   const availableProducts = products.filter((p) => (Number(p.quantity) || 0) > 0);
@@ -312,12 +363,19 @@ export const SalesFormPage = () => {
     };
 
     setTimeout(() => {
-      const res = createSale(payload, 'Sales Executive');
+      let res;
+      if (isEditing) {
+        res = updateSale(id, payload, 'Sales Executive');
+      } else {
+        res = createSale(payload, 'Sales Executive');
+      }
       setIsSubmitting(false);
 
       if (res.success) {
         playSuccessChime();
-        if (statusToSave === 'completed') {
+        if (isEditing) {
+          navigate(`/sales/${id}`);
+        } else if (statusToSave === 'completed') {
           setCompletedSale({
             ...res.sale,
             showRate,
@@ -356,9 +414,13 @@ export const SalesFormPage = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Record Sale / POS Invoice</CardTitle>
+          <CardTitle>
+            {isEditing ? 'বিক্রয় চালান সংশোধন (Edit Sales Invoice)' : 'Record Sale / POS Invoice'}
+          </CardTitle>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Create a point-of-sale invoice with full international customer role & enterprise management.
+            {isEditing
+              ? `ইনভয়েস #${invoiceNo}-এর সকল তথ্য ও মালামাল আপডেট করুন`
+              : 'Create a point-of-sale invoice with full international customer role & enterprise management.'}
           </p>
         </CardHeader>
 
@@ -820,23 +882,37 @@ export const SalesFormPage = () => {
             </Button>
 
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                icon={Clock}
-                isLoading={isSubmitting}
-                onClick={() => handleSubmit('draft')}
-              >
-                খসড়া সেভ (Save as Draft)
-              </Button>
-              <Button
-                variant="primary"
-                icon={CheckCircle2}
-                isLoading={isSubmitting}
-                onClick={() => handleSubmit('completed')}
-                className="shadow-md shadow-emerald-500/20 font-bold"
-              >
-                বিক্রি সম্পন্ন ও প্রিন্ট করুন (Complete & Print)
-              </Button>
+              {isEditing ? (
+                <Button
+                  variant="primary"
+                  icon={Save}
+                  isLoading={isSubmitting}
+                  onClick={() => handleSubmit(existingSale?.status || 'completed')}
+                  className="shadow-md shadow-emerald-500/20 font-bold"
+                >
+                  ইনভয়েস আপডেট করুন (Update Invoice)
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    icon={Clock}
+                    isLoading={isSubmitting}
+                    onClick={() => handleSubmit('draft')}
+                  >
+                    খসড়া সেভ (Save as Draft)
+                  </Button>
+                  <Button
+                    variant="primary"
+                    icon={CheckCircle2}
+                    isLoading={isSubmitting}
+                    onClick={() => handleSubmit('completed')}
+                    className="shadow-md shadow-emerald-500/20 font-bold"
+                  >
+                    বিক্রি সম্পন্ন ও প্রিন্ট করুন (Complete & Print)
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </CardContent>

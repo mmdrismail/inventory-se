@@ -15,6 +15,7 @@ import {
   Search,
   Receipt,
   Eye,
+  Edit2,
   Printer,
   CheckCircle2,
   XCircle,
@@ -333,6 +334,11 @@ export const SalesListPage = () => {
                           >
                             <Printer className="h-4 w-4" />
                           </button>
+                          <Link to={`/sales/${s.id}/edit`} title="Edit Invoice">
+                            <button className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                          </Link>
                           <Link to={`/sales/${s.id}`} title="View Details">
                             <button className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                               <Eye className="h-4 w-4" />

@@ -119,6 +119,104 @@ class SalesService {
   }
 
   /**
+   * Update an existing sale invoice (Customer info, items, pricing, etc.)
+   */
+  update(id, saleData, performedBy = 'Sales Executive') {
+    const sales = this.getAll();
+    const index = sales.findIndex((s) => s.id === id || s._id === id);
+    if (index === -1) {
+      return { success: false, message: 'Sale invoice not found.' };
+    }
+
+    const existing = sales[index];
+    const items = saleData.items || existing.items || [];
+    const { subtotal, discount, total } = calculateSaleTotals(items, saleData.discount !== undefined ? saleData.discount : existing.discount);
+    const totalVal = total;
+    let paidVal = Number(saleData.paidAmount !== undefined ? saleData.paidAmount : (saleData.paymentStatus === 'paid' ? totalVal : (saleData.paymentStatus === 'due' ? 0 : existing.paidAmount || 0)));
+    if (saleData.paymentStatus === 'paid') paidVal = totalVal;
+    const dueVal = Math.max(0, totalVal - paidVal);
+
+    // Auto-upsert customer profile if details provided
+    let customerId = saleData.customerId !== undefined ? saleData.customerId : existing.customerId;
+    const custName = saleData.customerName || existing.customerName;
+    if (custName && custName.trim() && custName !== 'Walk-in Retail Customer') {
+      const cust = customerService.upsertCustomer({
+        id: customerId,
+        name: custName,
+        companyName: saleData.customerCompany !== undefined ? saleData.customerCompany : existing.customerCompany,
+        designationRole: saleData.customerRole || existing.customerRole,
+        phone: saleData.customerPhone !== undefined ? saleData.customerPhone : existing.customerPhone,
+        email: saleData.customerEmail !== undefined ? saleData.customerEmail : existing.customerEmail,
+        address: saleData.customerAddress !== undefined ? saleData.customerAddress : existing.customerAddress,
+        location: saleData.customerLocation || saleData.customerAddress || existing.customerLocation,
+      });
+      if (cust && cust.id) {
+        customerId = cust.id;
+      }
+    }
+
+    const updatedSale = {
+      ...existing,
+      ...saleData,
+      id: existing.id,
+      _id: existing._id,
+      invoiceNo: existing.invoiceNo,
+      customerId,
+      customerName: custName || 'Walk-in Retail Customer',
+      customerCompany: saleData.customerCompany !== undefined ? saleData.customerCompany : (existing.customerCompany || ''),
+      customerRole: saleData.customerRole || existing.customerRole || 'owner',
+      customerPhone: saleData.customerPhone !== undefined ? saleData.customerPhone : (existing.customerPhone || ''),
+      customerAddress: saleData.customerAddress !== undefined ? saleData.customerAddress : (existing.customerAddress || ''),
+      customerLocation: saleData.customerLocation !== undefined ? saleData.customerLocation : (existing.customerLocation || ''),
+      items,
+      subtotal,
+      discount: saleData.discount !== undefined ? Number(saleData.discount) : (existing.discount || 0),
+      total,
+      totalAmount: total,
+      paidAmount: paidVal,
+      dueAmount: dueVal,
+      paymentStatus: saleData.paymentStatus || existing.paymentStatus || 'paid',
+      updatedAt: new Date().toISOString(),
+    };
+
+    sales[index] = updatedSale;
+    storageService.setItem(STORAGE_KEYS.SALES, sales);
+
+    // Live sync to MongoDB Atlas
+    const mongoId = existing._id || existing.id;
+    if (mongoId) {
+      apiClient.put(`/sales/${mongoId}`, {
+        customerId: updatedSale.customerId,
+        customerName: updatedSale.customerName,
+        customerCompany: updatedSale.customerCompany,
+        customerRole: updatedSale.customerRole,
+        customerPhone: updatedSale.customerPhone,
+        customerEmail: updatedSale.customerEmail,
+        customerAddress: updatedSale.customerAddress,
+        customerLocation: updatedSale.customerLocation,
+        items: (updatedSale.items || []).map((it) => ({
+          productId: it.productId || it.id,
+          productName: it.productName || it.name,
+          sku: it.sku,
+          quantity: Number(it.quantity) || 1,
+          unitPrice: Number(it.unitPrice || it.sellingPrice || it.price) || 0,
+          lineTotal: Number(it.lineTotal || (Number(it.quantity || 1) * Number(it.unitPrice || it.price || 0))) || 0,
+        })),
+        subtotal: updatedSale.subtotal,
+        discount: updatedSale.discount,
+        totalAmount: updatedSale.total,
+        paymentStatus: updatedSale.paymentStatus,
+        status: updatedSale.status,
+        notes: updatedSale.notes,
+      }).catch((err) => {
+        console.warn('[MongoDB Sales update sync]:', err.message);
+      });
+    }
+
+    return { success: true, sale: updatedSale };
+  }
+
+  /**
    * Transition a Draft sale to Completed status: decreases stock
    */
   completeSale(id, performedBy = 'Sales Executive') {
