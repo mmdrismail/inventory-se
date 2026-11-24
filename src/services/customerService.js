@@ -15,26 +15,44 @@ class CustomerService {
     const customers = this.getAll();
     const newCustomer = {
       ...data,
-      id: `cust-${Date.now()}`,
-      name: data.name.trim(),
-      email: data.email?.trim() || '',
-      phone: data.phone?.trim() || '',
-      address: data.address?.trim() || '',
+      id: data.id || `cust-${Date.now()}`,
+      name: (data.name || '').trim(),
+      companyName: (data.companyName || data.company || '').trim(),
+      designationRole: data.designationRole || data.customerRole || data.role || 'owner',
+      phone: (data.phone || data.companyPhone || '').trim(),
+      companyPhone: (data.companyPhone || data.phone || '').trim(),
+      email: (data.email || '').trim(),
+      address: (data.address || '').trim(),
+      location: (data.location || data.address || '').trim(),
+      city: (data.city || '').trim(),
       customerType: data.customerType || 'Retail',
-      notes: data.notes?.trim() || '',
-      createdAt: new Date().toISOString(),
+      type: data.type || (data.companyName ? 'corporate' : 'retail'),
+      totalDue: Number(data.totalDue) || 0,
+      balance: Number(data.balance !== undefined ? data.balance : data.totalDue) || 0,
+      totalSales: Number(data.totalSales) || 0,
+      totalPaid: Number(data.totalPaid) || 0,
+      notes: (data.notes || '').trim(),
+      createdAt: data.createdAt || new Date().toISOString(),
     };
 
     customers.unshift(newCustomer);
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, customers);
 
-    // Live sync to MongoDB Atlas
+    // Live sync to MongoDB Atlas with full corporate profile
     apiClient.post('/customers', {
       name: newCustomer.name,
-      email: newCustomer.email,
+      companyName: newCustomer.companyName,
+      designationRole: newCustomer.designationRole,
       phone: newCustomer.phone,
+      companyPhone: newCustomer.companyPhone,
+      email: newCustomer.email,
       address: newCustomer.address,
+      location: newCustomer.location,
+      city: newCustomer.city,
       customerType: newCustomer.customerType,
+      type: newCustomer.type,
+      totalDue: newCustomer.totalDue,
+      balance: newCustomer.balance,
       notes: newCustomer.notes,
     }).then((res) => {
       if (res?.data?._id) {
@@ -55,7 +73,7 @@ class CustomerService {
 
   update(id, updates) {
     const customers = this.getAll();
-    const index = customers.findIndex((c) => c.id === id);
+    const index = customers.findIndex((c) => c.id === id || c._id === id);
     if (index === -1) {
       return { success: false, message: 'Customer not found.' };
     }
@@ -69,7 +87,8 @@ class CustomerService {
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, customers);
 
     // Live sync to MongoDB Atlas
-    apiClient.put(`/customers/${id}`, updates).catch((err) => {
+    const targetId = customers[index]._id || customers[index].id || id;
+    apiClient.put(`/customers/${targetId}`, updates).catch((err) => {
       console.warn('[MongoDB Customer update notice]:', err.message);
     });
 
@@ -134,39 +153,44 @@ class CustomerService {
     const customers = this.getAll();
     let existing = null;
     if (data.id) {
-      existing = customers.find((c) => c.id === data.id);
+      existing = customers.find((c) => c.id === data.id || c._id === data.id);
     }
-    if (!existing && data.phone) {
-      existing = customers.find((c) => c.phone && c.phone.trim() === data.phone.trim());
+    if (!existing && data.phone && String(data.phone).trim()) {
+      const cleanP = String(data.phone).replace(/\D/g, '');
+      existing = customers.find((c) => {
+        if (!c.phone) return false;
+        const cp = String(c.phone).replace(/\D/g, '');
+        return cp && (cp === cleanP || cp.slice(-10) === cleanP.slice(-10));
+      });
     }
     if (!existing && data.name) {
-      existing = customers.find((c) => c.name.toLowerCase().trim() === data.name.toLowerCase().trim());
+      existing = customers.find((c) => c.name && c.name.toLowerCase().trim() === data.name.toLowerCase().trim());
     }
 
     if (existing) {
       const updates = {
         name: data.name.trim(),
-        companyName: data.companyName !== undefined ? data.companyName : existing.companyName || '',
-        designationRole: data.designationRole || data.customerRole || existing.designationRole || 'owner',
-        phone: data.phone || existing.phone || '',
-        companyPhone: data.companyPhone || existing.companyPhone || '',
-        email: data.email || existing.email || '',
-        address: data.address || existing.address || '',
-        location: data.location || data.address || existing.location || '',
+        companyName: (data.companyName && data.companyName.trim()) ? data.companyName.trim() : (existing.companyName || ''),
+        designationRole: (data.designationRole && data.designationRole !== 'owner') ? data.designationRole : (data.customerRole || existing.designationRole || 'owner'),
+        phone: (data.phone && data.phone.trim()) ? data.phone.trim() : (existing.phone || ''),
+        companyPhone: (data.companyPhone && data.companyPhone.trim()) ? data.companyPhone.trim() : (existing.companyPhone || existing.phone || ''),
+        email: (data.email && data.email.trim()) ? data.email.trim() : (existing.email || ''),
+        address: (data.address && data.address.trim()) ? data.address.trim() : (existing.address || ''),
+        location: (data.location && data.location.trim()) ? data.location.trim() : (existing.location || existing.address || data.address || ''),
         customerType: data.customerType || existing.customerType || 'Retail',
       };
-      this.update(existing.id, updates);
+      this.update(existing.id || existing._id, updates);
       return { ...existing, ...updates };
     } else {
       const res = this.create({
         name: data.name.trim(),
-        companyName: data.companyName || '',
+        companyName: (data.companyName || data.company || '').trim(),
         designationRole: data.designationRole || data.customerRole || 'owner',
-        phone: data.phone || '',
-        companyPhone: data.companyPhone || '',
-        email: data.email || '',
-        address: data.address || '',
-        location: data.location || data.address || '',
+        phone: (data.phone || '').trim(),
+        companyPhone: (data.companyPhone || data.phone || '').trim(),
+        email: (data.email || '').trim(),
+        address: (data.address || '').trim(),
+        location: (data.location || data.address || '').trim(),
         customerType: data.customerType || 'Retail',
         totalSales: 0,
         totalPaid: 0,

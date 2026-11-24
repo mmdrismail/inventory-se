@@ -35,6 +35,7 @@ export const QuotationFormPage = () => {
     products,
     customers,
     quotations,
+    sales,
     createQuotation,
     updateQuotation,
     settings,
@@ -189,13 +190,37 @@ export const QuotationFormPage = () => {
       setCustomerAddress('');
       return;
     }
-    setSelectedCustomerId(cust.id);
-    setCustomerName(cust.name || '');
-    setCustomerCompany(cust.companyName || cust.company || '');
-    setCustomerRole(cust.designationRole || cust.role || 'owner');
-    setCustomerPhone(cust.phone || cust.companyPhone || '');
-    setCustomerEmail(cust.email || '');
-    setCustomerAddress(cust.address || cust.location || '');
+
+    const cPhone = (cust.phone || cust.companyPhone || '').trim();
+    const cName = (cust.name || '').toLowerCase().trim();
+
+    const matchQuote = (quotations || []).find((q) =>
+      (q.customerId && (q.customerId === cust.id || q.customerId === cust._id)) ||
+      (q.customerPhone && cPhone && q.customerPhone.trim() === cPhone) ||
+      (q.customerName && cName && q.customerName.toLowerCase().trim() === cName)
+    );
+    const matchSale = (sales || []).find((s) =>
+      (s.customerId && (s.customerId === cust.id || s.customerId === cust._id)) ||
+      (s.customerPhone && cPhone && s.customerPhone.trim() === cPhone) ||
+      (s.customerName && cName && s.customerName.toLowerCase().trim() === cName)
+    );
+
+    const resolvedName = cust.name || matchQuote?.customerName || matchSale?.customerName || '';
+    const resolvedCompany = cust.companyName || cust.company || matchQuote?.customerCompany || matchSale?.customerCompany || '';
+    const resolvedRole = (cust.designationRole && cust.designationRole !== 'owner')
+      ? cust.designationRole
+      : (matchQuote?.customerRole || matchSale?.customerRole || cust.designationRole || 'owner');
+    const resolvedPhone = cust.phone || cust.companyPhone || matchQuote?.customerPhone || matchSale?.customerPhone || '';
+    const resolvedEmail = cust.email || matchQuote?.customerEmail || matchSale?.customerEmail || '';
+    const resolvedAddress = cust.address || cust.location || matchQuote?.customerAddress || matchSale?.customerAddress || '';
+
+    setSelectedCustomerId(cust.id || cust._id);
+    setCustomerName(resolvedName);
+    setCustomerCompany(resolvedCompany);
+    setCustomerRole(resolvedRole);
+    setCustomerPhone(resolvedPhone);
+    setCustomerEmail(resolvedEmail);
+    setCustomerAddress(resolvedAddress);
   };
 
   // Add Item Row
@@ -537,7 +562,7 @@ export const QuotationFormPage = () => {
               <select
                 value={selectedCustomerId}
                 onChange={(e) => {
-                  const found = customers.find((c) => c.id === e.target.value);
+                  const found = customers.find((c) => c.id === e.target.value || c._id === e.target.value);
                   handleSelectCustomer(found || null);
                 }}
                 className="w-full px-3 py-1.5 text-xs rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-medium focus:outline-none"
@@ -549,11 +574,26 @@ export const QuotationFormPage = () => {
                     obro: '-- Quick Pick Registered Client --',
                   })}
                 </option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.companyName ? `(${c.companyName})` : ''}
-                  </option>
-                ))}
+                {customers.map((c) => {
+                  const cPhone = (c.phone || c.companyPhone || '').trim();
+                  const cName = (c.name || '').toLowerCase().trim();
+                  const matchQ = (quotations || []).find((q) =>
+                    (q.customerId && (q.customerId === c.id || q.customerId === c._id)) ||
+                    (q.customerPhone && cPhone && q.customerPhone.trim() === cPhone) ||
+                    (q.customerName && cName && q.customerName.toLowerCase().trim() === cName)
+                  );
+                  const matchS = (sales || []).find((s) =>
+                    (s.customerId && (s.customerId === c.id || s.customerId === c._id)) ||
+                    (s.customerPhone && cPhone && s.customerPhone.trim() === cPhone) ||
+                    (s.customerName && cName && s.customerName.toLowerCase().trim() === cName)
+                  );
+                  const comp = c.companyName || c.company || matchQ?.customerCompany || matchS?.customerCompany || '';
+                  return (
+                    <option key={c.id || c._id} value={c.id || c._id}>
+                      {c.name} {comp ? `(${comp})` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

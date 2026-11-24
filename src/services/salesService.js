@@ -42,6 +42,41 @@ class SalesService {
 
     const isCompleted = saleData.status === 'completed' || !saleData.status;
 
+    const isGenericClientName = (name) => {
+      if (!name) return true;
+      const n = name.trim().toLowerCase();
+      return (
+        n === 'walk-in retail customer' ||
+        n === 'direct client' ||
+        n === 'valued client' ||
+        n === 'counter direct sale' ||
+        n === 'সাধারণ ক্লায়েন্ট' ||
+        n === 'সাধারণ গ্রাহক' ||
+        n.includes('walk-in')
+      );
+    };
+
+    if (
+      saleData.autoSaveCustomer !== false &&
+      saleData.customerName &&
+      saleData.customerName.trim() &&
+      !isGenericClientName(saleData.customerName)
+    ) {
+      const cust = customerService.upsertCustomer({
+        id: customerId,
+        name: saleData.customerName,
+        companyName: saleData.customerCompany,
+        designationRole: saleData.customerRole,
+        phone: saleData.customerPhone,
+        email: saleData.customerEmail,
+        address: saleData.customerAddress,
+        location: saleData.customerLocation || saleData.customerAddress,
+      });
+      if (cust && (cust.id || cust._id)) {
+        customerId = cust.id || cust._id;
+      }
+    }
+
     if (customerId && isCompleted) {
       customerService.updateFinancials(customerId, totalVal, paidVal, dueVal);
     }
@@ -178,6 +213,24 @@ class SalesService {
       paymentStatus: saleData.paymentStatus || existing.paymentStatus || 'paid',
       updatedAt: new Date().toISOString(),
     };
+
+    if (
+      saleData.autoSaveCustomer !== false &&
+      custName &&
+      custName.trim() &&
+      !isGenericClientName(custName)
+    ) {
+      customerService.upsertCustomer({
+        id: customerId,
+        name: custName,
+        companyName: updatedSale.customerCompany,
+        designationRole: updatedSale.customerRole,
+        phone: updatedSale.customerPhone,
+        email: updatedSale.customerEmail,
+        address: updatedSale.customerAddress,
+        location: updatedSale.customerLocation || updatedSale.customerAddress,
+      });
+    }
 
     sales[index] = updatedSale;
     storageService.setItem(STORAGE_KEYS.SALES, sales);

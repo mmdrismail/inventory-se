@@ -159,7 +159,8 @@ export const CustomerListPage = () => {
   };
 
   const handleDelete = (c) => {
-    const stats = customerStats[c.id];
+    const custId = c.id || c._id;
+    const stats = customerStats[custId] || customerStats[c.id] || customerStats[c._id];
     if (stats && stats.count > 0) {
       alert(`Cannot delete customer "${c.name}" because ${stats.count} sales invoices are registered under their account.`);
       return;
@@ -171,7 +172,7 @@ export const CustomerListPage = () => {
       confirmText: 'Delete Customer',
       isDestructive: true,
       onConfirm: () => {
-        deleteCustomer(c.id);
+        deleteCustomer(custId);
       },
     });
   };
@@ -189,7 +190,7 @@ export const CustomerListPage = () => {
     };
 
     if (editingCustomer) {
-      const res = updateCustomer(editingCustomer.id, payload);
+      const res = updateCustomer(editingCustomer.id || editingCustomer._id, payload);
       if (res.success) {
         setIsModalOpen(false);
       } else {
@@ -278,7 +279,7 @@ export const CustomerListPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredCustomers.map((c) => {
-            const stats = customerStats[c.id] || { count: 0, totalSpend: 0, totalDue: 0, quotationsCount: 0 };
+            const stats = customerStats[c.id] || customerStats[c._id] || { count: 0, totalSpend: 0, totalDue: 0, quotationsCount: 0 };
             const effectiveDue = Math.max(Number(c.totalDue || 0), stats.totalDue);
 
             return (

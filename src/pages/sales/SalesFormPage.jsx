@@ -25,7 +25,7 @@ import {
 import { playBarcodeBeep, playSuccessChime, playErrorTone } from '../../utils/soundEffects';
 
 export const SalesFormPage = () => {
-  const { customers, products, sales, createSale, updateSale, settings } = useAppData();
+  const { customers, products, sales, quotations, createSale, updateSale, settings } = useAppData();
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
@@ -156,19 +156,43 @@ export const SalesFormPage = () => {
       return;
     }
 
-    const found = customers.find((c) => c.id === selectedId);
+    const found = customers.find((c) => c.id === selectedId || c._id === selectedId);
     if (found) {
-      setCustomerName(found.name || '');
-      setCustomerCompany(found.companyName || '');
-      setCustomerRole(found.designationRole || 'owner');
-      setCustomerPhone(found.phone || found.companyPhone || '');
-      setCustomerEmail(found.email || '');
-      setCustomerAddress(found.address || '');
-      setCustomerLocation(found.location || found.address || '');
+      const cPhone = (found.phone || found.companyPhone || '').trim();
+      const cName = (found.name || '').toLowerCase().trim();
+
+      const matchQuote = (quotations || []).find((q) =>
+        (q.customerId && (q.customerId === found.id || q.customerId === found._id)) ||
+        (q.customerPhone && cPhone && q.customerPhone.trim() === cPhone) ||
+        (q.customerName && cName && q.customerName.toLowerCase().trim() === cName)
+      );
+      const matchSale = (sales || []).find((s) =>
+        (s.customerId && (s.customerId === found.id || s.customerId === found._id)) ||
+        (s.customerPhone && cPhone && s.customerPhone.trim() === cPhone) ||
+        (s.customerName && cName && s.customerName.toLowerCase().trim() === cName)
+      );
+
+      const resolvedName = found.name || matchQuote?.customerName || matchSale?.customerName || '';
+      const resolvedCompany = found.companyName || found.company || matchQuote?.customerCompany || matchSale?.customerCompany || '';
+      const resolvedRole = (found.designationRole && found.designationRole !== 'owner')
+        ? found.designationRole
+        : (matchQuote?.customerRole || matchSale?.customerRole || found.designationRole || 'owner');
+      const resolvedPhone = found.phone || found.companyPhone || matchQuote?.customerPhone || matchSale?.customerPhone || '';
+      const resolvedEmail = found.email || matchQuote?.customerEmail || matchSale?.customerEmail || '';
+      const resolvedAddress = found.address || matchQuote?.customerAddress || matchSale?.customerAddress || '';
+      const resolvedLocation = found.location || matchQuote?.customerLocation || matchSale?.customerLocation || resolvedAddress || '';
+
+      setCustomerName(resolvedName);
+      setCustomerCompany(resolvedCompany);
+      setCustomerRole(resolvedRole);
+      setCustomerPhone(resolvedPhone);
+      setCustomerEmail(resolvedEmail);
+      setCustomerAddress(resolvedAddress);
+      setCustomerLocation(resolvedLocation);
     }
   };
 
-  const selectedCustomerObj = customers.find((c) => c.id === customerId);
+  const selectedCustomerObj = customers.find((c) => c.id === customerId || c._id === customerId);
 
   const handleBarcodeSearchAndAdd = (code) => {
     const trimmed = (code || '').trim().toLowerCase();
@@ -461,10 +485,25 @@ export const SalesFormPage = () => {
                   onChange={(e) => handleCustomerSelect(e.target.value)}
                   options={[
                     { value: '', label: '➕ নতুন গ্রাহক টাইপ করুন / Walk-in' },
-                    ...customers.map((c) => ({
-                      value: c.id,
-                      label: `${c.name} ${c.companyName ? `(${c.companyName})` : ''}`,
-                    })),
+                    ...customers.map((c) => {
+                      const cPhone = (c.phone || c.companyPhone || '').trim();
+                      const cName = (c.name || '').toLowerCase().trim();
+                      const matchQ = (quotations || []).find((q) =>
+                        (q.customerId && (q.customerId === c.id || q.customerId === c._id)) ||
+                        (q.customerPhone && cPhone && q.customerPhone.trim() === cPhone) ||
+                        (q.customerName && cName && q.customerName.toLowerCase().trim() === cName)
+                      );
+                      const matchS = (sales || []).find((s) =>
+                        (s.customerId && (s.customerId === c.id || s.customerId === c._id)) ||
+                        (s.customerPhone && cPhone && s.customerPhone.trim() === cPhone) ||
+                        (s.customerName && cName && s.customerName.toLowerCase().trim() === cName)
+                      );
+                      const comp = c.companyName || c.company || matchQ?.customerCompany || matchS?.customerCompany || '';
+                      return {
+                        value: c.id || c._id,
+                        label: `${c.name} ${comp ? `(${comp})` : ''}`,
+                      };
+                    }),
                   ]}
                   helperText="বাটন থেকে সিলেক্ট করলে বাকি তথ্য স্বয়ংক্রিয় পূরণ হবে"
                 />

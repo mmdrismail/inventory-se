@@ -36,11 +36,11 @@ export const CustomerDetailPage = () => {
   const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'quotations' | 'orders'
   const [activePrintQuotation, setActivePrintQuotation] = useState(null);
 
-  const customer = customers.find((c) => c.id === id);
+  const customer = customers.find((c) => c.id === id || c._id === id);
 
   const customerSales = useMemo(() => {
-    return sales.filter((s) => s.customerId === id);
-  }, [sales, id]);
+    return sales.filter((s) => s.customerId === id || (customer && s.customerName?.toLowerCase() === customer.name?.toLowerCase()));
+  }, [sales, id, customer]);
 
   const customerQuotations = useMemo(() => {
     return (quotations || []).filter(
