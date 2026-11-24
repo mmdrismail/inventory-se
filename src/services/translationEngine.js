@@ -286,8 +286,8 @@ class TranslationEngineService {
       },
       {
         en: 'Add Demo User',
-        bn: '+ নতুন ইউজার যোগ করুন',
-        obro: '+ Add Demo User',
+        bn: 'নতুন ইউজার যোগ করুন',
+        obro: 'Add Demo User',
       },
       {
         en: 'Search by user name, email, or department...',

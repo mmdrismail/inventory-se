@@ -425,9 +425,9 @@ export const TRANSLATIONS = {
     obro: 'Supplier / Vendor',
   },
   new_supplier_btn: {
-    bn: '+ নতুন সাপ্লায়ার',
-    en: '+ New Supplier',
-    obro: '+ Notun Supplier',
+    bn: 'নতুন সাপ্লায়ার',
+    en: 'New Supplier',
+    obro: 'Notun Supplier',
   },
   po_reference_label: {
     bn: 'পিও রেফারেন্স নম্বর',
@@ -455,9 +455,9 @@ export const TRANSLATIONS = {
     obro: 'Kroykrito Products o Poriman',
   },
   add_item_line_btn: {
-    bn: '+ আইটেম লাইন যোগ করুন',
-    en: '+ Add Item Line',
-    obro: '+ Item Line Jog Korun',
+    bn: 'আইটেম লাইন যোগ করুন',
+    en: 'Add Item Line',
+    obro: 'Item Line Jog Korun',
   },
   product_col_label: {
     bn: 'পণ্য নির্বাচন',
@@ -532,9 +532,9 @@ export const TRANSLATIONS = {
     obro: 'Inventory items, pricing, SKUs ebong reorder level manage korun.',
   },
   btn_add_product: {
-    bn: '+ নতুন পণ্য যোগ করুন',
-    en: '+ Add Product',
-    obro: '+ Notun Product',
+    bn: 'নতুন পণ্য যোগ করুন',
+    en: 'Add Product',
+    obro: 'Notun Product',
   },
   btn_import_csv: {
     bn: 'ইমপোর্ট CSV',
@@ -949,9 +949,9 @@ export const TRANSLATIONS = {
     obro: 'Machinery parts, tools, gases ebong consumables categorize korun.',
   },
   btn_add_category: {
-    bn: '+ নতুন ক্যাটাগরি',
-    en: '+ New Category',
-    obro: '+ New Category',
+    bn: 'নতুন ক্যাটাগরি',
+    en: 'New Category',
+    obro: 'New Category',
   },
   col_category_name: {
     bn: 'ক্যাটাগরির নাম',
@@ -981,9 +981,9 @@ export const TRANSLATIONS = {
     obro: 'Retail buyers, cold storage plant owners ebong corporate accounts.',
   },
   btn_add_customer: {
-    bn: '+ নতুন ক্লায়েন্ট',
-    en: '+ Add Customer',
-    obro: '+ Add Customer',
+    bn: 'নতুন ক্লায়েন্ট',
+    en: 'Add Customer',
+    obro: 'Add Customer',
   },
   col_client_name: {
     bn: 'গ্রাহক ও প্রতিষ্ঠান',
@@ -1018,9 +1018,9 @@ export const TRANSLATIONS = {
     obro: 'Ship breaking yards, local auctioneers ebong OEM importers.',
   },
   btn_add_supplier: {
-    bn: '+ নতুন ভেন্ডর',
-    en: '+ Add Supplier',
-    obro: '+ Add Supplier',
+    bn: 'নতুন ভেন্ডর',
+    en: 'Add Supplier',
+    obro: 'Add Supplier',
   },
   col_supplier_name: {
     bn: 'সরবরাহকারী ও প্রতিষ্ঠান',

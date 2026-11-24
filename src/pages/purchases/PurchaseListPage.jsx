@@ -481,7 +481,7 @@ export const PurchaseListPage = () => {
               onClick={() => setIsNewLotModalOpen(true)}
               className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
             >
-              {t('action_new_lot_entry', '+ নতুন নিলাম লট এন্ট্রি')}
+              {t('action_new_lot_entry', 'নতুন নিলাম লট এন্ট্রি')}
             </Button>
           ) : (
             <>
@@ -490,7 +490,7 @@ export const PurchaseListPage = () => {
               </Button>
               <Link to="/purchases/new">
                 <Button variant="primary" size="sm" icon={Plus}>
-                  {t('action_create_purchase', '+ Create Purchase')}
+                  {t('action_create_purchase', 'Create Purchase')}
                 </Button>
               </Link>
             </>
@@ -750,7 +750,7 @@ export const PurchaseListPage = () => {
                 onClick={() => setIsNewLotModalOpen(true)}
                 className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
               >
-                + নতুন নিলাম লট এন্ট্রি দিন
+                নতুন নিলাম লট এন্ট্রি দিন
               </Button>
             </Card>
           ) : (
@@ -957,7 +957,7 @@ export const PurchaseListPage = () => {
                   className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
                 >
                   <Plus className="h-3 w-3" />
-                  <span>+ নতুন সাপ্লায়ার</span>
+                  <span>নতুন সাপ্লায়ার</span>
                 </button>
               </div>
               <div className="flex items-center gap-1.5">
@@ -1037,7 +1037,7 @@ export const PurchaseListPage = () => {
                 onClick={handleAddLotItemRow}
                 className="text-xs"
               >
-                + আরও মালামাল লাইন যোগ
+                আরও মালামাল লাইন যোগ
               </Button>
             </div>
 

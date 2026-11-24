@@ -220,7 +220,7 @@ export const CustomerListPage = () => {
         </div>
 
         <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenAdd}>
-          {t('btn_add_customer', '+ Add Customer (নতুন গ্রাহক)')}
+          {t('btn_add_customer', 'Add Customer (নতুন গ্রাহক)')}
         </Button>
       </div>
 

@@ -225,9 +225,9 @@ export const UserManagementPage = () => {
           </Button>
           <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenAdd}>
             {l({
-              bn: '+ নতুন ইউজার যোগ করুন',
+              bn: 'নতুন ইউজার যোগ করুন',
               en: 'Add Demo User',
-              obro: '+ Add Demo User',
+              obro: 'Add Demo User',
             })}
           </Button>
         </div>

@@ -298,7 +298,7 @@ export const PurchaseFormPage = () => {
                   className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
                 >
                   <Plus className="h-3 w-3" />
-                  <span>{t('new_supplier_btn', '+ New Supplier')}</span>
+                  <span>{t('new_supplier_btn', 'New Supplier')}</span>
                 </button>
               </div>
               <div className="flex items-center gap-1.5">
@@ -427,7 +427,7 @@ export const PurchaseFormPage = () => {
                 {t('purchased_products_heading', 'Purchased Products & Quantities')}
               </span>
               <Button variant="outline" size="sm" icon={Plus} onClick={handleAddItem}>
-                {t('add_item_line_btn', '+ Add Item Line')}
+                {t('add_item_line_btn', 'Add Item Line')}
               </Button>
             </div>
 

@@ -465,7 +465,7 @@ export const ProductFormPage = () => {
                     className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline"
                   >
                     <Plus className="h-3 w-3" />
-                    <span>+ New Supplier</span>
+                    <span>New Supplier</span>
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -736,7 +736,7 @@ export const ProductFormPage = () => {
                   onClick={handleAddVariant}
                   className="border-purple-300 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40"
                 >
-                  + ভ্যারিয়েন্ট যোগ করুন
+                  ভ্যারিয়েন্ট যোগ করুন
                 </Button>
               </div>
 

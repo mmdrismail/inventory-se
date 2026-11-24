@@ -900,7 +900,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>+ নতুন পণ্য / আইটেম যোগ করুন (Add Line Item)</span>
+                    <span>নতুন পণ্য / আইটেম যোগ করুন (Add Line Item)</span>
                   </button>
 
                   <div className="flex items-center gap-4 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 font-mono text-xs">

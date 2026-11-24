@@ -39,6 +39,23 @@ export const Button = ({
       'bg-white hover:bg-emerald-50 text-emerald-800 dark:text-emerald-900 shadow-md focus:ring-white border border-transparent font-semibold',
   };
 
+  // Defensive guard: prevent redundant duplicate plus signs when an Icon is displayed
+  const sanitizeChildren = (node) => {
+    if (!Icon) return node;
+    if (typeof node === 'string') {
+      return node.replace(/^\s*\+\s*/, '');
+    }
+    if (Array.isArray(node)) {
+      return React.Children.map(node, (child, idx) => {
+        if (idx === 0 && typeof child === 'string') {
+          return child.replace(/^\s*\+\s*/, '');
+        }
+        return child;
+      });
+    }
+    return node;
+  };
+
   return (
     <button
       type={type}
@@ -52,7 +69,7 @@ export const Button = ({
       ) : (
         <>
           {Icon && iconPosition === 'left' && <Icon className="h-4 w-4 shrink-0" />}
-          <span>{children}</span>
+          <span>{sanitizeChildren(children)}</span>
           {Icon && iconPosition === 'right' && <Icon className="h-4 w-4 shrink-0" />}
         </>
       )}

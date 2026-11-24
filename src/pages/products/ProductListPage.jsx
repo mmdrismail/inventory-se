@@ -190,7 +190,7 @@ export const ProductListPage = () => {
           </Button>
           <Link to="/products/new">
             <Button variant="primary" size="sm" icon={Plus}>
-              {t('btn_add_product', '+ Add Product')}
+              {t('btn_add_product', 'Add Product')}
             </Button>
           </Link>
         </div>
