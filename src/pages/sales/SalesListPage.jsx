@@ -260,7 +260,13 @@ export const SalesListPage = () => {
                   const dateStr = formatDate(s.date || s.createdAt);
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr
+                      key={s.id}
+                      id={`sale-item-${s.id}`}
+                      data-item-id={s.id}
+                      data-scroll-anchor={s.id}
+                      className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                    >
                       <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
                         <Link to={`/sales/${s.id}`} className="hover:text-emerald-600 transition-colors">
                           {invNo}

@@ -625,7 +625,13 @@ export const PurchaseListPage = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {paginatedPurchases.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                      <tr
+                        key={p.id}
+                        id={`purchase-item-${p.id}`}
+                        data-item-id={p.id}
+                        data-scroll-anchor={p.id}
+                        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                      >
                         <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
                           <Link to={`/purchases/${p.id}`} className="hover:text-emerald-600 transition-colors">
                             {p.referenceNo}

@@ -180,7 +180,13 @@ export const SupplierListPage = () => {
           {filteredSuppliers.map((s) => {
             const stats = supplierPurchaseStats[s.id] || { count: 0, totalAmount: 0 };
             return (
-              <Card key={s.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-all">
+              <Card
+                key={s.id}
+                id={`supplier-item-${s.id}`}
+                data-item-id={s.id}
+                data-scroll-anchor={s.id}
+                className="supplier-card p-5 flex flex-col justify-between hover:shadow-md transition-all"
+              >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">

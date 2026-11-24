@@ -4,6 +4,7 @@ import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import { generateSKU } from '../../utils/formatters';
 import { QuickAddSupplierModal } from '../../components/suppliers/QuickAddSupplierModal';
@@ -308,13 +309,9 @@ export const ProductFormPage = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Top action header */}
       <div className="flex items-center justify-between">
-        <Link
-          to="/products"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{l({ bn: 'পণ্য তালিকায় ফিরে যান', en: 'Back to Product List', obro: 'Back to Product List' })}</span>
-        </Link>
+        <BackLink to="/products">
+          {l({ bn: 'পণ্য তালিকায় ফিরে যান', en: 'Back to Product List', obro: 'Back to Product List' })}
+        </BackLink>
       </div>
 
       <Card>

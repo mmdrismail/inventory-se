@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { BackLink } from '../../components/common/BackLink';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -131,13 +132,9 @@ export const CustomerDetailPage = () => {
     <div className="space-y-6">
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <Link
-          to="/customers"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{l({ bn: 'গ্রাহক তালিকায় ফিরে যান', en: 'Back to Customers List', obro: 'Back to Customers List' })}</span>
-        </Link>
+        <BackLink to="/customers">
+          {l({ bn: 'গ্রাহক তালিকায় ফিরে যান', en: 'Back to Customers List', obro: 'Back to Customers List' })}
+        </BackLink>
 
         <div className="flex items-center gap-2">
           <Link to="/quotations/new">

@@ -5,6 +5,7 @@ import { useAppData } from '../../context/AppDataContext';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { Input, Textarea, Select } from '../../components/forms/FormControls';
 import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, CheckCircle2, ShieldCheck, Truck, CreditCard, Sparkles } from 'lucide-react';
@@ -100,13 +101,9 @@ export const CheckoutPage = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <Link
-        to="/cart"
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span>Back to Cart</span>
-      </Link>
+      <BackLink to="/cart">
+        Back to Cart
+      </BackLink>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Checkout Form */}

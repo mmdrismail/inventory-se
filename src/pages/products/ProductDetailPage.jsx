@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { StockBadge } from '../../components/common/Badge';
+import { BackLink } from '../../components/common/BackLink';
 import { BarcodeLabelModal } from '../../components/products/BarcodeLabelModal';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import {
@@ -147,13 +148,9 @@ export const ProductDetailPage = () => {
     <div className="space-y-6">
       {/* Top back & actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <Link
-          to="/products"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{l({ bn: 'পণ্য তালিকায় ফিরে যান', en: 'Back to Products', obro: 'Back to Products' })}</span>
-        </Link>
+        <BackLink to="/products">
+          {l({ bn: 'পণ্য তালিকায় ফিরে যান', en: 'Back to Products', obro: 'Back to Products' })}
+        </BackLink>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Barcode & Thermal Sticker Print Button */}

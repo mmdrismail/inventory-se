@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { BackLink } from '../../components/common/BackLink';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { ArrowLeft, Truck, Mail, Phone, MapPin, ShoppingCart, Eye, Plus } from 'lucide-react';
 
@@ -46,13 +47,9 @@ export const SupplierDetailPage = () => {
     <div className="space-y-6">
       {/* Back button */}
       <div className="flex items-center justify-between">
-        <Link
-          to="/suppliers"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{l({ bn: 'সরবরাহকারী তালিকায় ফিরে যান', en: 'Back to Suppliers', obro: 'Back to Suppliers' })}</span>
-        </Link>
+        <BackLink to="/suppliers">
+          {l({ bn: 'সরবরাহকারী তালিকায় ফিরে যান', en: 'Back to Suppliers', obro: 'Back to Suppliers' })}
+        </BackLink>
 
         <Link to="/purchases/new">
           <Button variant="primary" size="sm" icon={Plus}>

@@ -4,6 +4,7 @@ import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { formatCurrency } from '../../utils/formatters';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
@@ -378,12 +379,10 @@ export const QuotationFormPage = () => {
       {/* Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link
+          <BackLink
             to="/quotations"
             className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          />
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
               <FileSpreadsheet className="h-6 w-6 text-purple-600 dark:text-purple-400" />

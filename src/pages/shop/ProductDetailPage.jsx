@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, ShoppingBag, CheckCircle2, ShieldCheck, Truck, RefreshCw } from 'lucide-react';
 
@@ -42,13 +43,9 @@ export const StorefrontProductDetailPage = () => {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Back button */}
-      <Link
-        to="/shop"
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span>Back to Storefront Catalog</span>
-      </Link>
+      <BackLink to="/shop">
+        Back to Storefront Catalog
+      </BackLink>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
         {/* Product Image */}

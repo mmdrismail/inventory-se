@@ -1,17 +1,27 @@
-import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { useLocation, useNavigationType } from 'react-router-dom';
+import { scrollRestorationEngine } from '../../services/scrollRestorationEngine';
 
 /**
- * ScrollToTop Component
- * Ensures every route change immediately resets the scroll position to the top of the window.
- * If a URL hash (#section) is specified, it smoothly scrolls to that target.
+ * Universal Scroll Restoration & Navigation Component
+ * -------------------------------------------------------------
+ * Intelligently determines whether a navigation event should:
+ * 1. Restore exact prior scroll position & item anchor (on Back/POP and return-to-list)
+ * 2. Smoothly scroll to a hash anchor (#section)
+ * 3. Reset scroll position to top (on fresh forward navigations)
  */
 export const ScrollToTop = () => {
-  const { pathname, search, hash } = useLocation();
+  const location = useLocation();
+  const navType = useNavigationType(); // 'POP' | 'PUSH' | 'REPLACE'
+  const prevPathRef = useRef(location.pathname);
 
   useEffect(() => {
+    const { pathname, search, hash, state } = location;
+    const prevPath = prevPathRef.current;
+    prevPathRef.current = pathname;
+
+    // 1. Hash Navigation (#section)
     if (hash) {
-      // Delay slightly to ensure target DOM element has rendered if coming from another route
       const timer = setTimeout(() => {
         const id = hash.replace('#', '');
         const element = document.getElementById(id);
@@ -22,20 +32,27 @@ export const ScrollToTop = () => {
       return () => clearTimeout(timer);
     }
 
-    // Instantly reset window, html, and body scroll position to top
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: 'instant',
-    });
+    // 2. Determine if this route transition is a return / back navigation
+    const isPop = navType === 'POP';
+    const isExplicitBack =
+      Boolean(state?.isBackNavigation) || scrollRestorationEngine.consumeBackFlag();
+    const isHierarchicalReturn = scrollRestorationEngine.isReturnToList(prevPath, pathname);
 
-    if (document.documentElement) {
-      document.documentElement.scrollTop = 0;
+    const shouldRestoreScroll = isPop || isExplicitBack || isHierarchicalReturn;
+
+    if (shouldRestoreScroll) {
+      const saved = scrollRestorationEngine.getPosition(pathname);
+      if (saved && (saved.y > 0 || saved.anchor)) {
+        scrollRestorationEngine.restoreScroll(saved.y, saved.anchor);
+        return;
+      }
     }
-    if (document.body) {
-      document.body.scrollTop = 0;
-    }
-  }, [pathname, search, hash]);
+
+    // 3. Fresh forward navigation to a different main module -> start at top
+    scrollRestorationEngine.scrollToTop();
+  }, [location, navType]);
 
   return null;
 };
+
+export default ScrollToTop;

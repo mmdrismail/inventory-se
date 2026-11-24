@@ -318,6 +318,9 @@ export const QuotationListPage = () => {
                 {filteredQuotations.map((quote) => (
                   <tr
                     key={quote.id}
+                    id={`quotation-item-${quote.id}`}
+                    data-item-id={quote.id}
+                    data-scroll-anchor={quote.id}
                     className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
                   >
                     {/* Quotation Number */}

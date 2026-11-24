@@ -4,6 +4,7 @@ import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import { cleanItemName } from '../../utils/printTemplateGenerator';
@@ -103,13 +104,9 @@ export const SaleDetailPage = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Top back & actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <Link
-          to="/sales"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{l({ bn: 'বিক্রয় তালিকায় ফিরে যান', en: 'Back to Sales List', obro: 'Sales List-e Ferot Jan' })}</span>
-        </Link>
+        <BackLink to="/sales">
+          {l({ bn: 'বিক্রয় তালিকায় ফিরে যান', en: 'Back to Sales List', obro: 'Sales List-e Ferot Jan' })}
+        </BackLink>
 
         <div className="flex items-center gap-2">
           <Link to={`/sales/${sale.id}/edit`}>

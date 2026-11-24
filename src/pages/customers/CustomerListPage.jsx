@@ -283,7 +283,13 @@ export const CustomerListPage = () => {
             const effectiveDue = Math.max(Number(c.totalDue || 0), stats.totalDue);
 
             return (
-              <Card key={c.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-all border border-slate-200/80 dark:border-slate-800">
+              <Card
+                key={c.id}
+                id={`customer-item-${c.id}`}
+                data-item-id={c.id}
+                data-scroll-anchor={c.id}
+                className="customer-card p-5 flex flex-col justify-between hover:shadow-md transition-all border border-slate-200/80 dark:border-slate-800"
+              >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">

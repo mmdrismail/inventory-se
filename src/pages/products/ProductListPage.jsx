@@ -324,7 +324,13 @@ export const ProductListPage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginatedProducts.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr
+                    key={p.id}
+                    id={`product-item-${p.id}`}
+                    data-item-id={p.id}
+                    data-scroll-anchor={p.id}
+                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                  >
                     {/* Image & Name */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">

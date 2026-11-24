@@ -257,7 +257,13 @@ export const OrderListPage = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginatedOrders.map((ord) => (
-                  <tr key={ord.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr
+                    key={ord.id}
+                    id={`order-item-${ord.id}`}
+                    data-item-id={ord.id}
+                    data-scroll-anchor={ord.id}
+                    className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
+                  >
                     <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
                       <Link to={`/orders/${ord.id}`} className="hover:text-emerald-600 transition-colors">
                         {ord.orderNumber}

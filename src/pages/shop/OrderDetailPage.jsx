@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import {
   ArrowLeft,
@@ -47,13 +48,9 @@ export const OrderDetailPage = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Top navigation */}
-      <Link
-        to="/my-orders"
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span>Back to Order History</span>
-      </Link>
+      <BackLink to="/my-orders">
+        Back to Order History
+      </BackLink>
 
       <Card className="p-6 space-y-8">
         {/* Order Header */}

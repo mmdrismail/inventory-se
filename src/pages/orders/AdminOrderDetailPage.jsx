@@ -4,6 +4,7 @@ import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import {
   ArrowLeft,
@@ -77,13 +78,9 @@ export const AdminOrderDetailPage = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <Link
-          to="/orders"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{l({ bn: 'অর্ডার তালিকায় ফিরে যান', en: 'Back to Order List', obro: 'Order List-e Ferot Jan' })}</span>
-        </Link>
+        <BackLink to="/orders">
+          {l({ bn: 'অর্ডার তালিকায় ফিরে যান', en: 'Back to Order List', obro: 'Order List-e Ferot Jan' })}
+        </BackLink>
 
         {/* Status Actions Bar */}
         <div className="flex flex-wrap items-center gap-2">

@@ -123,6 +123,9 @@ export const ShopPage = () => {
             return (
               <Card
                 key={p.id}
+                id={`shop-item-${p.id}`}
+                data-item-id={p.id}
+                data-scroll-anchor={p.id}
                 className="overflow-hidden flex flex-col justify-between group hover:shadow-xl transition-all duration-300"
               >
                 <div>

@@ -4,6 +4,7 @@ import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { Input, Select } from '../../components/forms/FormControls';
 import { Badge } from '../../components/common/Badge';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
@@ -436,13 +437,9 @@ export const SalesFormPage = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Top back & quick links */}
       <div className="flex items-center justify-between">
-        <Link
-          to="/sales"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{l({ bn: 'বিক্রয় তালিকায় ফিরে যান', en: 'Back to Sales List', obro: 'Back to Sales List' })}</span>
-        </Link>
+        <BackLink to="/sales">
+          {l({ bn: 'বিক্রয় তালিকায় ফিরে যান', en: 'Back to Sales List', obro: 'Back to Sales List' })}
+        </BackLink>
 
         {prefill && (
           <div className="flex items-center gap-2 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 px-3 py-1 rounded-lg text-xs text-purple-700 dark:text-purple-300 font-semibold">

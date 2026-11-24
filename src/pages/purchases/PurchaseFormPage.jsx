@@ -4,6 +4,7 @@ import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { BackLink } from '../../components/common/BackLink';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, Plus, Trash2, CheckCircle2, Clock, Barcode, Eye, Printer, Check } from 'lucide-react';
@@ -261,13 +262,9 @@ export const PurchaseFormPage = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Top back */}
       <div className="flex items-center justify-between">
-        <Link
-          to="/purchases"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{t('back_to_purchases', 'Back to Purchases')}</span>
-        </Link>
+        <BackLink to="/purchases">
+          {t('back_to_purchases', 'Back to Purchases')}
+        </BackLink>
       </div>
 
       <Card>
