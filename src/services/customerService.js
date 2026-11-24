@@ -270,6 +270,53 @@ class CustomerService {
       balance: newDue,
     });
   }
+
+  /**
+   * Recompute exact customer totals from all active (non-cancelled) local sales invoices
+   */
+  recalculateFromSales(customerId) {
+    if (!customerId) return null;
+    const customers = this.getAll();
+    const index = customers.findIndex(
+      (c) => c.id === customerId || c._id === customerId || c.clientSideId === customerId
+    );
+    if (index === -1) return null;
+
+    const customer = customers[index];
+    const idSet = new Set([customer.id, customer._id, customer.clientSideId, customerId].filter(Boolean).map(String));
+    const sales = storageService.getItem(STORAGE_KEYS.SALES, []);
+
+    let totalSales = 0;
+    let totalPaid = 0;
+    let totalDue = 0;
+
+    for (const s of sales) {
+      if (s.status === 'cancelled') continue;
+      if (!s.customerId || !idSet.has(String(s.customerId))) continue;
+      const tot = Number(s.total !== undefined ? s.total : s.totalAmount) || 0;
+      const status = s.paymentStatus || 'paid';
+      const paid =
+        status === 'paid'
+          ? tot
+          : status === 'due'
+          ? 0
+          : Math.min(tot, Math.max(0, Number(s.paidAmount) || 0));
+      const due = Math.max(0, tot - paid);
+      totalSales += tot;
+      totalPaid += paid;
+      totalDue += due;
+    }
+
+    customers[index] = {
+      ...customer,
+      totalSales: Math.round(totalSales * 100) / 100,
+      totalPaid: Math.round(totalPaid * 100) / 100,
+      totalDue: Math.round(totalDue * 100) / 100,
+      balance: Math.round(totalDue * 100) / 100,
+    };
+    storageService.setItem(STORAGE_KEYS.CUSTOMERS, customers);
+    return customers[index];
+  }
 }
 
 export const customerService = new CustomerService();

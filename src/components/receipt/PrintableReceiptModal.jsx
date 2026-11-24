@@ -208,10 +208,15 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
     return editableItems.reduce((sum, it) => sum + (Number(it.lineTotal) || 0), 0);
   }, [editableItems]);
 
-  const discountVal = Number(customDiscount) || 0;
-  const taxVal = Number(sale?.tax) || 0;
+  const discountVal = Math.min(liveSubtotal, Math.max(0, Number(customDiscount) || 0));
+  const taxVal = Math.max(0, Number(sale?.tax) || 0);
   const liveGrandTotal = Math.max(0, liveSubtotal - discountVal + taxVal);
-  const paidVal = sale?.paymentStatus === 'paid' ? liveGrandTotal : (Number(sale?.paidAmount) || 0);
+  const paidVal =
+    sale?.paymentStatus === 'paid'
+      ? liveGrandTotal
+      : sale?.paymentStatus === 'due'
+      ? 0
+      : Math.min(liveGrandTotal, Math.max(0, Number(sale?.paidAmount) || 0));
   const dueVal = Math.max(0, liveGrandTotal - paidVal);
   const totalUnits = editableItems.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
 
@@ -1232,8 +1237,20 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                 <div className="flex justify-end relative z-10">
                   <table className="w-60 text-xs border border-slate-400">
                     <tbody>
+                      {(discountVal > 0 || taxVal > 0) && (
+                        <tr className="border-b border-slate-300 bg-slate-50">
+                          <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{profile.t.subtotal}</td>
+                          <td className="py-1 px-2 font-mono font-bold text-right bg-blue-50/50">{formatCurrency(liveSubtotal, profile.currencySymbol)}</td>
+                        </tr>
+                      )}
+                      {discountVal > 0 && (
+                        <tr className="border-b border-slate-300 bg-slate-50 text-emerald-700">
+                          <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{profile.t.discount}</td>
+                          <td className="py-1 px-2 font-mono font-bold text-right bg-emerald-50/50">-{formatCurrency(discountVal, profile.currencySymbol)}</td>
+                        </tr>
+                      )}
                       <tr className="border-b border-slate-300 bg-slate-50">
-                        <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{profile.t.total}</td>
+                        <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{discountVal > 0 ? profile.t.netPayable : profile.t.total}</td>
                         <td className="py-1 px-2 font-mono font-bold text-right bg-blue-50/50">{formatCurrency(liveGrandTotal, profile.currencySymbol)}</td>
                       </tr>
                       <tr className="border-b border-slate-300 bg-slate-50">

@@ -318,6 +318,37 @@ async function runAllTests() {
       record('Sales', 'POST create sale and auto-deduct inventory stock', ok, res.data?.message);
       if (ok) testSaleId = res.data.data._id;
     }
+    if (testSaleId && testCustomerId) {
+      const editRes = await request(`/api/sales/${testSaleId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          discount: 29.98,
+          paymentStatus: 'partial',
+          paidAmount: 100,
+        }),
+      });
+      const editedSale = editRes.data?.data;
+      record(
+        'Sales',
+        'PUT edit sale discount & partial payment auto-recalculates net total/due',
+        editRes.status === 200 &&
+          Number(editedSale?.totalAmount) === 150 &&
+          Number(editedSale?.discount) === 29.98 &&
+          Number(editedSale?.paidAmount) === 100 &&
+          Number(editedSale?.dueAmount) === 50
+      );
+
+      const custRes = await request(`/api/customers/${testCustomerId}`);
+      const custData = custRes.data?.data;
+      record(
+        'Sales',
+        'Customer ledger automatically cascades updated sale discount & due balance',
+        custRes.status === 200 &&
+          Number(custData?.totalSales) === 150 &&
+          Number(custData?.totalPaid) === 100 &&
+          Number(custData?.totalDue) === 50
+      );
+    }
 
     // 7.1. Quotations Module (দরপত্র ও কোটেশন)
     console.log(`\n\x1b[34m--- [7.1. Quotations Module] ---\x1b[0m`);

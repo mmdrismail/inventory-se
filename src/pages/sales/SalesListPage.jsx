@@ -307,11 +307,18 @@ export const SalesListPage = () => {
                           className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                             s.paymentStatus === 'paid'
                               ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+                              : s.paymentStatus === 'partial'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+                              : 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300'
                           }`}
                         >
                           {s.paymentStatus}
                         </span>
+                        {Number(s.dueAmount) > 0 && (
+                          <span className="block text-[10px] font-mono text-red-600 dark:text-red-400 mt-0.5">
+                            Due: {formatCurrency(s.dueAmount, settings.currency)}
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-3 px-3 text-center">

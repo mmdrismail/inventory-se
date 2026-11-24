@@ -854,8 +854,14 @@ export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
   const items = sale.items || [];
   const subtotal = Number(sale.subtotal) || 0;
   const discount = Number(sale.discount) || 0;
-  const total = Number(sale.totalAmount || sale.total) || subtotal - discount;
-  const paid = sale.paymentStatus === 'paid' ? total : Number(sale.paidAmount) || 0;
+  const tax = Number(sale.tax) || 0;
+  const total = Number(sale.totalAmount !== undefined ? sale.totalAmount : (sale.total !== undefined ? sale.total : Math.max(0, subtotal - discount + tax))) || 0;
+  const paid =
+    sale.paymentStatus === 'paid'
+      ? total
+      : sale.paymentStatus === 'due'
+      ? 0
+      : Math.min(total, Math.max(0, Number(sale.paidAmount) || 0));
   const due = Math.max(0, total - paid);
 
   const showRate = options.showRate !== undefined ? options.showRate : (sale.showRate !== undefined ? sale.showRate : true);
@@ -980,8 +986,18 @@ export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
     ${showGrandTotal ? `
     <table class="memo-totals-table">
       <tbody>
+        ${discount > 0 || tax > 0 ? `
         <tr>
-          <td class="totals-label">${p.t.total}</td>
+          <td class="totals-label">${p.t.subtotal}</td>
+          <td class="totals-value">${formatCurrency(subtotal, p.currencySymbol)}</td>
+        </tr>` : ''}
+        ${discount > 0 ? `
+        <tr>
+          <td class="totals-label" style="color: #047857;">${p.t.discount}</td>
+          <td class="totals-value" style="color: #047857;">-${formatCurrency(discount, p.currencySymbol)}</td>
+        </tr>` : ''}
+        <tr>
+          <td class="totals-label">${discount > 0 ? p.t.netPayable : p.t.total}</td>
           <td class="totals-value">${formatCurrency(total, p.currencySymbol)}</td>
         </tr>
         <tr>

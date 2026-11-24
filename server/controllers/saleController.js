@@ -190,9 +190,27 @@ exports.createSale = async (req, res, next) => {
     }
 
     // Step 4: Handle Customer Financials & Auto-Upsert
-    const totalVal = Number(totalAmount) || 0;
-    let paidVal = Number(req.body.paidAmount !== undefined ? req.body.paidAmount : (paymentStatus === 'paid' ? totalVal : (paymentStatus === 'due' ? 0 : 0)));
-    if (paymentStatus === 'paid') paidVal = totalVal;
+    const computedSubtotal =
+      subtotal !== undefined
+        ? Number(subtotal) || 0
+        : normalizedItems.reduce((sum, it) => sum + (Number(it.lineTotal) || 0), 0);
+    const discountVal = Math.min(computedSubtotal, Math.max(0, Number(discount) || 0));
+    const taxVal = Math.max(0, Number(tax) || 0);
+    const explicitTotal =
+      totalAmount !== undefined ? totalAmount : req.body.total !== undefined ? req.body.total : undefined;
+    const totalVal =
+      explicitTotal !== undefined
+        ? Math.max(0, Number(explicitTotal) || 0)
+        : Math.max(0, computedSubtotal - discountVal + taxVal);
+    const nextPayStatus = ['paid', 'partial', 'due', 'pending'].includes(paymentStatus)
+      ? paymentStatus
+      : 'paid';
+    let paidVal =
+      nextPayStatus === 'paid'
+        ? totalVal
+        : nextPayStatus === 'due'
+        ? 0
+        : Math.min(totalVal, Math.max(0, Number(req.body.paidAmount) || 0));
     const dueVal = Math.max(0, totalVal - paidVal);
 
     let activeCustomerId = customerId;
@@ -248,14 +266,15 @@ exports.createSale = async (req, res, next) => {
       customerAddress: req.body.customerAddress || activeCustomer?.address || '',
       customerLocation: req.body.customerLocation || activeCustomer?.location || '',
       items: normalizedItems,
-      subtotal: Number(subtotal) || 0,
-      tax: Number(tax) || 0,
-      discount: Number(discount) || 0,
+      subtotal: computedSubtotal,
+      tax: taxVal,
+      discount: discountVal,
       totalAmount: totalVal,
+      total: totalVal,
       paidAmount: paidVal,
       dueAmount: dueVal,
       paymentMethod: paymentMethod || 'cash',
-      paymentStatus: paymentStatus || 'paid',
+      paymentStatus: nextPayStatus,
       status: isCompleted ? 'completed' : 'draft',
       requisitionRef: req.body.requisitionRef || '',
       quotationId: req.body.quotationId || null,
@@ -303,38 +322,125 @@ exports.updateSale = async (req, res, next) => {
     }
 
     const prevCustomerId = sale.customerId;
+    const prevQuotationId = sale.quotationId;
     const updates = { ...req.body };
     delete updates._id;
     delete updates.__v;
     delete updates.createdAt;
     delete updates.id;
 
+    if (updates.invoiceNo && !updates.invoiceNumber) {
+      updates.invoiceNumber = String(updates.invoiceNo).trim();
+    }
+
     if (updates.items && Array.isArray(updates.items)) {
-      updates.items = updates.items.map((it) => {
+      const resolvedItems = [];
+      for (const it of updates.items) {
         const quantity = Number(it.quantity) || 1;
         const unitPrice = Number(it.unitPrice !== undefined ? it.unitPrice : (it.price !== undefined ? it.price : it.sellingPrice)) || 0;
         const lineTotal = Number(it.lineTotal !== undefined ? it.lineTotal : (it.subtotal !== undefined ? it.subtotal : (it.total !== undefined ? it.total : quantity * unitPrice))) || 0;
-        return {
-          productId: it.productId || it.id || null,
+        let resolvedProdId = null;
+        if (it.productId && mongoose.Types.ObjectId.isValid(it.productId)) {
+          const prodDoc = await Product.findById(it.productId).select('_id').lean();
+          if (prodDoc) resolvedProdId = prodDoc._id;
+        } else if (it.sku) {
+          const prodDoc = await Product.findOne({ sku: it.sku }).select('_id').lean();
+          if (prodDoc) resolvedProdId = prodDoc._id;
+        }
+        resolvedItems.push({
+          productId: resolvedProdId,
           productName: it.productName || it.name || '',
           sku: it.sku || '',
           quantity,
           unitPrice,
           lineTotal,
-        };
+        });
+      }
+      updates.items = resolvedItems;
+    }
+
+    // Reconcile tracked Product stock when completed status/quantities change
+    const nextStatus = updates.status || sale.status || 'completed';
+    const nextItemsForStock = updates.items || sale.items || [];
+    const buildTrackedQtyMap = (statusVal, itemList) => {
+      const map = new Map();
+      if (statusVal !== 'completed') return map;
+      for (const it of itemList || []) {
+        if (!it.productId || !mongoose.Types.ObjectId.isValid(it.productId)) continue;
+        const k = String(it.productId);
+        map.set(k, (map.get(k) || 0) + (Number(it.quantity) || 0));
+      }
+      return map;
+    };
+    const oldStockMap = buildTrackedQtyMap(sale.status, sale.items);
+    const newStockMap = buildTrackedQtyMap(nextStatus, nextItemsForStock);
+    const allProdIds = new Set([...oldStockMap.keys(), ...newStockMap.keys()]);
+
+    for (const pid of allProdIds) {
+      const delta = (newStockMap.get(pid) || 0) - (oldStockMap.get(pid) || 0);
+      if (delta > 0) {
+        const prod = await Product.findById(pid);
+        if (prod && prod.quantity < delta) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient stock for "${prod.name}". Additional needed: ${delta}, Available: ${prod.quantity}.`,
+          });
+        }
+      }
+    }
+    for (const pid of allProdIds) {
+      const delta = (newStockMap.get(pid) || 0) - (oldStockMap.get(pid) || 0);
+      if (delta === 0) continue;
+      const prod = await Product.findById(pid);
+      if (!prod) continue;
+      prod.quantity = Math.max(0, prod.quantity - delta);
+      await prod.save();
+      await StockMovement.create({
+        productId: prod._id,
+        type: delta > 0 ? 'sale_out' : 'reversal',
+        quantity: -delta,
+        balanceAfter: prod.quantity,
+        reference: updates.invoiceNumber || sale.invoiceNumber,
+        reason: `Invoice edit stock adjustment (${updates.invoiceNumber || sale.invoiceNumber})`,
+        performedBy: req.user ? req.user.name : 'Manager',
       });
     }
 
-    // Auto-recalculate financial balances if totals are updated
-    if (updates.totalAmount !== undefined || updates.total !== undefined) {
-      const tot = Number(updates.totalAmount !== undefined ? updates.totalAmount : updates.total) || 0;
-      const paid = Number(updates.paidAmount !== undefined ? updates.paidAmount : sale.paidAmount) || 0;
-      updates.totalAmount = tot;
-      updates.total = tot;
-      updates.dueAmount = Math.max(0, tot - paid);
-    }
+    // Always keep subtotal, discount, tax, totalAmount, paidAmount, dueAmount, paymentStatus in sync
+    const effectiveItems = updates.items || sale.items || [];
+    const nextSubtotal =
+      updates.subtotal !== undefined
+        ? Number(updates.subtotal) || 0
+        : effectiveItems.reduce((sum, it) => sum + (Number(it.lineTotal ?? it.quantity * it.unitPrice) || 0), 0);
+    const nextDiscount = Math.min(
+      nextSubtotal,
+      Math.max(0, Number(updates.discount !== undefined ? updates.discount : sale.discount) || 0)
+    );
+    const nextTax = Math.max(0, Number(updates.tax !== undefined ? updates.tax : sale.tax) || 0);
+    const nextTotal = Math.max(0, nextSubtotal - nextDiscount + nextTax);
 
-    // Resolve and update linked Customer profile directly on backend as well
+    const nextPaymentStatus = updates.paymentStatus || sale.paymentStatus || 'paid';
+    let nextPaid = nextTotal;
+    if (nextPaymentStatus === 'due') {
+      nextPaid = 0;
+    } else if (nextPaymentStatus === 'partial') {
+      nextPaid = Math.min(
+        nextTotal,
+        Math.max(0, Number(updates.paidAmount !== undefined ? updates.paidAmount : sale.paidAmount) || 0)
+      );
+    }
+    const nextDue = Math.max(0, nextTotal - nextPaid);
+
+    updates.subtotal = Math.round(nextSubtotal * 100) / 100;
+    updates.discount = Math.round(nextDiscount * 100) / 100;
+    updates.tax = Math.round(nextTax * 100) / 100;
+    updates.totalAmount = Math.round(nextTotal * 100) / 100;
+    updates.total = updates.totalAmount;
+    updates.paymentStatus = nextPaymentStatus;
+    updates.paidAmount = Math.round(nextPaid * 100) / 100;
+    updates.dueAmount = Math.round(nextDue * 100) / 100;
+
+    // Resolve and update/create linked Customer profile directly on backend as well
     const custName = updates.customerName || sale.customerName;
     if (updates.autoSaveCustomer !== false && custName && custName.trim() && custName !== 'Walk-in Retail Customer') {
       let targetCustomer = null;
@@ -360,6 +466,17 @@ exports.updateSale = async (req, res, next) => {
         if (updates.customerLocation !== undefined) targetCustomer.location = updates.customerLocation.trim();
         await targetCustomer.save();
         updates.customerId = targetCustomer._id;
+      } else {
+        targetCustomer = await Customer.create({
+          name: custName.trim(),
+          companyName: (updates.customerCompany || '').trim(),
+          designationRole: updates.customerRole || 'owner',
+          phone: (updates.customerPhone || '').trim(),
+          email: (updates.customerEmail || '').trim(),
+          address: (updates.customerAddress || '').trim(),
+          location: (updates.customerLocation || updates.customerAddress || '').trim(),
+        });
+        updates.customerId = targetCustomer._id;
       }
     }
 
@@ -367,6 +484,20 @@ exports.updateSale = async (req, res, next) => {
       new: true,
       runValidators: true,
     });
+
+    // Sync linked Quotation hierarchy if quotationId is linked/changed
+    if (prevQuotationId && String(prevQuotationId) !== String(updated.quotationId) && mongoose.Types.ObjectId.isValid(prevQuotationId)) {
+      await Quotation.findOneAndUpdate(
+        { _id: prevQuotationId, convertedSaleId: updated._id },
+        { $set: { convertedSaleId: null } }
+      ).catch(() => {});
+    }
+    if (updated.quotationId && mongoose.Types.ObjectId.isValid(updated.quotationId)) {
+      await Quotation.findByIdAndUpdate(updated.quotationId, {
+        status: 'converted',
+        convertedSaleId: updated._id,
+      }).catch(() => {});
+    }
 
     // Recalculate financials for previous and current linked customer
     if (prevCustomerId && String(prevCustomerId) !== String(updated.customerId)) {

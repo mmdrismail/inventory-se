@@ -18,16 +18,43 @@ export const calculatePurchaseTotals = (items = []) => {
   };
 };
 
-export const calculateSaleTotals = (items = [], discount = 0) => {
+export const calculateSaleTotals = (items = [], discount = 0, tax = 0) => {
   const subtotal = items.reduce((sum, item) => {
-    return sum + calculateLineTotal(item.unitPrice, item.quantity);
+    const rate =
+      item.unitPrice !== undefined
+        ? item.unitPrice
+        : item.rate !== undefined
+        ? item.rate
+        : item.price !== undefined
+        ? item.price
+        : item.sellingPrice;
+    return sum + calculateLineTotal(rate, item.quantity);
   }, 0);
   const discountVal = Math.min(subtotal, Math.max(0, Number(discount) || 0));
-  const total = Math.max(0, subtotal - discountVal);
+  const taxVal = Math.max(0, Number(tax) || 0);
+  const total = Math.max(0, subtotal - discountVal + taxVal);
   return {
     subtotal,
     discount: discountVal,
+    tax: taxVal,
     total,
+  };
+};
+
+export const calculatePaymentBreakdown = ({ total = 0, paymentStatus = 'paid', paidAmount = 0 }) => {
+  const totalVal = Math.max(0, Number(total) || 0);
+  const status = ['paid', 'partial', 'due'].includes(paymentStatus) ? paymentStatus : 'paid';
+  let paidVal = totalVal;
+  if (status === 'due') {
+    paidVal = 0;
+  } else if (status === 'partial') {
+    paidVal = Math.min(totalVal, Math.max(0, Number(paidAmount) || 0));
+  }
+  const dueVal = Math.max(0, totalVal - paidVal);
+  return {
+    paymentStatus: status,
+    paidAmount: paidVal,
+    dueAmount: dueVal,
   };
 };
 

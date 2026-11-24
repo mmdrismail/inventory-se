@@ -9,6 +9,7 @@ import { Input, Select } from '../../components/forms/FormControls';
 import { Badge } from '../../components/common/Badge';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { formatCurrency } from '../../utils/formatters';
+import { calculateSaleTotals, calculatePaymentBreakdown } from '../../utils/calculations';
 import {
   ArrowLeft,
   Plus,
@@ -62,11 +63,13 @@ export const SalesFormPage = () => {
   );
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentStatus, setPaymentStatus] = useState('paid'); // 'paid', 'partial', 'due'
+  const [paymentMethod, setPaymentMethod] = useState(prefill?.paymentMethod || 'cash');
   const [paidAmountInput, setPaidAmountInput] = useState('');
   const [discount, setDiscount] = useState(prefill?.discount ? String(prefill.discount) : '0');
+  const [tax, setTax] = useState(prefill?.tax ? String(prefill.tax) : '0');
   const [notes, setNotes] = useState(prefill ? `Generated from Quotation #${prefill.quotationNumber}` : '');
   const [requisitionRef, setRequisitionRef] = useState(prefill?.requisitionRef || '');
-  const [quotationId, setQuotationId] = useState(prefill?.id || null);
+  const [quotationId, setQuotationId] = useState(prefill?.id || prefill?._id || '');
 
   // Single-line column & total visibility controls ("eta ek line e thakbe eigula")
   const [showRate, setShowRate] = useState(prefill?.showRate !== undefined ? prefill.showRate : true);
@@ -99,13 +102,15 @@ export const SalesFormPage = () => {
       setCustomerAddress(existingSale.customerAddress || '');
       setCustomerLocation(existingSale.customerLocation || '');
       setPaymentStatus(existingSale.paymentStatus || 'paid');
+      setPaymentMethod(existingSale.paymentMethod || 'cash');
       setPaidAmountInput(
         existingSale.paidAmount !== undefined ? String(existingSale.paidAmount) : ''
       );
       setDiscount(existingSale.discount !== undefined ? String(existingSale.discount) : '0');
+      setTax(existingSale.tax !== undefined ? String(existingSale.tax) : '0');
       setNotes(existingSale.notes || '');
       setRequisitionRef(existingSale.requisitionRef || '');
-      setQuotationId(existingSale.quotationId || null);
+      setQuotationId(existingSale.quotationId || '');
       if (existingSale.showRate !== undefined) setShowRate(existingSale.showRate);
       if (existingSale.showLineTotal !== undefined) setShowLineTotal(existingSale.showLineTotal);
       if (existingSale.showGrandTotal !== undefined) setShowGrandTotal(existingSale.showGrandTotal);
@@ -300,7 +305,7 @@ export const SalesFormPage = () => {
 
   // Calculations
   const calculatedItems = items.map((item) => {
-    const prod = products.find((p) => p.id === item.productId);
+    const prod = products.find((p) => p.id === item.productId || p._id === item.productId);
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unitPrice) || 0;
     const available = Number(prod?.quantity) || 0;
@@ -315,27 +320,41 @@ export const SalesFormPage = () => {
     };
   });
 
-  const subtotal = calculatedItems.reduce((sum, item) => sum + item.total, 0);
-  const discountVal = Math.min(subtotal, Math.max(0, Number(discount) || 0));
-  const total = Math.max(0, subtotal - discountVal);
+  const {
+    subtotal,
+    discount: discountVal,
+    tax: taxVal,
+    total,
+  } = calculateSaleTotals(calculatedItems, discount, tax);
 
-  // Paid and due amount calculations
-  let calculatedPaid = total;
-  if (paymentStatus === 'due') {
-    calculatedPaid = 0;
-  } else if (paymentStatus === 'partial') {
-    calculatedPaid = Math.min(total, Math.max(0, Number(paidAmountInput) || 0));
-  }
-  const calculatedDue = Math.max(0, total - calculatedPaid);
+  const {
+    paidAmount: calculatedPaid,
+    dueAmount: calculatedDue,
+  } = calculatePaymentBreakdown({
+    total,
+    paymentStatus,
+    paidAmount: paidAmountInput,
+  });
 
   const validate = (statusToSave) => {
     const errs = {};
     if (!invoiceNo.trim()) errs.invoiceNo = 'Invoice number is required.';
     if (items.length === 0) errs.items = 'Please add at least one product.';
 
+    // Account for quantities already deducted on the invoice being edited
+    const previouslyDeductedByProd = new Map();
+    if (isEditing && existingSale?.status === 'completed') {
+      for (const prevIt of existingSale.items || []) {
+        const pid = String(prevIt.productId || '');
+        if (!pid || pid === 'custom' || pid === 'custom-item') continue;
+        previouslyDeductedByProd.set(pid, (previouslyDeductedByProd.get(pid) || 0) + (Number(prevIt.quantity) || 0));
+      }
+    }
+
+    const requestedByProd = new Map();
     for (let i = 0; i < items.length; i++) {
       const line = items[i];
-      const prod = products.find((p) => p.id === line.productId);
+      const prod = products.find((p) => p.id === line.productId || p._id === line.productId);
       const isCustom = line.productId === 'custom' || !prod;
 
       if (isCustom && (!line.productName || !line.productName.trim())) {
@@ -351,9 +370,16 @@ export const SalesFormPage = () => {
         errs.items = `Line ${i + 1}: Quantity must be at least 1.`;
         break;
       }
-      if (statusToSave === 'completed' && prod && qty > (Number(prod.quantity) || 0)) {
-        errs.items = `Line ${i + 1}: Cannot sell ${qty} units of "${prod.name}". Only ${prod.quantity} available in stock!`;
-        break;
+      if (statusToSave === 'completed' && prod) {
+        const key = String(prod.id);
+        const totalReq = (requestedByProd.get(key) || 0) + qty;
+        requestedByProd.set(key, totalReq);
+        const prevDeducted = previouslyDeductedByProd.get(key) || previouslyDeductedByProd.get(String(prod._id)) || 0;
+        const effectiveAvailable = (Number(prod.quantity) || 0) + prevDeducted;
+        if (totalReq > effectiveAvailable) {
+          errs.items = `Line ${i + 1}: Cannot sell ${totalReq} units of "${prod.name}". Only ${effectiveAvailable} available in stock!`;
+          break;
+        }
       }
     }
 
@@ -381,13 +407,15 @@ export const SalesFormPage = () => {
       invoiceNo,
       date: new Date(date).toISOString(),
       status: statusToSave,
+      paymentMethod,
       paymentStatus,
       paidAmount: calculatedPaid,
       dueAmount: calculatedDue,
       discount: discountVal,
+      tax: taxVal,
       notes,
       requisitionRef,
-      quotationId,
+      quotationId: quotationId || null,
       items: calculatedItems,
       subtotal,
       total,
@@ -534,7 +562,7 @@ export const SalesFormPage = () => {
 
               <div>
                 <Input
-                  label="গ্রাহকের নাম (Customer Name) *"
+                  label="গ্রাহকের নাম (Customer Name)"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="যেমন: আলহাজ্ব নাসির উদ্দিন"
@@ -647,24 +675,50 @@ export const SalesFormPage = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Select
               label="পেমেন্ট স্ট্যাটাস (Payment Status)"
               value={paymentStatus}
               onChange={(e) => setPaymentStatus(e.target.value)}
               options={[
                 { value: 'paid', label: 'সম্পূর্ণ পরিশোধ (Paid in Full)' },
-                { value: 'partial', label: 'আংশিক পরিশোধ (Partial Advance / Deposit)' },
+                { value: 'partial', label: 'আংশিক পরিশোধ (Partial / Advance)' },
                 { value: 'due', label: 'সম্পূর্ণ বকেয়া (Due / On Credit)' },
               ]}
             />
 
+            <Select
+              label="পেমেন্ট মাধ্যম (Payment Method)"
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              options={[
+                { value: 'cash', label: 'নগদ (Cash)' },
+                { value: 'mobile_banking', label: 'মোবাইল ব্যাংকিং (bKash / Nagad)' },
+                { value: 'bank_transfer', label: 'ব্যাংক ট্রান্সফার (Bank Transfer)' },
+                { value: 'card', label: 'কার্ড (Card)' },
+                { value: 'cheque', label: 'চেক (Cheque)' },
+              ]}
+            />
+
+            <Input
+              label={`বিশেষ ছাড় / ডিসকাউন্ট (${settings.currency})`}
+              type="number"
+              step="any"
+              min="0"
+              max={subtotal}
+              value={discount}
+              onChange={(e) => setDiscount(e.target.value)}
+              placeholder="0.00"
+              helperText={discountVal > 0 ? `নিট মূল্যে -${formatCurrency(discountVal, settings.currency)} ছাড় প্রযোজ্য` : 'সাবটোটাল থেকে সরাসরি ছাড়'}
+            />
+
             {paymentStatus === 'partial' ? (
               <Input
-                label={`জমা / প্রাপ্ত টাকা (${settings.currency}) *`}
+                label={`জমা / প্রাপ্ত টাকা (${settings.currency})`}
                 type="number"
                 step="any"
                 min="0"
+                max={total}
                 value={paidAmountInput}
                 onChange={(e) => setPaidAmountInput(e.target.value)}
                 placeholder="0.00"
@@ -672,14 +726,34 @@ export const SalesFormPage = () => {
                 required
               />
             ) : (
-              <Input
-                label={`বিশেষ ছাড় / ডিসকাউন্ট (${settings.currency})`}
-                type="number"
-                step="any"
-                min="0"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                placeholder="0.00"
+              <Select
+                label="সংযুক্ত দরপত্র / কোটেশন (Linked Quotation)"
+                value={quotationId || ''}
+                onChange={(e) => setQuotationId(e.target.value)}
+                options={[
+                  { value: '', label: 'সরাসরি বিক্রয় (কোনো কোটেশন নয়)' },
+                  ...(quotations || []).map((q) => ({
+                    value: q.id || q._id,
+                    label: `#${q.quotationNumber} — ${q.customerName || 'Client'} (${formatCurrency(q.totalAmount || 0, settings.currency)})`,
+                  })),
+                ]}
+              />
+            )}
+          </div>
+
+          <div className={`grid grid-cols-1 ${paymentStatus === 'partial' ? 'sm:grid-cols-2' : ''} gap-4`}>
+            {paymentStatus === 'partial' && (
+              <Select
+                label="সংযুক্ত দরপত্র / কোটেশন (Linked Quotation)"
+                value={quotationId || ''}
+                onChange={(e) => setQuotationId(e.target.value)}
+                options={[
+                  { value: '', label: 'সরাসরি বিক্রয় (কোনো কোটেশন নয়)' },
+                  ...(quotations || []).map((q) => ({
+                    value: q.id || q._id,
+                    label: `#${q.quotationNumber} — ${q.customerName || 'Client'} (${formatCurrency(q.totalAmount || 0, settings.currency)})`,
+                  })),
+                ]}
               />
             )}
 
@@ -687,7 +761,7 @@ export const SalesFormPage = () => {
               label="ইনভয়েস নোট ও মন্তব্য (Notes)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="পেমেন্ট মাধ্যম বা ডেলিভারি নোট"
+              placeholder="পেমেন্ট মাধ্যম, ছাড় বা ডেলিভারি সংক্রান্ত নোট"
             />
           </div>
 
@@ -879,9 +953,17 @@ export const SalesFormPage = () => {
 
           {/* SECTION 4: FINANCIAL TOTALS BREAKDOWN */}
           <div className="flex flex-col sm:flex-row justify-between items-start pt-4 border-t border-slate-100 dark:border-slate-800 gap-4">
-            <div className="text-xs text-slate-500 space-y-1">
-              <p>• বিল সম্পন্ন করলে ইনভেন্টরি থেকে স্বয়ংক্রিয়ভাবে স্টক হ্রাস পাবে।</p>
+            <div className="text-xs text-slate-500 space-y-1.5 flex-1">
+              <p>• বিল সম্পন্ন করলে ইনভেন্টরি থেকে স্বয়ংক্রিয়ভাবে স্টক সমন্বয় হবে।</p>
               <p>• মেমো প্রিন্ট মোডালে ক্যাশ মেমো, চালান, প্যাড ও কোটেশন পাওয়া যাবে।</p>
+              <p className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                • ছাড় (Discount), জমা ও বকেয়া পরিবর্তন করলে সাথে সাথে গ্রাহক লেজার ও MongoDB আপডেট হবে।
+              </p>
+              {isEditing && existingSale && Number(existingSale.paidAmount) > total && (
+                <p className="text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 px-2.5 py-1.5 rounded-lg">
+                  ℹ️ পূর্বে জমা ছিল {formatCurrency(existingSale.paidAmount, settings.currency)}; ছাড় প্রয়োগের পর নতুন নিট মূল্য {formatCurrency(total, settings.currency)} (পার্থক্য {formatCurrency(Number(existingSale.paidAmount) - total, settings.currency)})।
+                </p>
+              )}
               {calculatedDue > 0 && showGrandTotal && (
                 <p className="text-red-600 dark:text-red-400 font-bold">
                   • অবশিষ্ট বকেয়া {formatCurrency(calculatedDue, settings.currency)} গ্রাহক লেজারে জমা হবে।
@@ -890,30 +972,110 @@ export const SalesFormPage = () => {
             </div>
 
             {showGrandTotal ? (
-              <div className="w-full sm:w-72 space-y-2 text-xs bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+              <div className="w-full sm:w-96 space-y-2.5 text-xs bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
                   <span>সর্বমোট (Subtotal):</span>
-                  <span className="font-mono font-semibold">{formatCurrency(subtotal, settings.currency)}</span>
+                  <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                    {formatCurrency(subtotal, settings.currency)}
+                  </span>
                 </div>
 
-                {discountVal > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-semibold">
-                    <span>বিশেষ ছাড় (Discount):</span>
-                    <span className="font-mono">-{formatCurrency(discountVal, settings.currency)}</span>
+                {/* Inline Editable Discount Control */}
+                <div className="flex justify-between items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold">
+                  <label htmlFor="invoiceDiscountSummary" className="shrink-0">
+                    বিশেষ ছাড় (Discount -):
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-emerald-600">-</span>
+                    <input
+                      id="invoiceDiscountSummary"
+                      type="number"
+                      step="any"
+                      min="0"
+                      max={subtotal}
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      placeholder="0"
+                      className="w-28 px-2.5 py-1 text-right font-mono font-bold text-xs rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
                   </div>
-                )}
+                </div>
 
-                <div className="flex justify-between font-bold text-slate-800 dark:text-white pt-1 border-t border-slate-200 dark:border-slate-700">
+                {/* Inline Editable Tax / Extra Charge */}
+                <div className="flex justify-between items-center gap-2 text-slate-600 dark:text-slate-400">
+                  <label htmlFor="invoiceTaxSummary" className="shrink-0">
+                    ভ্যাট / অতিরিক্ত চার্জ (+):
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-slate-500">+</span>
+                    <input
+                      id="invoiceTaxSummary"
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={tax}
+                      onChange={(e) => setTax(e.target.value)}
+                      placeholder="0"
+                      className="w-28 px-2.5 py-1 text-right font-mono font-semibold text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center font-bold text-slate-800 dark:text-white pt-2 border-t border-slate-200 dark:border-slate-700">
                   <span>নিট মূল্য (Net Payable):</span>
-                  <span className="font-mono text-emerald-600 text-sm">{formatCurrency(total, settings.currency)}</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 text-base">
+                    {formatCurrency(total, settings.currency)}
+                  </span>
                 </div>
 
-                <div className="flex justify-between text-slate-700 dark:text-slate-300 pt-1">
-                  <span>জমা / নগদ প্রাপ্তি (Paid):</span>
-                  <span className="font-mono font-bold text-emerald-700">{formatCurrency(calculatedPaid, settings.currency)}</span>
+                {/* Inline Payment Status Quick Toggle + Editable Paid Input */}
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-600 dark:text-slate-400 font-semibold">পেমেন্ট মোড:</span>
+                    <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900">
+                      {[
+                        { val: 'paid', text: 'পরিশোধ' },
+                        { val: 'partial', text: 'আংশিক' },
+                        { val: 'due', text: 'বকেয়া' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => setPaymentStatus(opt.val)}
+                          className={`px-2 py-0.5 text-[11px] font-bold transition-colors ${
+                            paymentStatus === opt.val
+                              ? 'bg-emerald-600 text-white'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {opt.text}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-slate-700 dark:text-slate-300">
+                    <span>জমা / নগদ প্রাপ্তি (Paid):</span>
+                    {paymentStatus === 'partial' ? (
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        max={total}
+                        value={paidAmountInput}
+                        onChange={(e) => setPaidAmountInput(e.target.value)}
+                        placeholder="0"
+                        className="w-28 px-2.5 py-1 text-right font-mono font-bold text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                      />
+                    ) : (
+                      <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                        {formatCurrency(calculatedPaid, settings.currency)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex justify-between font-bold text-red-600 pt-1 border-t border-slate-200 dark:border-slate-700">
+                <div className="flex justify-between items-center font-bold text-red-600 dark:text-red-400 pt-1.5 border-t border-slate-200 dark:border-slate-700">
                   <span>বাকী / বকেয়া (Balance Due):</span>
                   <span className="font-mono text-sm">{formatCurrency(calculatedDue, settings.currency)}</span>
                 </div>

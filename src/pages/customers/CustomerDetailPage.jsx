@@ -28,6 +28,7 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle2,
+  Edit2,
 } from 'lucide-react';
 
 export const CustomerDetailPage = () => {
@@ -63,40 +64,34 @@ export const CustomerDetailPage = () => {
     );
   }, [orders, id, customer]);
 
-  // Financial calculations
+  // Financial calculations (matches active sales ledger on backend)
   const financials = useMemo(() => {
     let salesTotal = 0;
     let paidTotal = 0;
     let dueTotal = 0;
 
     customerSales.forEach((s) => {
-      const invTotal = Number(s.total) || 0;
+      if (s.status === 'cancelled') return;
+      const invTotal = Number(s.total !== undefined ? s.total : s.totalAmount) || 0;
       salesTotal += invTotal;
 
-      if (s.paidAmount !== undefined) {
-        paidTotal += Number(s.paidAmount) || 0;
-      } else if (s.paymentStatus === 'paid') {
-        paidTotal += invTotal;
-      }
+      const pStatus = s.paymentStatus || 'paid';
+      const paidAmt =
+        pStatus === 'paid'
+          ? invTotal
+          : pStatus === 'due'
+          ? 0
+          : Math.min(invTotal, Math.max(0, Number(s.paidAmount) || 0));
+      const dueAmt = Math.max(0, invTotal - paidAmt);
 
-      if (s.dueAmount !== undefined) {
-        dueTotal += Number(s.dueAmount) || 0;
-      } else if (s.paymentStatus === 'due') {
-        dueTotal += invTotal;
-      } else if (s.paymentStatus === 'partial') {
-        dueTotal += Math.max(0, invTotal - (Number(s.paidAmount) || 0));
-      }
+      paidTotal += paidAmt;
+      dueTotal += dueAmt;
     });
 
-    // If customer model has an explicit totalDue that exceeds computed, honor it
-    if (customer && customer.totalDue && customer.totalDue > dueTotal) {
-      dueTotal = Number(customer.totalDue);
-    }
-
     return {
-      totalSales: salesTotal || (customer?.totalSales || 0),
-      totalPaid: paidTotal || (customer?.totalPaid || 0),
-      totalDue: dueTotal,
+      totalSales: customerSales.length > 0 ? salesTotal : (customer?.totalSales || 0),
+      totalPaid: customerSales.length > 0 ? paidTotal : (customer?.totalPaid || 0),
+      totalDue: customerSales.length > 0 ? dueTotal : (customer?.totalDue || 0),
     };
   }, [customerSales, customer]);
 
@@ -390,6 +385,11 @@ export const CustomerDetailPage = () => {
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
                             {formatCurrency(totalAmt, settings.currency)}
+                            {Number(s.discount) > 0 && (
+                              <span className="block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                ছাড়: -{formatCurrency(s.discount, settings.currency)}
+                              </span>
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(paidAmt, settings.currency)}
@@ -428,11 +428,18 @@ export const CustomerDetailPage = () => {
                             </span>
                           </td>
                           <td className="py-2.5 px-4 text-right">
-                            <Link to={`/sales/${s.id}`}>
-                              <button className="p-1 rounded-lg text-slate-400 hover:text-emerald-600">
-                                <Eye className="h-4 w-4" />
-                              </button>
-                            </Link>
+                            <div className="inline-flex items-center justify-end gap-1">
+                              <Link to={`/sales/${s._id || s.id}/edit`} title="Edit Invoice / Discount">
+                                <button className="p-1 rounded-lg text-slate-400 hover:text-purple-600">
+                                  <Edit2 className="h-4 w-4" />
+                                </button>
+                              </Link>
+                              <Link to={`/sales/${s._id || s.id}`} title="View Invoice">
+                                <button className="p-1 rounded-lg text-slate-400 hover:text-emerald-600">
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                              </Link>
+                            </div>
                           </td>
                         </tr>
                       );

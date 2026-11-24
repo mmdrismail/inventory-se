@@ -16,10 +16,15 @@ const findCustomerQuery = (id) => {
 const recalculateCustomerFinancials = async (customerId) => {
   if (!customerId) return null;
   try {
-    const queryIds = [String(customerId)];
-    if (mongoose.Types.ObjectId.isValid(customerId)) {
-      queryIds.push(new mongoose.Types.ObjectId(customerId));
-    }
+    const custQuery = mongoose.Types.ObjectId.isValid(customerId)
+      ? { _id: customerId }
+      : { $or: [{ id: String(customerId) }, { clientSideId: String(customerId) }] };
+    const custDoc = await Customer.findOne(custQuery).lean();
+    if (!custDoc) return null;
+
+    const queryIds = [custDoc._id, String(custDoc._id), String(customerId)];
+    if (custDoc.clientSideId) queryIds.push(String(custDoc.clientSideId));
+
     const sales = await Sale.find({
       customerId: { $in: queryIds },
       status: { $ne: 'cancelled' },
@@ -29,20 +34,22 @@ const recalculateCustomerFinancials = async (customerId) => {
     let totalPaid = 0;
     let totalDue = 0;
     for (const s of sales) {
-      const tot = Number(s.totalAmount !== undefined ? s.totalAmount : s.total) || 0;
-      const paid = Number(s.paidAmount !== undefined ? s.paidAmount : (s.paymentStatus === 'paid' ? tot : 0)) || 0;
+      const tot = Math.max(0, Number(s.totalAmount !== undefined ? s.totalAmount : s.total) || 0);
+      const pStatus = s.paymentStatus || 'paid';
+      const paid =
+        pStatus === 'paid'
+          ? tot
+          : pStatus === 'due'
+          ? 0
+          : Math.min(tot, Math.max(0, Number(s.paidAmount) || 0));
       const due = Math.max(0, tot - paid);
       totalSales += tot;
       totalPaid += paid;
       totalDue += due;
     }
 
-    const custQuery = mongoose.Types.ObjectId.isValid(customerId)
-      ? { _id: customerId }
-      : { $or: [{ id: String(customerId) }, { clientSideId: String(customerId) }] };
-
-    return await Customer.findOneAndUpdate(
-      custQuery,
+    return await Customer.findByIdAndUpdate(
+      custDoc._id,
       {
         totalSales: Math.round(totalSales * 100) / 100,
         totalPaid: Math.round(totalPaid * 100) / 100,

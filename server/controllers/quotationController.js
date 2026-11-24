@@ -205,6 +205,28 @@ exports.updateQuotation = async (req, res, next) => {
       });
     }
 
+    if (
+      updates.items !== undefined ||
+      updates.discount !== undefined ||
+      updates.tax !== undefined ||
+      updates.subtotal !== undefined
+    ) {
+      const effectiveItems = updates.items || existing.items || [];
+      const nextSub =
+        updates.subtotal !== undefined
+          ? Number(updates.subtotal) || 0
+          : effectiveItems.reduce((sum, it) => sum + (Number(it.lineTotal) || 0), 0);
+      const nextDisc = Math.min(
+        nextSub,
+        Math.max(0, Number(updates.discount !== undefined ? updates.discount : existing.discount) || 0)
+      );
+      const nextTax = Math.max(0, Number(updates.tax !== undefined ? updates.tax : existing.tax) || 0);
+      updates.subtotal = Math.round(nextSub * 100) / 100;
+      updates.discount = Math.round(nextDisc * 100) / 100;
+      updates.tax = Math.round(nextTax * 100) / 100;
+      updates.totalAmount = Math.round(Math.max(0, nextSub - nextDisc + nextTax) * 100) / 100;
+    }
+
     // Also link & update customer profile in MongoDB if customer info is provided
     const custName = updates.customerName || existing.customerName;
     if (updates.autoSaveCustomer !== false && custName && custName.trim() && custName !== 'Direct Client' && custName !== 'Client Representative') {

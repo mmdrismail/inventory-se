@@ -60,30 +60,36 @@ export const CustomerListPage = () => {
   });
   const [errors, setErrors] = useState({});
 
-  // Compute spend and due stats per customer
+  // Compute spend, due, and quotation counts per customer (consistent with backend ledger)
   const customerStats = useMemo(() => {
     const map = {};
+    const ensure = (cid) => {
+      if (!map[cid]) {
+        map[cid] = { count: 0, totalSpend: 0, totalDue: 0, quotationsCount: 0 };
+      }
+      return map[cid];
+    };
+
     sales.forEach((s) => {
       if (s.customerId) {
-        if (!map[s.customerId]) {
-          map[s.customerId] = { count: 0, totalSpend: 0, totalDue: 0, quotationsCount: 0 };
-        }
-        map[s.customerId].count += 1;
-        if (s.status === 'completed') {
-          map[s.customerId].totalSpend += Number(s.total) || 0;
+        const entry = ensure(s.customerId);
+        entry.count += 1;
+        if (s.status !== 'cancelled') {
+          const tot = Number(s.total !== undefined ? s.total : s.totalAmount) || 0;
+          entry.totalSpend += tot;
           if (s.paymentStatus === 'due') {
-            map[s.customerId].totalDue += Number(s.dueAmount !== undefined ? s.dueAmount : s.total) || 0;
+            entry.totalDue += Number(s.dueAmount !== undefined ? s.dueAmount : tot) || 0;
           } else if (s.paymentStatus === 'partial') {
-            map[s.customerId].totalDue += Number(s.dueAmount !== undefined ? s.dueAmount : 0) || 0;
+            entry.totalDue += Number(s.dueAmount !== undefined ? s.dueAmount : 0) || 0;
           }
         }
       }
     });
 
-    // Count quotations per customer
+    // Count quotations per customer (even when customer has 0 invoices yet)
     (quotations || []).forEach((q) => {
-      if (q.customerId && map[q.customerId]) {
-        map[q.customerId].quotationsCount += 1;
+      if (q.customerId) {
+        ensure(q.customerId).quotationsCount += 1;
       }
     });
 

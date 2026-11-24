@@ -7,13 +7,14 @@ import { Button } from '../../components/common/Button';
 import { BackLink } from '../../components/common/BackLink';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
+import { calculatePaymentBreakdown } from '../../utils/calculations';
 import { cleanItemName } from '../../utils/printTemplateGenerator';
-import { ArrowLeft, Printer, CheckCircle2, XCircle, Clock, Users2, Edit2 } from 'lucide-react';
+import { ArrowLeft, Printer, CheckCircle2, XCircle, Clock, Users2, Edit2, FileSpreadsheet } from 'lucide-react';
 
 export const SaleDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { sales, customers, completeSale, cancelSale, confirmAction, settings } = useAppData();
+  const { sales, customers, quotations, completeSale, cancelSale, confirmAction, settings } = useAppData();
   const { language, t } = useLanguage();
 
   const l = (texts) => {
@@ -31,6 +32,9 @@ export const SaleDetailPage = () => {
 
   const sale = sales.find((s) => s.id === id || s._id === id);
   const customer = customers.find((c) => c.id === sale?.customerId || c._id === sale?.customerId);
+  const linkedQuotation = sale?.quotationId
+    ? (quotations || []).find((q) => q.id === sale.quotationId || q._id === sale.quotationId)
+    : null;
 
   React.useEffect(() => {
     if (sale) {
@@ -52,7 +56,19 @@ export const SaleDetailPage = () => {
   }
 
   const invoiceNumber = sale.invoiceNo || sale.invoiceNumber || (sale.id ? `INV-${sale.id.slice(-4)}` : 'INV-2026');
+  const discountVal = Number(sale.discount) || 0;
+  const taxVal = Number(sale.tax) || 0;
   const totalAmount = Number(sale.total !== undefined ? sale.total : (sale.totalAmount !== undefined ? sale.totalAmount : 0));
+  const subtotalVal = Number(sale.subtotal !== undefined ? sale.subtotal : Math.max(0, totalAmount + discountVal - taxVal));
+  const {
+    paymentStatus: resolvedPayStatus,
+    paidAmount: paidAmt,
+    dueAmount: dueAmt,
+  } = calculatePaymentBreakdown({
+    total: totalAmount,
+    paymentStatus: sale.paymentStatus || 'paid',
+    paidAmount: sale.paidAmount,
+  });
   const saleDate = sale.date || sale.createdAt || new Date();
 
   const handleComplete = () => {
@@ -176,14 +192,18 @@ export const SaleDetailPage = () => {
             </div>
             <span
               className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase mt-1 ${
-                sale.paymentStatus === 'paid'
+                resolvedPayStatus === 'paid'
                   ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+                  : resolvedPayStatus === 'partial'
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+                  : 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300'
               }`}
             >
-              {sale.paymentStatus === 'paid'
+              {resolvedPayStatus === 'paid'
                 ? l({ bn: 'পরিশোধিত', en: 'PAID', obro: 'PAID' })
-                : l({ bn: 'বকেয়া', en: 'PENDING', obro: 'PENDING' })}
+                : resolvedPayStatus === 'partial'
+                ? l({ bn: 'আংশিক জমা', en: 'PARTIAL', obro: 'PARTIAL' })
+                : l({ bn: 'বকেয়া', en: 'DUE', obro: 'DUE' })}
             </span>
           </div>
         </div>
@@ -206,15 +226,38 @@ export const SaleDetailPage = () => {
                 {sale.customerName || l({ bn: 'খুচরা নগদ ক্রেতা', en: 'Walk-in Retail Customer', obro: 'Walk-in Customer' })}
               </span>
             )}
+            {(customer?.companyName || sale.customerCompany) && (
+              <p className="text-purple-600 dark:text-purple-400 font-semibold mt-0.5">
+                {customer?.companyName || sale.customerCompany}
+              </p>
+            )}
             <p className="text-slate-500 mt-0.5">{customer?.phone || sale.customerPhone || l({ bn: 'কাউন্টার সরাসরি বিক্রয়', en: 'Direct counter sale', obro: 'Direct counter sale' })}</p>
+            {(customer?.address || sale.customerAddress) && (
+              <p className="text-slate-400 mt-0.5">{customer?.address || sale.customerAddress}</p>
+            )}
           </div>
-          <div>
-            <span className="text-slate-400 font-semibold block uppercase text-[10px] mb-1">
-              {l({ bn: 'ইনভয়েস মন্তব্য ও বিবরণ', en: 'Invoice Remarks', obro: 'Invoice Remarks' })}
-            </span>
-            <p className="text-slate-700 dark:text-slate-300">
-              {sale.notes || l({ bn: 'সাধারণ নিয়মিত লেনদেন।', en: 'Standard retail transaction.', obro: 'Standard retail transaction.' })}
-            </p>
+          <div className="space-y-2">
+            <div>
+              <span className="text-slate-400 font-semibold block uppercase text-[10px] mb-1">
+                {l({ bn: 'ইনভয়েস মন্তব্য ও বিবরণ', en: 'Invoice Remarks', obro: 'Invoice Remarks' })}
+              </span>
+              <p className="text-slate-700 dark:text-slate-300">
+                {sale.notes || l({ bn: 'সাধারণ নিয়মিত লেনদেন।', en: 'Standard retail transaction.', obro: 'Standard retail transaction.' })}
+              </p>
+            </div>
+            {linkedQuotation && (
+              <div>
+                <Link
+                  to={`/quotations/${linkedQuotation.id || linkedQuotation._id}`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-semibold hover:bg-purple-100 dark:hover:bg-purple-950/60"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  <span>
+                    {l({ bn: 'দরপত্র', en: 'Quotation', obro: 'Quotation' })} #{linkedQuotation.quotationNumber}
+                  </span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
@@ -303,21 +346,37 @@ export const SaleDetailPage = () => {
         {/* Totals Breakdown */}
         {showGrandTotal ? (
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col items-end gap-1.5 text-xs">
-            <div className="flex justify-between w-64 text-slate-500">
+            <div className="flex justify-between w-72 text-slate-500">
               <span>{l({ bn: 'উপমোট (Subtotal):', en: 'Subtotal:', obro: 'Subtotal:' })}</span>
-              <span className="font-mono">{formatCurrency(sale.subtotal !== undefined ? sale.subtotal : totalAmount, settings.currency)}</span>
+              <span className="font-mono">{formatCurrency(subtotalVal, settings.currency)}</span>
             </div>
-            {Number(sale.discount) > 0 && (
-              <div className="flex justify-between w-64 text-emerald-600 font-semibold">
-                <span>{l({ bn: 'ছাড় / ডিসকাউন্ট:', en: 'Discount Applied:', obro: 'Discount Applied:' })}</span>
-                <span className="font-mono">-{formatCurrency(sale.discount, settings.currency)}</span>
+            {discountVal > 0 && (
+              <div className="flex justify-between w-72 text-emerald-600 font-semibold">
+                <span>{l({ bn: 'বিশেষ ছাড় / ডিসকাউন্ট:', en: 'Discount Applied:', obro: 'Discount Applied:' })}</span>
+                <span className="font-mono">-{formatCurrency(discountVal, settings.currency)}</span>
               </div>
             )}
-            <div className="flex justify-between w-64 text-base font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-100 dark:border-slate-800">
-              <span>{l({ bn: 'সর্বমোট প্রদেয়:', en: 'Grand Total:', obro: 'Grand Total:' })}</span>
+            {taxVal > 0 && (
+              <div className="flex justify-between w-72 text-slate-600 dark:text-slate-400 font-semibold">
+                <span>{l({ bn: 'ভ্যাট / অতিরিক্ত চার্জ:', en: 'Tax / Extra:', obro: 'Tax / Extra:' })}</span>
+                <span className="font-mono">+{formatCurrency(taxVal, settings.currency)}</span>
+              </div>
+            )}
+            <div className="flex justify-between w-72 text-base font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span>{l({ bn: 'নিট প্রদেয় মূল্য:', en: 'Net Payable:', obro: 'Net Payable:' })}</span>
               <span className="font-mono text-emerald-600 dark:text-emerald-400">
                 {formatCurrency(totalAmount, settings.currency)}
               </span>
+            </div>
+            <div className="flex justify-between w-72 text-slate-700 dark:text-slate-300 pt-1">
+              <span>{l({ bn: 'জমা / আদায় (Paid):', en: 'Paid Amount:', obro: 'Paid Amount:' })}</span>
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                {formatCurrency(paidAmt, settings.currency)}
+              </span>
+            </div>
+            <div className="flex justify-between w-72 font-bold text-red-600 dark:text-red-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+              <span>{l({ bn: 'বাকী / বকেয়া (Balance Due):', en: 'Balance Due:', obro: 'Balance Due:' })}</span>
+              <span className="font-mono">{formatCurrency(dueAmt, settings.currency)}</span>
             </div>
           </div>
         ) : (

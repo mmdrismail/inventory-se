@@ -1,8 +1,23 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { inventoryService } from './inventoryService';
 import { customerService } from './customerService';
-import { calculateSaleTotals } from '../utils/calculations';
+import { calculateSaleTotals, calculatePaymentBreakdown } from '../utils/calculations';
 import { apiClient } from './apiClient';
+
+const linkQuotationLocal = (quotationId, saleId) => {
+  if (!quotationId || !saleId) return;
+  const quotes = storageService.getItem(STORAGE_KEYS.QUOTATIONS, []);
+  const idx = quotes.findIndex((q) => q.id === quotationId || q._id === quotationId);
+  if (idx !== -1) {
+    quotes[idx] = {
+      ...quotes[idx],
+      status: 'converted',
+      convertedSaleId: saleId,
+      updatedAt: new Date().toISOString(),
+    };
+    storageService.setItem(STORAGE_KEYS.QUOTATIONS, quotes);
+  }
+};
 
 const isGenericClientName = (name) => {
   if (!name) return true;
@@ -30,19 +45,21 @@ class SalesService {
 
   create(saleData, performedBy = 'Sales Executive') {
     const sales = this.getAll();
-    const { subtotal, discount, total } = calculateSaleTotals(saleData.items || [], saleData.discount);
-    const totalVal = total;
-    let paidVal = Number(
-      saleData.paidAmount !== undefined
-        ? saleData.paidAmount
-        : saleData.paymentStatus === 'paid'
-        ? totalVal
-        : saleData.paymentStatus === 'due'
-        ? 0
-        : 0
+    const { subtotal, discount, tax, total } = calculateSaleTotals(
+      saleData.items || [],
+      saleData.discount,
+      saleData.tax
     );
-    if (saleData.paymentStatus === 'paid') paidVal = totalVal;
-    const dueVal = Math.max(0, totalVal - paidVal);
+    const totalVal = total;
+    const {
+      paymentStatus: nextPaymentStatus,
+      paidAmount: paidVal,
+      dueAmount: dueVal,
+    } = calculatePaymentBreakdown({
+      total: totalVal,
+      paymentStatus: saleData.paymentStatus || 'paid',
+      paidAmount: saleData.paidAmount !== undefined ? saleData.paidAmount : 0,
+    });
 
     // Auto-upsert customer profile if details provided and not generic
     let customerId = saleData.customerId;
@@ -69,12 +86,6 @@ class SalesService {
       }
     }
 
-    const isCompleted = saleData.status === 'completed' || !saleData.status;
-
-    if (customerId && isCompleted) {
-      customerService.updateFinancials(customerId, totalVal, paidVal, dueVal);
-    }
-
     const now = new Date().toISOString();
     const invNo =
       saleData.invoiceNo?.trim() ||
@@ -96,9 +107,11 @@ class SalesService {
       customerLocation: saleData.customerLocation || '',
       date: saleData.date || now,
       status: saleData.status || 'completed',
-      paymentStatus: saleData.paymentStatus || 'paid',
+      paymentMethod: saleData.paymentMethod || 'cash',
+      paymentStatus: nextPaymentStatus,
       subtotal,
       discount,
+      tax,
       total,
       totalAmount: total,
       paidAmount: paidVal,
@@ -120,6 +133,8 @@ class SalesService {
 
     sales.unshift(newSale);
     storageService.setItem(STORAGE_KEYS.SALES, sales);
+    if (customerId) customerService.recalculateFromSales(customerId);
+    if (newSale.quotationId) linkQuotationLocal(newSale.quotationId, newSale.id);
 
     // Live sync to MongoDB Atlas (wait for customer upsert first if temp customer was created)
     const syncPromise = Promise.resolve(custSyncPromise)
@@ -150,6 +165,7 @@ class SalesService {
             })),
             subtotal: newSale.subtotal,
             discount: newSale.discount,
+            tax: newSale.tax,
             totalAmount: newSale.total,
             paidAmount: newSale.paidAmount,
             dueAmount: newSale.dueAmount,
@@ -173,6 +189,7 @@ class SalesService {
             if (res.data.customerId) cur[idx].customerId = res.data.customerId;
             storageService.setItem(STORAGE_KEYS.SALES, cur);
           }
+          if (newSale.quotationId) linkQuotationLocal(newSale.quotationId, res.data._id);
         }
         return res;
       })
@@ -195,23 +212,26 @@ class SalesService {
     }
 
     const existing = sales[index];
+    const prevCustomerId = existing.customerId;
     const items = saleData.items || existing.items || [];
-    const { subtotal, discount, total } = calculateSaleTotals(
+    const { subtotal, discount, tax, total } = calculateSaleTotals(
       items,
-      saleData.discount !== undefined ? saleData.discount : existing.discount
+      saleData.discount !== undefined ? saleData.discount : existing.discount,
+      saleData.tax !== undefined ? saleData.tax : existing.tax || 0
     );
     const totalVal = total;
-    let paidVal = Number(
-      saleData.paidAmount !== undefined
-        ? saleData.paidAmount
-        : saleData.paymentStatus === 'paid'
-        ? totalVal
-        : saleData.paymentStatus === 'due'
-        ? 0
-        : existing.paidAmount || 0
-    );
-    if (saleData.paymentStatus === 'paid') paidVal = totalVal;
-    const dueVal = Math.max(0, totalVal - paidVal);
+    const {
+      paymentStatus: nextPaymentStatus,
+      paidAmount: paidVal,
+      dueAmount: dueVal,
+    } = calculatePaymentBreakdown({
+      total: totalVal,
+      paymentStatus: saleData.paymentStatus || existing.paymentStatus || 'paid',
+      paidAmount: saleData.paidAmount !== undefined ? saleData.paidAmount : existing.paidAmount || 0,
+    });
+
+    const nextInvNo =
+      (saleData.invoiceNo || saleData.invoiceNumber || existing.invoiceNo || existing.invoiceNumber || '').trim();
 
     // Auto-upsert customer profile if details provided
     let customerId = saleData.customerId !== undefined ? saleData.customerId : existing.customerId;
@@ -239,8 +259,8 @@ class SalesService {
       ...saleData,
       id: existing.id,
       _id: existing._id,
-      invoiceNo: existing.invoiceNo || existing.invoiceNumber,
-      invoiceNumber: existing.invoiceNumber || existing.invoiceNo,
+      invoiceNo: nextInvNo,
+      invoiceNumber: nextInvNo,
       customerId,
       customerName: custName || 'Walk-in Retail Customer',
       customerCompany: saleData.customerCompany !== undefined ? saleData.customerCompany : existing.customerCompany || '',
@@ -251,17 +271,36 @@ class SalesService {
       customerLocation: saleData.customerLocation !== undefined ? saleData.customerLocation : existing.customerLocation || '',
       items,
       subtotal,
-      discount: saleData.discount !== undefined ? Number(saleData.discount) : existing.discount || 0,
+      discount,
+      tax,
       total,
       totalAmount: total,
       paidAmount: paidVal,
       dueAmount: dueVal,
-      paymentStatus: saleData.paymentStatus || existing.paymentStatus || 'paid',
+      paymentMethod: saleData.paymentMethod || existing.paymentMethod || 'cash',
+      paymentStatus: nextPaymentStatus,
+      requisitionRef: saleData.requisitionRef !== undefined ? saleData.requisitionRef : existing.requisitionRef || '',
+      quotationId: saleData.quotationId !== undefined ? saleData.quotationId : existing.quotationId || null,
       updatedAt: new Date().toISOString(),
     };
 
+    const stockRes = inventoryService.reconcileSaleEditStock(existing, updatedSale, performedBy);
+    if (!stockRes.success) {
+      return stockRes;
+    }
+
     sales[index] = updatedSale;
     storageService.setItem(STORAGE_KEYS.SALES, sales);
+
+    if (prevCustomerId && String(prevCustomerId) !== String(customerId)) {
+      customerService.recalculateFromSales(prevCustomerId);
+    }
+    if (customerId) {
+      customerService.recalculateFromSales(customerId);
+    }
+    if (updatedSale.quotationId) {
+      linkQuotationLocal(updatedSale.quotationId, updatedSale._id || updatedSale.id);
+    }
 
     // Live sync to MongoDB Atlas
     const mongoId = existing._id || existing.id;
@@ -270,6 +309,8 @@ class SalesService {
       syncPromise = Promise.allSettled([
         custSyncPromise,
         apiClient.put(`/sales/${mongoId}`, {
+          invoiceNumber: updatedSale.invoiceNumber,
+          date: updatedSale.date,
           customerId: updatedSale.customerId,
           customerName: updatedSale.customerName,
           customerCompany: updatedSale.customerCompany,
@@ -289,11 +330,16 @@ class SalesService {
           })),
           subtotal: updatedSale.subtotal,
           discount: updatedSale.discount,
+          tax: updatedSale.tax,
           totalAmount: updatedSale.total,
+          total: updatedSale.total,
           paidAmount: updatedSale.paidAmount,
           dueAmount: updatedSale.dueAmount,
+          paymentMethod: updatedSale.paymentMethod,
           paymentStatus: updatedSale.paymentStatus,
           status: updatedSale.status,
+          requisitionRef: updatedSale.requisitionRef,
+          quotationId: updatedSale.quotationId,
           showRate: updatedSale.showRate,
           showLineTotal: updatedSale.showLineTotal,
           showGrandTotal: updatedSale.showGrandTotal,
@@ -348,6 +394,7 @@ class SalesService {
     sale.updatedAt = new Date().toISOString();
     sales[index] = sale;
     storageService.setItem(STORAGE_KEYS.SALES, sales);
+    if (sale.customerId) customerService.recalculateFromSales(sale.customerId);
 
     const mongoId = sale._id || sale.id;
     const syncPromise = apiClient.put(`/sales/${mongoId}`, { status: 'completed' }).catch((err) => {
@@ -386,6 +433,7 @@ class SalesService {
     sale.updatedAt = new Date().toISOString();
     sales[index] = sale;
     storageService.setItem(STORAGE_KEYS.SALES, sales);
+    if (sale.customerId) customerService.recalculateFromSales(sale.customerId);
 
     const mongoId = sale._id || sale.id;
     const syncPromise = apiClient.put(`/sales/${mongoId}/cancel`, {}).catch((err) => {

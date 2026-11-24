@@ -273,6 +273,81 @@ class InventoryService {
     storageService.setItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, movements);
     return { success: true, updatedProducts: products };
   }
+
+  /**
+   * Reconcile inventory deltas when an existing sale invoice is edited
+   * Only adjusts catalog-tracked products when status is or was 'completed'.
+   */
+  reconcileSaleEditStock(prevSale, nextSale, performedBy = 'Sales Executive') {
+    const products = storageService.getItem(STORAGE_KEYS.PRODUCTS, []);
+    const movements = this.getMovements();
+    const resolveTrackedProduct = (pid) =>
+      pid && pid !== 'custom' && pid !== 'custom-item'
+        ? products.find((prod) => prod.id === pid || prod._id === pid)
+        : null;
+
+    const buildQtyMap = (saleObj) => {
+      const map = new Map();
+      if (!saleObj || saleObj.status !== 'completed') return map;
+      for (const item of saleObj.items || []) {
+        const prod = resolveTrackedProduct(item.productId);
+        if (!prod) continue;
+        const key = prod.id;
+        map.set(key, (map.get(key) || 0) + (Number(item.quantity) || 0));
+      }
+      return map;
+    };
+
+    const oldMap = buildQtyMap(prevSale);
+    const newMap = buildQtyMap(nextSale);
+    const allProductKeys = new Set([...oldMap.keys(), ...newMap.keys()]);
+
+    // Pre-validate positive stock deductions
+    for (const key of allProductKeys) {
+      const delta = (newMap.get(key) || 0) - (oldMap.get(key) || 0);
+      if (delta > 0) {
+        const prod = products.find((p) => p.id === key);
+        const available = Number(prod?.quantity) || 0;
+        if (delta > available) {
+          return {
+            success: false,
+            message: `Insufficient stock for "${prod.name}". Additional needed: ${delta}, Available: ${available}.`,
+          };
+        }
+      }
+    }
+
+    let changed = false;
+    const invLabel = nextSale?.invoiceNo || nextSale?.invoiceNumber || nextSale?.id || 'Invoice';
+    for (const key of allProductKeys) {
+      const delta = (newMap.get(key) || 0) - (oldMap.get(key) || 0);
+      if (delta === 0) continue;
+      const prod = products.find((p) => p.id === key);
+      if (!prod) continue;
+
+      prod.quantity = Math.max(0, (Number(prod.quantity) || 0) - delta);
+      changed = true;
+      movements.unshift({
+        id: `mov-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        productId: prod.id,
+        productName: prod.name,
+        sku: prod.sku,
+        type: delta > 0 ? 'sale_out' : 'sale_cancel_reversal',
+        quantityChange: -delta,
+        balanceAfter: prod.quantity,
+        referenceId: nextSale?.id || invLabel,
+        reason: `Invoice edit stock adjustment (${invLabel})`,
+        timestamp: new Date().toISOString(),
+        performedBy,
+      });
+    }
+
+    if (changed) {
+      storageService.setItem(STORAGE_KEYS.PRODUCTS, products);
+      storageService.setItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, movements);
+    }
+    return { success: true, updatedProducts: products };
+  }
 }
 
 export const inventoryService = new InventoryService();
