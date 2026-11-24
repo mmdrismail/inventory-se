@@ -1,8 +1,18 @@
+const mongoose = require('mongoose');
 const Quotation = require('../models/Quotation');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
 const Customer = require('../models/Customer');
+
+// Safe query helper supporting MongoDB ObjectId, custom String ID, or Quotation Number
+const findQuotationQuery = (id) => {
+  if (!id) return { _id: null };
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    return { _id: id };
+  }
+  return { $or: [{ id: String(id) }, { quotationNumber: String(id) }] };
+};
 
 // @desc    Get all quotations
 // @route   GET /api/quotations
@@ -58,7 +68,7 @@ exports.getQuotations = async (req, res, next) => {
 // @access  Private
 exports.getQuotationById = async (req, res, next) => {
   try {
-    const quotation = await Quotation.findById(req.params.id);
+    const quotation = await Quotation.findOne(findQuotationQuery(req.params.id));
     if (!quotation) {
       return res.status(404).json({
         success: false,
@@ -163,7 +173,7 @@ exports.createQuotation = async (req, res, next) => {
 // @access  Private
 exports.updateQuotation = async (req, res, next) => {
   try {
-    const updated = await Quotation.findByIdAndUpdate(req.params.id, req.body, {
+    const updated = await Quotation.findOneAndUpdate(findQuotationQuery(req.params.id), req.body, {
       new: true,
       runValidators: true,
     });
@@ -188,14 +198,14 @@ exports.updateQuotation = async (req, res, next) => {
 // @access  Private (Admin, Manager)
 exports.deleteQuotation = async (req, res, next) => {
   try {
-    const quotation = await Quotation.findById(req.params.id);
+    const quotation = await Quotation.findOne(findQuotationQuery(req.params.id));
     if (!quotation) {
       return res.status(404).json({
         success: false,
         message: 'Quotation not found.',
       });
     }
-    await Quotation.findByIdAndDelete(req.params.id);
+    await Quotation.findOneAndDelete(findQuotationQuery(req.params.id));
     res.json({
       success: true,
       message: `Quotation ${quotation.quotationNumber} removed successfully.`,
@@ -210,7 +220,7 @@ exports.deleteQuotation = async (req, res, next) => {
 // @access  Private
 exports.convertQuotationToSale = async (req, res, next) => {
   try {
-    const quotation = await Quotation.findById(req.params.id);
+    const quotation = await Quotation.findOne(findQuotationQuery(req.params.id));
     if (!quotation) {
       return res.status(404).json({
         success: false,

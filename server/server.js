@@ -27,11 +27,28 @@ const lotRoutes = require('./routes/lotRoutes');
 
 const compression = require('compression');
 const { cacheMiddleware, cacheInvalidator } = require('./middleware/cache');
+const { authRateLimiter, apiRateLimiter } = require('./middleware/rateLimiter');
 
 // Initialize MongoDB connection
 connectDB();
 
 const app = express();
+
+// Security Hardening: Disable fingerprinting
+app.disable('x-powered-by');
+
+// Security & Privacy Headers (OWASP compliant)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // High-speed response compression (Gzip / Deflate)
 app.use(compression());
@@ -55,8 +72,13 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Payload size safety to prevent memory flooding / DoS
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+// Global API rate limiter on /api endpoints
+app.use('/api', apiRateLimiter);
 
 // Automatic cache invalidation on any POST/PUT/DELETE
 app.use(cacheInvalidator());

@@ -1,8 +1,18 @@
+const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
 const Customer = require('../models/Customer');
 const Quotation = require('../models/Quotation');
+
+// Safe query helper supporting MongoDB ObjectId, custom String ID, or Invoice Number
+const findSaleQuery = (id) => {
+  if (!id) return { _id: null };
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    return { _id: id };
+  }
+  return { $or: [{ id: String(id) }, { invoiceNumber: String(id) }, { invoiceNo: String(id) }] };
+};
 
 // @desc    Get all sales invoices
 // @route   GET /api/sales
@@ -67,7 +77,7 @@ exports.getSales = async (req, res, next) => {
 // @access  Private
 exports.getSaleById = async (req, res, next) => {
   try {
-    const sale = await Sale.findById(req.params.id);
+    const sale = await Sale.findOne(findSaleQuery(req.params.id));
     if (!sale) {
       return res.status(404).json({
         success: false,
@@ -280,7 +290,8 @@ exports.createSale = async (req, res, next) => {
 // @access  Private (Admin, Manager, Staff)
 exports.updateSale = async (req, res, next) => {
   try {
-    const sale = await Sale.findById(req.params.id);
+    const saleQuery = findSaleQuery(req.params.id);
+    const sale = await Sale.findOne(saleQuery);
     if (!sale) {
       return res.status(404).json({
         success: false,
@@ -304,7 +315,16 @@ exports.updateSale = async (req, res, next) => {
       });
     }
 
-    const updated = await Sale.findByIdAndUpdate(req.params.id, req.body, {
+    // Auto-recalculate financial balances if totals are updated
+    if (req.body.totalAmount !== undefined || req.body.total !== undefined) {
+      const tot = Number(req.body.totalAmount !== undefined ? req.body.totalAmount : req.body.total) || 0;
+      const paid = Number(req.body.paidAmount !== undefined ? req.body.paidAmount : sale.paidAmount) || 0;
+      req.body.totalAmount = tot;
+      req.body.total = tot;
+      req.body.dueAmount = Math.max(0, tot - paid);
+    }
+
+    const updated = await Sale.findOneAndUpdate(saleQuery, req.body, {
       new: true,
       runValidators: true,
     });
@@ -324,7 +344,8 @@ exports.updateSale = async (req, res, next) => {
 // @access  Private (Admin, Manager)
 exports.cancelSale = async (req, res, next) => {
   try {
-    const sale = await Sale.findById(req.params.id);
+    const saleQuery = findSaleQuery(req.params.id);
+    const sale = await Sale.findOne(saleQuery);
     if (!sale) {
       return res.status(404).json({
         success: false,

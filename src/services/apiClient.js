@@ -125,11 +125,22 @@ class ApiClient {
 
   async isBackendAvailable() {
     try {
+      let signal;
+      let timerId;
+      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        signal = AbortSignal.timeout(2000);
+      } else if (typeof AbortController !== 'undefined') {
+        const controller = new AbortController();
+        timerId = setTimeout(() => controller.abort(), 2000);
+        signal = controller.signal;
+      }
+
       const res = await fetch(`${this.baseUrl.replace(/\/api$/, '')}/api/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(2000),
+        ...(signal ? { signal } : {}),
       });
+      if (timerId) clearTimeout(timerId);
       return res.ok;
     } catch {
       return false;

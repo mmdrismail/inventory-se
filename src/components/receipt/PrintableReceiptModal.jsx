@@ -20,6 +20,7 @@ import {
   Users2,
   Package,
   Building2,
+  Download,
 } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import { useAppData } from '../../context/AppDataContext';
@@ -28,6 +29,7 @@ import {
   DOCUMENT_TYPES,
   DOCUMENT_LANGUAGES,
   printDocumentViaIframe,
+  generatePrintFileName,
   generateCashMemoHtml,
   generateChallanHtml,
   generateOfficialPadHtml,
@@ -285,15 +287,41 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
 
   if (!sale) return null;
 
+  // Standardized print & save filename: Customer Number + Memo/Doc Number + Date + Customer Name
+  const printFileName = useMemo(() => {
+    return generatePrintFileName(effectiveSale, docType, options);
+  }, [effectiveSale, docType, options]);
+
   const handlePrint = () => {
-    printDocumentViaIframe(currentHtml);
+    printDocumentViaIframe(currentHtml, printFileName);
   };
 
   const handleOpenRaw = () => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(currentHtml);
+      try {
+        printWindow.document.title = printFileName;
+      } catch {
+        // ignore
+      }
       printWindow.document.close();
+    }
+  };
+
+  const handleDownloadHtml = () => {
+    try {
+      const blob = new Blob([currentHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${printFileName}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download voucher error:', err);
     }
   };
 
@@ -1719,14 +1747,32 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
 
         {/* Footer Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-          <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
-            <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-            <span className="font-medium">
-              ফরম্যাট: <strong>{getDocTitle()}</strong> · ভাষা: <strong>{docLanguage === 'bn' ? 'বাংলা' : docLanguage === 'en' ? 'English' : 'উভয়'}</strong>
-            </span>
+          <div className="text-xs text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+              <span className="font-medium">
+                ফরম্যাট: <strong>{getDocTitle()}</strong> · ভাষা: <strong>{docLanguage === 'bn' ? 'বাংলা' : docLanguage === 'en' ? 'English' : 'উভয়'}</strong>
+              </span>
+            </div>
+            <div
+              className="text-[11px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 truncate max-w-[260px]"
+              title={`সেভ বা প্রিন্ট ফাইলের নাম: ${printFileName}`}
+            >
+              📄 {printFileName}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              onClick={handleDownloadHtml}
+              title={`ভাউচার ডাউনলোড (${printFileName}.html)`}
+              className="text-xs text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            >
+              ভাউচার সেভ
+            </Button>
             <Button
               variant="outline"
               size="sm"

@@ -4,8 +4,23 @@
  */
 
 class MemoryCache {
-  constructor() {
+  constructor(maxEntries = 500) {
     this.cache = new Map();
+    this.maxEntries = maxEntries;
+
+    // Background sweep of expired cache entries every 60 seconds
+    this.cleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [key, item] of this.cache.entries()) {
+        if (now > item.expiresAt) {
+          this.cache.delete(key);
+        }
+      }
+    }, 60 * 1000);
+
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
+    }
   }
 
   get(key) {
@@ -17,10 +32,20 @@ class MemoryCache {
       return null;
     }
 
+    // Refresh position for LRU
+    this.cache.delete(key);
+    this.cache.set(key, item);
+
     return item.data;
   }
 
   set(key, data, ttlSeconds = 30) {
+    if (this.cache.size >= this.maxEntries) {
+      // Evict oldest entry (first item in Map)
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey) this.cache.delete(oldestKey);
+    }
+
     this.cache.set(key, {
       data,
       expiresAt: Date.now() + ttlSeconds * 1000,
@@ -48,7 +73,7 @@ class MemoryCache {
   }
 }
 
-const memoryCache = new MemoryCache();
+const memoryCache = new MemoryCache(500);
 
 /**
  * Express middleware for caching GET responses

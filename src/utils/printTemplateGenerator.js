@@ -28,10 +28,69 @@ export const DOCUMENT_LANGUAGES = {
 };
 
 /**
+ * Standardized Document Filename Generator
+ * Formats: Customer Number (Phone) + Memo/Quotation/Doc Number + Date (YYYY-MM-DD) + Customer Name
+ * Safe for Windows, macOS, Linux, and browser PDF printing dialogs.
+ */
+export const generatePrintFileName = (doc = {}, docType = DOCUMENT_TYPES.CASH_MEMO, options = {}) => {
+  // 1. Customer Number / Phone
+  const rawPhone = options.overrides?.customerPhone ||
+    doc.customerPhone ||
+    doc.phone ||
+    doc.clientPhone ||
+    doc.customer?.phone ||
+    '';
+  const cleanPhone = String(rawPhone).replace(/[^\d+]/g, '').trim() || 'NoPhone';
+
+  // 2. Memo / Quotation / Document Number
+  const isQuote = docType === DOCUMENT_TYPES.QUOTATION || Boolean(doc.quotationNumber || doc.quotationNo);
+  const rawNumber = options.overrides?.invoiceNumber ||
+    (isQuote
+      ? (doc.quotationNumber || doc.quotationNo || doc.invoiceNumber || 'QT-000')
+      : (doc.invoiceNumber || doc.invoiceNo || doc.receiptNumber || 'INV-000'));
+  const cleanNumber = String(rawNumber).replace(/[/\\?%*:|"<>]/g, '-').trim() || 'DOC';
+
+  // 3. Document Date (YYYY-MM-DD)
+  const rawDate = doc.date || doc.quotationDate || doc.createdAt || new Date();
+  let cleanDate = '';
+  try {
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      cleanDate = `${yyyy}-${mm}-${dd}`;
+    } else {
+      cleanDate = new Date().toISOString().slice(0, 10);
+    }
+  } catch {
+    cleanDate = new Date().toISOString().slice(0, 10);
+  }
+
+  // 4. Customer Name
+  const rawName = options.overrides?.customerName ||
+    doc.customerName ||
+    doc.clientContactPerson ||
+    doc.customer?.name ||
+    doc.name ||
+    doc.customerCompany ||
+    'Customer';
+  const cleanName = String(rawName)
+    .replace(/[/\\?%*:|"<>]/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 40) || 'Customer';
+
+  // Customer Number + Memo/Quotation Number + Date + Customer Name
+  return `${cleanPhone}_${cleanNumber}_${cleanDate}_${cleanName}`;
+};
+
+/**
  * Isolated Iframe Printing Engine
  * Bypasses all modal layout constraints, transforms, body overflow, and screen dark modes.
+ * Ensures the target filename (customTitle) is enforced in browser "Save as PDF" dialogs.
  */
-export const printDocumentViaIframe = (htmlContent) => {
+export const printDocumentViaIframe = (htmlContent, customTitle) => {
   let iframe = document.getElementById('shanta-print-engine-frame');
   if (!iframe) {
     iframe = document.createElement('iframe');
@@ -53,7 +112,24 @@ export const printDocumentViaIframe = (htmlContent) => {
   doc.write(htmlContent);
   doc.close();
 
+  if (customTitle) {
+    try {
+      doc.title = customTitle;
+    } catch {
+      // ignore
+    }
+  }
+
   const triggerPrint = () => {
+    const originalDocumentTitle = document.title;
+    if (customTitle) {
+      try {
+        document.title = customTitle;
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
@@ -62,11 +138,27 @@ export const printDocumentViaIframe = (htmlContent) => {
       // Fallback: open in new window if iframe print is blocked
       const fallbackWin = window.open('', '_blank');
       if (fallbackWin) {
+        if (customTitle) {
+          try {
+            fallbackWin.document.title = customTitle;
+          } catch {
+            // ignore
+          }
+        }
         fallbackWin.document.write(htmlContent);
         fallbackWin.document.close();
         fallbackWin.focus();
         fallbackWin.print();
       }
+    } finally {
+      // Revert top document.title after print preview settles
+      setTimeout(() => {
+        try {
+          document.title = originalDocumentTitle;
+        } catch {
+          // ignore
+        }
+      }, 1500);
     }
   };
 
@@ -772,13 +864,14 @@ export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
 
   const TOTAL_LINES = 13;
   const dummyRowsNeeded = Math.max(0, TOTAL_LINES - items.length);
+  const docFileName = generatePrintFileName(sale, DOCUMENT_TYPES.CASH_MEMO, options);
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${p.t.cashMemoBadge} - ${cleanSerial}</title>
+  <title>${docFileName}</title>
   <style>${getAuthenticStyles(false)}</style>
 </head>
 <body>
@@ -930,13 +1023,14 @@ export const generateChallanHtml = (sale, settings = {}, options = {}) => {
   const TOTAL_LINES = 14;
   const dummyRowsNeeded = Math.max(0, TOTAL_LINES - items.length);
   const totalUnits = items.reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
+  const docFileName = generatePrintFileName(sale, DOCUMENT_TYPES.CHALLAN, options);
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${p.t.challanBadge} - ${cleanSerial}</title>
+  <title>${docFileName}</title>
   <style>${getAuthenticStyles(false)}</style>
 </head>
 <body>
@@ -1071,13 +1165,14 @@ export const generateOfficialPadHtml = (sale, settings = {}, options = {}) => {
   const showRate = options.showRate !== undefined ? options.showRate : (sale.showRate !== undefined ? sale.showRate : true);
   const showLineTotal = options.showLineTotal !== undefined ? options.showLineTotal : (sale.showLineTotal !== undefined ? sale.showLineTotal : true);
   const showGrandTotal = options.showGrandTotal !== undefined ? options.showGrandTotal : (sale.showGrandTotal !== undefined ? sale.showGrandTotal : true);
+  const docFileName = generatePrintFileName(sale, DOCUMENT_TYPES.OFFICIAL_PAD, options);
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${p.t.padBadge} - ${cleanSerial}</title>
+  <title>${docFileName}</title>
   <style>
     ${getAuthenticStyles(false)}
     .pad-top-bar {
@@ -1242,13 +1337,14 @@ export const generateThermalReceiptHtml = (sale, settings = {}, options = {}) =>
   const subtotal = Number(sale.subtotal) || 0;
   const discount = Number(sale.discount) || 0;
   const total = Number(sale.totalAmount || sale.total) || subtotal - discount;
+  const docFileName = generatePrintFileName(sale, DOCUMENT_TYPES.THERMAL, options);
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${p.t.thermalBadge} - ${cleanSerial}</title>
+  <title>${docFileName}</title>
   <style>
     ${getAuthenticStyles(true)}
     .thermal-box {
@@ -1378,13 +1474,14 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
   const resolvedTerms = (!quotation.termsAndConditions || isStandardDefaultTerms(quotation.termsAndConditions))
     ? p.t.defaultTerms
     : quotation.termsAndConditions;
+  const docFileName = generatePrintFileName(quotation, DOCUMENT_TYPES.QUOTATION, options);
 
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Quotation - ${cleanSerial}</title>
+  <title>${docFileName}</title>
   <style>
     ${getAuthenticStyles(false)}
     .pad-top-bar {

@@ -1,5 +1,15 @@
+const mongoose = require('mongoose');
 const Customer = require('../models/Customer');
 const Sale = require('../models/Sale');
+
+// Safe query helper supporting MongoDB ObjectId or custom String ID
+const findCustomerQuery = (id) => {
+  if (!id) return { _id: null };
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    return { _id: id };
+  }
+  return { $or: [{ id: String(id) }, { phone: String(id) }] };
+};
 
 // @desc    Get all customers
 // @route   GET /api/customers
@@ -59,7 +69,7 @@ exports.getCustomers = async (req, res, next) => {
 // @access  Private
 exports.getCustomerById = async (req, res, next) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne(findCustomerQuery(req.params.id));
     if (!customer) {
       return res.status(404).json({
         success: false,
@@ -93,7 +103,7 @@ exports.createCustomer = async (req, res, next) => {
 // @access  Private
 exports.updateCustomer = async (req, res, next) => {
   try {
-    const updated = await Customer.findByIdAndUpdate(req.params.id, req.body, {
+    const updated = await Customer.findOneAndUpdate(findCustomerQuery(req.params.id), req.body, {
       new: true,
       runValidators: true,
     });
@@ -118,7 +128,7 @@ exports.updateCustomer = async (req, res, next) => {
 // @access  Private (Admin)
 exports.deleteCustomer = async (req, res, next) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne(findCustomerQuery(req.params.id));
     if (!customer) {
       return res.status(404).json({
         success: false,
@@ -126,7 +136,7 @@ exports.deleteCustomer = async (req, res, next) => {
       });
     }
 
-    const hasSales = await Sale.findOne({ customerId: req.params.id });
+    const hasSales = await Sale.findOne({ $or: [{ customerId: customer._id }, { customerId: customer.id }] });
     if (hasSales) {
       return res.status(400).json({
         success: false,
@@ -134,7 +144,7 @@ exports.deleteCustomer = async (req, res, next) => {
       });
     }
 
-    await Customer.findByIdAndDelete(req.params.id);
+    await Customer.findOneAndDelete(findCustomerQuery(req.params.id));
     res.json({
       success: true,
       message: `Customer "${customer.name}" deleted successfully.`,
