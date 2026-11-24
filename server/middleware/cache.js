@@ -86,8 +86,10 @@ const cacheMiddleware = (ttlSeconds = 30) => {
       return next();
     }
 
-    // Skip caching if requested via header
-    if (req.headers['cache-control'] === 'no-cache') {
+    // Skip caching if requested via header or cache-buster query param
+    const cc = String(req.headers['cache-control'] || '').toLowerCase();
+    if (cc.includes('no-cache') || cc.includes('no-store') || req.query?._t) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       return next();
     }
 
@@ -96,7 +98,7 @@ const cacheMiddleware = (ttlSeconds = 30) => {
 
     if (cachedResponse) {
       res.setHeader('X-Cache', 'HIT');
-      res.setHeader('Cache-Control', `public, max-age=${ttlSeconds}`);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       return res.json(cachedResponse);
     }
 
@@ -106,6 +108,7 @@ const cacheMiddleware = (ttlSeconds = 30) => {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         memoryCache.set(key, body, ttlSeconds);
         res.setHeader('X-Cache', 'MISS');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       }
       return originalJson(body);
     };
@@ -143,10 +146,22 @@ const cacheInvalidator = (entityPrefixes = []) => {
             pathStr.includes('/sales') ||
             pathStr.includes('/orders') ||
             pathStr.includes('/inventory') ||
-            pathStr.includes('/products')
+            pathStr.includes('/products') ||
+            pathStr.includes('/lots')
           ) {
             memoryCache.clearByPattern('/api/products');
             memoryCache.clearByPattern('/api/inventory');
+          }
+
+          // Cross-invalidate customers, sales, and quotations on linked updates
+          if (
+            pathStr.includes('/customers') ||
+            pathStr.includes('/sales') ||
+            pathStr.includes('/quotations')
+          ) {
+            memoryCache.clearByPattern('/api/customers');
+            memoryCache.clearByPattern('/api/sales');
+            memoryCache.clearByPattern('/api/quotations');
           }
         }
         return originalJson(body);

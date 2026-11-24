@@ -58,7 +58,7 @@ class SupplierService {
 
   update(id, updates) {
     const suppliers = this.getAll();
-    const index = suppliers.findIndex((s) => s.id === id);
+    const index = suppliers.findIndex((s) => s.id === id || s._id === id);
     if (index === -1) {
       return { success: false, message: 'Supplier not found.' };
     }
@@ -72,23 +72,27 @@ class SupplierService {
     storageService.setItem(STORAGE_KEYS.SUPPLIERS, suppliers);
 
     // Live sync to MongoDB Atlas
-    apiClient.put(`/suppliers/${id}`, updates).catch((err) => {
+    const targetId = suppliers[index]._id || suppliers[index].id || id;
+    const syncPromise = apiClient.put(`/suppliers/${targetId}`, updates).catch((err) => {
       console.warn('[MongoDB Supplier update notice]:', err.message);
+      return null;
     });
 
-    return { success: true, supplier: suppliers[index] };
+    return { success: true, supplier: suppliers[index], syncPromise };
   }
 
   remove(id) {
     const suppliers = this.getAll();
-    const supplier = suppliers.find((s) => s.id === id);
+    const supplier = suppliers.find((s) => s.id === id || s._id === id);
     if (!supplier) {
       return { success: false, message: 'Supplier not found.' };
     }
 
+    const supIds = new Set([supplier.id, supplier._id, id].filter(Boolean));
+
     // Safety check: has purchase orders
     const purchases = storageService.getItem(STORAGE_KEYS.PURCHASES, []);
-    const supplierPurchases = purchases.filter((p) => p.supplierId === id);
+    const supplierPurchases = purchases.filter((p) => supIds.has(p.supplierId));
     if (supplierPurchases.length > 0) {
       return {
         success: false,
@@ -98,7 +102,7 @@ class SupplierService {
 
     // Also check if any products reference this supplier
     const products = storageService.getItem(STORAGE_KEYS.PRODUCTS, []);
-    const assignedProducts = products.filter((p) => p.supplierId === id);
+    const assignedProducts = products.filter((p) => supIds.has(p.supplierId));
     if (assignedProducts.length > 0) {
       return {
         success: false,
@@ -106,15 +110,17 @@ class SupplierService {
       };
     }
 
-    const filtered = suppliers.filter((s) => s.id !== id);
+    const filtered = suppliers.filter((s) => s.id !== id && s._id !== id);
     storageService.setItem(STORAGE_KEYS.SUPPLIERS, filtered);
 
     // Live sync to MongoDB Atlas
-    apiClient.delete(`/suppliers/${id}`).catch((err) => {
+    const targetId = supplier._id || supplier.id || id;
+    const syncPromise = apiClient.delete(`/suppliers/${targetId}`).catch((err) => {
       console.warn('[MongoDB Supplier delete notice]:', err.message);
+      return null;
     });
 
-    return { success: true, message: `Supplier "${supplier.name}" removed.` };
+    return { success: true, message: `Supplier "${supplier.name}" removed.`, syncPromise };
   }
 
   getSupplierPurchases(supplierId) {

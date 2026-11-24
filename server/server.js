@@ -50,26 +50,48 @@ app.use((req, res, next) => {
   next();
 });
 
+// Support Chrome Private Network Access (PNA) preflight so live HTTPS sites (e.g. GitHub Pages) can reach local/private backend cleanly
+app.use((req, res, next) => {
+  if (req.headers['access-control-request-private-network']) {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  }
+  next();
+});
+
 // High-speed response compression (Gzip / Deflate)
 app.use(compression());
 
-// CORS Configuration supporting multiple environments
-const rawClientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-const allowedOrigins = rawClientUrl.split(',').map((u) => u.trim());
+// CORS Configuration supporting multiple environments & GitHub Pages live deployment
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'https://saifulahnmsajed.github.io',
+  'https://mmdrismail.github.io',
+];
+const rawClientUrl = process.env.CLIENT_URL || '';
+const envOrigins = rawClientUrl.split(',').map((u) => u.trim()).filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow non-browser requests or matching origins, or wildcard in development
-      if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      // Allow non-browser requests, matching origins, github.io origins, or wildcard in development
+      if (
+        !origin ||
+        allowedOrigins.includes('*') ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.github.io') ||
+        process.env.NODE_ENV !== 'production'
+      ) {
         callback(null, true);
       } else {
         callback(new Error(`CORS policy violation: Origin '${origin}' is not authorized.`));
       }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'Expires'],
   })
 );
 

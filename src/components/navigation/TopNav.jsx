@@ -24,6 +24,8 @@ import {
   VolumeX,
   Keyboard,
   HelpCircle,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 
 export const TopNav = ({ onOpenMobileSidebar }) => {
@@ -33,7 +35,7 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
   const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const profileRef = useRef(null);
   const { currentUser, role, logout, demoLogin } = useAuth();
-  const { settings, toggleTheme } = useAppData();
+  const { settings, toggleTheme, syncState, syncNow, addToast } = useAppData();
   const navigate = useNavigate();
 
   // Global Keyboard Shortcuts (Ctrl+K for search, ? for help, Ctrl+Shift+D for dark mode)
@@ -122,6 +124,64 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
               <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
                 Ctrl K
               </kbd>
+            </button>
+
+            {/* Live MongoDB Sync Status Indicator */}
+            <button
+              type="button"
+              onClick={async () => {
+                await syncNow?.();
+                if (syncState?.isOnline === false) {
+                  addToast?.({
+                    title: 'MongoDB সংযোগ বিচ্ছিন্ন (Offline Mode)',
+                    message: 'আপনার লোকাল ব্যাকএন্ড সার্ভার (port 5000) চালু নেই। পরিবর্তনগুলো ব্রাউজারে সেভ থাকছে এবং সার্ভার সংযোগ পেলেই অটো সিঙ্ক হবে।',
+                    type: 'warning',
+                    duration: 5000,
+                  });
+                } else {
+                  addToast?.({
+                    title: 'MongoDB Atlas সিঙ্ক সম্পন্ন',
+                    message: 'সকল ডেটা ক্লাউডের সাথে সফলভাবে সিঙ্ক হয়েছে।',
+                    type: 'success',
+                  });
+                }
+              }}
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                syncState?.status === 'syncing'
+                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                  : syncState?.isOnline === false || syncState?.status === 'queued'
+                  ? 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+              }`}
+              title={
+                syncState?.lastError
+                  ? syncState.lastError
+                  : syncState?.isOnline === false
+                  ? 'Backend disconnected — Click to retry MongoDB sync'
+                  : 'Connected to live MongoDB Atlas — Click to force sync'
+              }
+            >
+              {syncState?.status === 'syncing' ? (
+                <RefreshCw className="h-3 w-3 animate-spin" />
+              ) : (
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    syncState?.isOnline === false || syncState?.status === 'queued'
+                      ? 'bg-red-500 animate-pulse'
+                      : 'bg-emerald-500'
+                  }`}
+                />
+              )}
+              <Database className="h-3 w-3" />
+              <span className="hidden lg:inline">
+                {syncState?.status === 'syncing'
+                  ? 'Syncing...'
+                  : syncState?.pendingCount > 0
+                  ? `Pending (${syncState.pendingCount})`
+                  : syncState?.isOnline === false
+                  ? 'Local Only'
+                  : 'MongoDB Live'}
+              </span>
             </button>
 
             {/* Audio Feedback Toggle */}

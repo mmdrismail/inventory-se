@@ -380,9 +380,20 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
 
   const handleSaveToRecord = () => {
     try {
-      if (isQuotation && sale?.id) {
+      const targetId = sale?._id || sale?.id;
+      if (isQuotation && targetId) {
+        const mappedItems = editableItems.map((it) => ({
+          productId: it.productId || null,
+          name: it.productName || it.name || 'Equipment Part',
+          productName: it.productName || it.name || 'Equipment Part',
+          description: it.description || '',
+          quantity: Number(it.quantity) || 1,
+          unit: it.unit || 'pc',
+          unitPrice: Number(it.unitPrice || it.rate || it.price) || 0,
+          lineTotal: Number(it.lineTotal) || 0,
+        }));
         const payload = {
-          ...effectiveSale,
+          customerId: sale.customerId || null,
           customerName: customerData.name,
           customerCompany: customerData.company,
           customerRole: customerData.role,
@@ -390,13 +401,15 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
           customerEmail: customerData.email,
           customerAddress: customerData.address,
           customerLocation: customerData.address,
-          items: editableItems,
+          items: mappedItems,
           subtotal: liveSubtotal,
           discount: discountVal,
+          tax: taxVal,
           totalAmount: liveGrandTotal,
           total: liveGrandTotal,
+          autoSaveCustomer: true,
         };
-        const res = updateQuotation(sale.id, payload);
+        const res = updateQuotation(targetId, payload);
         if (res && res.success !== false) {
           addToast({
             title: 'কোটেশন রেকর্ড আপডেট সম্পন্ন',
@@ -404,9 +417,18 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
             type: 'success',
           });
         }
-      } else if (sale?.id) {
+      } else if (targetId) {
+        const mappedItems = editableItems.map((it) => ({
+          productId: it.productId || 'custom',
+          productName: it.productName || it.name || 'Equipment Part',
+          sku: it.sku || '',
+          quantity: Number(it.quantity) || 1,
+          unit: it.unit || 'pc',
+          unitPrice: Number(it.unitPrice || it.rate || it.price) || 0,
+          lineTotal: Number(it.lineTotal) || 0,
+        }));
         const payload = {
-          ...effectiveSale,
+          customerId: sale.customerId || null,
           customerName: customerData.name,
           customerCompany: customerData.company,
           customerRole: customerData.role,
@@ -414,15 +436,17 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
           customerEmail: customerData.email,
           customerAddress: customerData.address,
           customerLocation: customerData.address,
-          items: editableItems,
+          items: mappedItems,
           subtotal: liveSubtotal,
           discount: discountVal,
+          tax: taxVal,
           totalAmount: liveGrandTotal,
           total: liveGrandTotal,
           paidAmount: paidVal,
           dueAmount: dueVal,
+          autoSaveCustomer: true,
         };
-        const res = updateSale(sale.id, payload, 'Sales Executive');
+        const res = updateSale(targetId, payload, 'Sales Executive');
         if (res && res.success !== false) {
           addToast({
             title: 'ইনভয়েস রেকর্ড আপডেট সম্পন্ন',
@@ -762,6 +786,12 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                       className="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
                     >
                       <option value="owner">কোম্পানির মালিক / স্বত্বাধিকারী (Owner)</option>
+                      <option value="agent">কোম্পানির প্রতিনিধি / এজেন্ট (Agent)</option>
+                      <option value="purchaser">ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার (Purchaser)</option>
+                      <option value="supplier_rep">সরবরাহকারী / ভেন্ডর প্রতিনিধি (Supplier Rep)</option>
+                      <option value="wholesale">পাইকারি ডিলার (Wholesale)</option>
+                      <option value="retail">সাধারণ খুচরা ক্রেতা (Retail)</option>
+                      <option value="manager">ম্যানেজার / ফ্যাক্টরি ইনচার্জ (Manager)</option>
                       <option value="managing_director">ম্যানেজিং ডিরেক্টর / এমডি (MD)</option>
                       <option value="purchase_manager">পারচেজ ম্যানেজার (Purchase Manager)</option>
                       <option value="project_director">প্রজেক্ট ডিরেক্টর (Project Director)</option>

@@ -8,11 +8,12 @@ class CustomerService {
 
   getById(id) {
     const customers = this.getAll();
-    return customers.find((c) => c.id === id) || null;
+    return customers.find((c) => c.id === id || c._id === id) || null;
   }
 
   create(data) {
     const customers = this.getAll();
+    const now = new Date().toISOString();
     const newCustomer = {
       ...data,
       id: data.id || `cust-${Date.now()}`,
@@ -32,43 +33,54 @@ class CustomerService {
       totalSales: Number(data.totalSales) || 0,
       totalPaid: Number(data.totalPaid) || 0,
       notes: (data.notes || '').trim(),
-      createdAt: data.createdAt || new Date().toISOString(),
+      createdAt: data.createdAt || now,
+      updatedAt: now,
     };
 
     customers.unshift(newCustomer);
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, customers);
 
     // Live sync to MongoDB Atlas with full corporate profile
-    apiClient.post('/customers', {
-      name: newCustomer.name,
-      companyName: newCustomer.companyName,
-      designationRole: newCustomer.designationRole,
-      phone: newCustomer.phone,
-      companyPhone: newCustomer.companyPhone,
-      email: newCustomer.email,
-      address: newCustomer.address,
-      location: newCustomer.location,
-      city: newCustomer.city,
-      customerType: newCustomer.customerType,
-      type: newCustomer.type,
-      totalDue: newCustomer.totalDue,
-      balance: newCustomer.balance,
-      notes: newCustomer.notes,
-    }).then((res) => {
-      if (res?.data?._id) {
-        const cur = storageService.getItem(STORAGE_KEYS.CUSTOMERS, []);
-        const idx = cur.findIndex((c) => c.name === newCustomer.name);
-        if (idx !== -1) {
-          cur[idx].id = res.data._id;
-          cur[idx]._id = res.data._id;
-          storageService.setItem(STORAGE_KEYS.CUSTOMERS, cur);
+    const syncPromise = apiClient
+      .post(
+        '/customers',
+        {
+          id: newCustomer.id,
+          name: newCustomer.name,
+          companyName: newCustomer.companyName,
+          designationRole: newCustomer.designationRole,
+          phone: newCustomer.phone,
+          companyPhone: newCustomer.companyPhone,
+          email: newCustomer.email,
+          address: newCustomer.address,
+          location: newCustomer.location,
+          city: newCustomer.city,
+          customerType: newCustomer.customerType,
+          type: newCustomer.type,
+          totalDue: newCustomer.totalDue,
+          balance: newCustomer.balance,
+          notes: newCustomer.notes,
+        },
+        { tempId: newCustomer.id, storageKey: STORAGE_KEYS.CUSTOMERS }
+      )
+      .then((res) => {
+        if (res?.data?._id) {
+          const cur = storageService.getItem(STORAGE_KEYS.CUSTOMERS, []);
+          const idx = cur.findIndex((c) => c.id === newCustomer.id || c.name === newCustomer.name);
+          if (idx !== -1) {
+            cur[idx].id = res.data._id;
+            cur[idx]._id = res.data._id;
+            storageService.setItem(STORAGE_KEYS.CUSTOMERS, cur);
+          }
         }
-      }
-    }).catch((err) => {
-      console.warn('[MongoDB Customer sync]:', err.message);
-    });
+        return res;
+      })
+      .catch((err) => {
+        console.warn('[MongoDB Customer sync]:', err.message);
+        return null;
+      });
 
-    return { success: true, customer: newCustomer };
+    return { success: true, customer: newCustomer, syncPromise };
   }
 
   update(id, updates) {
@@ -78,33 +90,57 @@ class CustomerService {
       return { success: false, message: 'Customer not found.' };
     }
 
-    customers[index] = {
+    const updatedRecord = {
       ...customers[index],
       ...updates,
       updatedAt: new Date().toISOString(),
     };
+    customers[index] = updatedRecord;
 
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, customers);
 
     // Live sync to MongoDB Atlas
-    const targetId = customers[index]._id || customers[index].id || id;
-    apiClient.put(`/customers/${targetId}`, updates).catch((err) => {
-      console.warn('[MongoDB Customer update notice]:', err.message);
-    });
+    const targetId = updatedRecord._id || updatedRecord.id || id;
+    const payload = { ...updates };
+    // Ensure backend fallback resolution has name/phone if temp ID is used
+    if (!/^[a-f\d]{24}$/i.test(String(targetId))) {
+      if (payload.name === undefined) payload.name = updatedRecord.name;
+      if (payload.phone === undefined && updatedRecord.phone) payload.phone = updatedRecord.phone;
+    }
 
-    return { success: true, customer: customers[index] };
+    const syncPromise = apiClient
+      .put(`/customers/${targetId}`, payload)
+      .then((res) => {
+        if (res?.data?._id) {
+          const cur = storageService.getItem(STORAGE_KEYS.CUSTOMERS, []);
+          const curIdx = cur.findIndex((c) => c.id === targetId || c._id === targetId || c._id === res.data._id);
+          if (curIdx !== -1) {
+            cur[curIdx] = { ...cur[curIdx], ...res.data, id: res.data._id, _id: res.data._id };
+            storageService.setItem(STORAGE_KEYS.CUSTOMERS, cur);
+          }
+        }
+        return res;
+      })
+      .catch((err) => {
+        console.warn('[MongoDB Customer update notice]:', err.message);
+        return null;
+      });
+
+    return { success: true, customer: updatedRecord, syncPromise };
   }
 
   remove(id) {
     const customers = this.getAll();
-    const customer = customers.find((c) => c.id === id);
+    const customer = customers.find((c) => c.id === id || c._id === id);
     if (!customer) {
       return { success: false, message: 'Customer not found.' };
     }
 
+    const custIds = new Set([customer.id, customer._id, id].filter(Boolean));
+
     // Safety check: sales history
     const sales = storageService.getItem(STORAGE_KEYS.SALES, []);
-    const customerSales = sales.filter((s) => s.customerId === id);
+    const customerSales = sales.filter((s) => custIds.has(s.customerId));
     if (customerSales.length > 0) {
       return {
         success: false,
@@ -114,7 +150,7 @@ class CustomerService {
 
     // Safety check: order history
     const orders = storageService.getItem(STORAGE_KEYS.ORDERS, []);
-    const customerOrders = orders.filter((o) => o.customerId === id);
+    const customerOrders = orders.filter((o) => custIds.has(o.customerId));
     if (customerOrders.length > 0) {
       return {
         success: false,
@@ -122,15 +158,17 @@ class CustomerService {
       };
     }
 
-    const filtered = customers.filter((c) => c.id !== id);
+    const filtered = customers.filter((c) => c.id !== id && c._id !== id);
     storageService.setItem(STORAGE_KEYS.CUSTOMERS, filtered);
 
     // Live sync to MongoDB Atlas
-    apiClient.delete(`/customers/${id}`).catch((err) => {
+    const targetId = customer._id || customer.id || id;
+    const syncPromise = apiClient.delete(`/customers/${targetId}`).catch((err) => {
       console.warn('[MongoDB Customer delete notice]:', err.message);
+      return null;
     });
 
-    return { success: true, message: `Customer "${customer.name}" removed.` };
+    return { success: true, message: `Customer "${customer.name}" removed.`, syncPromise };
   }
 
   getCustomerSales(customerId) {
@@ -170,17 +208,28 @@ class CustomerService {
     if (existing) {
       const updates = {
         name: data.name.trim(),
-        companyName: (data.companyName && data.companyName.trim()) ? data.companyName.trim() : (existing.companyName || ''),
-        designationRole: (data.designationRole && data.designationRole !== 'owner') ? data.designationRole : (data.customerRole || existing.designationRole || 'owner'),
-        phone: (data.phone && data.phone.trim()) ? data.phone.trim() : (existing.phone || ''),
-        companyPhone: (data.companyPhone && data.companyPhone.trim()) ? data.companyPhone.trim() : (existing.companyPhone || existing.phone || ''),
-        email: (data.email && data.email.trim()) ? data.email.trim() : (existing.email || ''),
-        address: (data.address && data.address.trim()) ? data.address.trim() : (existing.address || ''),
-        location: (data.location && data.location.trim()) ? data.location.trim() : (existing.location || existing.address || data.address || ''),
+        companyName: data.companyName !== undefined && data.companyName.trim() ? data.companyName.trim() : (existing.companyName || ''),
+        designationRole:
+          data.designationRole !== undefined
+            ? data.designationRole
+            : data.customerRole !== undefined
+            ? data.customerRole
+            : existing.designationRole || 'owner',
+        phone: data.phone !== undefined && data.phone.trim() ? data.phone.trim() : (existing.phone || ''),
+        companyPhone:
+          data.companyPhone !== undefined && data.companyPhone.trim()
+            ? data.companyPhone.trim()
+            : existing.companyPhone || data.phone || existing.phone || '',
+        email: data.email !== undefined && data.email.trim() ? data.email.trim() : (existing.email || ''),
+        address: data.address !== undefined && data.address.trim() ? data.address.trim() : (existing.address || ''),
+        location:
+          data.location !== undefined && data.location.trim()
+            ? data.location.trim()
+            : existing.location || existing.address || data.address || '',
         customerType: data.customerType || existing.customerType || 'Retail',
       };
-      this.update(existing.id || existing._id, updates);
-      return { ...existing, ...updates };
+      const res = this.update(existing._id || existing.id, updates);
+      return { ...(res.customer || { ...existing, ...updates }), _syncPromise: res.syncPromise };
     } else {
       const res = this.create({
         name: data.name.trim(),
@@ -197,7 +246,7 @@ class CustomerService {
         totalDue: 0,
         balance: 0,
       });
-      return res.customer;
+      return { ...res.customer, _syncPromise: res.syncPromise };
     }
   }
 
@@ -207,14 +256,14 @@ class CustomerService {
   updateFinancials(customerId, totalAmount = 0, paidAmount = 0, dueAmount = 0) {
     if (!customerId) return;
     const customers = this.getAll();
-    const customer = customers.find((c) => c.id === customerId);
+    const customer = customers.find((c) => c.id === customerId || c._id === customerId);
     if (!customer) return;
 
     const newSales = (Number(customer.totalSales) || 0) + Number(totalAmount);
     const newPaid = (Number(customer.totalPaid) || 0) + Number(paidAmount);
     const newDue = (Number(customer.totalDue) || 0) + Number(dueAmount);
 
-    this.update(customerId, {
+    return this.update(customer._id || customer.id, {
       totalSales: newSales,
       totalPaid: newPaid,
       totalDue: newDue,

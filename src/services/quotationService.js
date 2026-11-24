@@ -57,6 +57,7 @@ class QuotationService {
 
     // Auto-upsert customer if customer information provided and autoSave is enabled
     let customerId = data.customerId;
+    let custSyncPromise = null;
 
     if (
       data.autoSaveCustomer !== false &&
@@ -75,15 +76,17 @@ class QuotationService {
         location: data.customerLocation || data.customerAddress,
       });
       if (cust && (cust.id || cust._id)) {
-        customerId = cust.id || cust._id;
+        customerId = cust._id || cust.id;
+        custSyncPromise = cust._syncPromise;
       }
     }
 
+    const now = new Date().toISOString();
     const newQuotation = {
       ...data,
       id: `quote-${Date.now()}`,
       quotationNumber,
-      date: data.date || new Date().toISOString(),
+      date: data.date || now,
       validUntil: data.validUntil || new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
       requisitionRef: data.requisitionRef?.trim() || '',
       customerId: customerId || null,
@@ -99,53 +102,68 @@ class QuotationService {
       discount,
       tax,
       totalAmount,
-      status: data.status || 'draft', // 'draft', 'sent', 'approved', 'rejected', 'converted'
-      termsAndConditions: data.termsAndConditions || '১. সকল মালামাল প্রাপ্যতা সাপেক্ষে সরবরাহ করা হইবে।\n২. ডেলিভারি সময়: কার্যাদেশ প্রাপ্তির ৩ কার্যদিবসের মধ্যে।\n৩. এই কোটেশনের মেয়াদ জারির তারিখ হইতে ১৫ দিন পর্যন্ত বৈধ।',
+      status: data.status || 'draft',
+      termsAndConditions:
+        data.termsAndConditions ||
+        '১. সকল মালামাল প্রাপ্যতা সাপেক্ষে সরবরাহ করা হইবে।\n২. ডেলিভারি সময়: কার্যাদেশ প্রাপ্তির ৩ কার্যদিবসের মধ্যে।\n৩. এই কোটেশনের মেয়াদ জারির তারিখ হইতে ১৫ দিন পর্যন্ত বৈধ।',
       notes: data.notes?.trim() || '',
       preparedBy,
       convertedSaleId: null,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     quotes.unshift(newQuotation);
     storageService.setItem(STORAGE_KEYS.QUOTATIONS, quotes);
 
     // Live sync to MongoDB Atlas
-    apiClient.post('/quotations', {
-      quotationNumber: newQuotation.quotationNumber,
-      date: newQuotation.date,
-      validUntil: newQuotation.validUntil,
-      requisitionRef: newQuotation.requisitionRef,
-      customerId: newQuotation.customerId,
-      customerName: newQuotation.customerName,
-      customerCompany: newQuotation.customerCompany,
-      customerRole: newQuotation.customerRole,
-      customerPhone: newQuotation.customerPhone,
-      customerEmail: newQuotation.customerEmail,
-      customerAddress: newQuotation.customerAddress,
-      items: newQuotation.items,
-      subtotal: newQuotation.subtotal,
-      discount: newQuotation.discount,
-      tax: newQuotation.tax,
-      totalAmount: newQuotation.totalAmount,
-      status: newQuotation.status,
-      termsAndConditions: newQuotation.termsAndConditions,
-      notes: newQuotation.notes,
-    }).then((res) => {
-      if (res?.data?._id) {
-        const cur = storageService.getItem(STORAGE_KEYS.QUOTATIONS, []);
-        const idx = cur.findIndex((q) => q.id === newQuotation.id);
-        if (idx !== -1) {
-          cur[idx].id = res.data._id;
-          cur[idx]._id = res.data._id;
-          storageService.setItem(STORAGE_KEYS.QUOTATIONS, cur);
+    const syncPromise = Promise.resolve(custSyncPromise)
+      .then((custRes) => {
+        const resolvedCustId = custRes?.data?._id || newQuotation.customerId;
+        return apiClient.post(
+          '/quotations',
+          {
+            quotationNumber: newQuotation.quotationNumber,
+            date: newQuotation.date,
+            validUntil: newQuotation.validUntil,
+            requisitionRef: newQuotation.requisitionRef,
+            customerId: resolvedCustId,
+            customerName: newQuotation.customerName,
+            customerCompany: newQuotation.customerCompany,
+            customerRole: newQuotation.customerRole,
+            customerPhone: newQuotation.customerPhone,
+            customerEmail: newQuotation.customerEmail,
+            customerAddress: newQuotation.customerAddress,
+            items: newQuotation.items,
+            subtotal: newQuotation.subtotal,
+            discount: newQuotation.discount,
+            tax: newQuotation.tax,
+            totalAmount: newQuotation.totalAmount,
+            status: newQuotation.status,
+            termsAndConditions: newQuotation.termsAndConditions,
+            notes: newQuotation.notes,
+          },
+          { tempId: newQuotation.id, storageKey: STORAGE_KEYS.QUOTATIONS }
+        );
+      })
+      .then((res) => {
+        if (res?.data?._id) {
+          const cur = storageService.getItem(STORAGE_KEYS.QUOTATIONS, []);
+          const idx = cur.findIndex((q) => q.id === newQuotation.id);
+          if (idx !== -1) {
+            cur[idx].id = res.data._id;
+            cur[idx]._id = res.data._id;
+            storageService.setItem(STORAGE_KEYS.QUOTATIONS, cur);
+          }
         }
-      }
-    }).catch((err) => {
-      console.warn('[MongoDB Quotation sync]:', err.message);
-    });
+        return res;
+      })
+      .catch((err) => {
+        console.warn('[MongoDB Quotation sync]:', err.message);
+        return null;
+      });
 
-    return { success: true, quotation: newQuotation };
+    return { success: true, quotation: newQuotation, syncPromise };
   }
 
   update(id, updates) {
@@ -155,37 +173,73 @@ class QuotationService {
       return { success: false, message: 'Quotation not found.' };
     }
 
-    quotes[index] = {
-      ...quotes[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
+    const cleanUpdates = { ...updates };
+    delete cleanUpdates._id;
+    delete cleanUpdates.__v;
+    delete cleanUpdates.createdAt;
+    delete cleanUpdates.id;
 
-    if (
-      updates.autoSaveCustomer !== false &&
-      updates.customerName &&
-      updates.customerName.trim() &&
-      !isGenericClientName(updates.customerName)
-    ) {
-      customerService.upsertCustomer({
-        id: quotes[index].customerId,
-        name: updates.customerName,
-        companyName: updates.customerCompany,
-        designationRole: updates.customerRole,
-        phone: updates.customerPhone,
-        email: updates.customerEmail,
-        address: updates.customerAddress,
-        location: updates.customerLocation || updates.customerAddress,
+    if (cleanUpdates.items && Array.isArray(cleanUpdates.items)) {
+      cleanUpdates.items = cleanUpdates.items.map((it) => {
+        const qty = Number(it.quantity) || 1;
+        const rate = Number(it.unitPrice || it.rate || it.price) || 0;
+        const total = Number(it.lineTotal || it.amount || qty * rate) || 0;
+        return {
+          ...it,
+          productId: it.productId || null,
+          name: it.name || it.productName || 'Equipment Part',
+          description: it.description || '',
+          quantity: qty,
+          unit: it.unit || 'pc',
+          unitPrice: rate,
+          lineTotal: total,
+        };
       });
     }
 
+    let custSyncPromise = null;
+    if (
+      cleanUpdates.autoSaveCustomer !== false &&
+      cleanUpdates.customerName &&
+      cleanUpdates.customerName.trim() &&
+      !isGenericClientName(cleanUpdates.customerName)
+    ) {
+      const cust = customerService.upsertCustomer({
+        id: quotes[index].customerId,
+        name: cleanUpdates.customerName,
+        companyName: cleanUpdates.customerCompany,
+        designationRole: cleanUpdates.customerRole,
+        phone: cleanUpdates.customerPhone,
+        email: cleanUpdates.customerEmail,
+        address: cleanUpdates.customerAddress,
+        location: cleanUpdates.customerLocation || cleanUpdates.customerAddress,
+      });
+      if (cust && (cust.id || cust._id)) {
+        cleanUpdates.customerId = cust._id || cust.id;
+        custSyncPromise = cust._syncPromise;
+      }
+    }
+
+    quotes[index] = {
+      ...quotes[index],
+      ...cleanUpdates,
+      updatedAt: new Date().toISOString(),
+    };
+
     storageService.setItem(STORAGE_KEYS.QUOTATIONS, quotes);
 
-    apiClient.put(`/quotations/${id}`, updates).catch((err) => {
-      console.warn('[MongoDB Quotation update notice]:', err.message);
-    });
+    const targetId = quotes[index]._id || quotes[index].id || id;
+    const syncPromise = Promise.allSettled([
+      custSyncPromise,
+      apiClient.put(`/quotations/${targetId}`, cleanUpdates),
+    ])
+      .then(([, qRes]) => qRes?.value || null)
+      .catch((err) => {
+        console.warn('[MongoDB Quotation update notice]:', err.message);
+        return null;
+      });
 
-    return { success: true, quotation: quotes[index] };
+    return { success: true, quotation: quotes[index], syncPromise };
   }
 
   remove(id) {
@@ -198,11 +252,13 @@ class QuotationService {
     const filtered = quotes.filter((q) => q.id !== id && q._id !== id);
     storageService.setItem(STORAGE_KEYS.QUOTATIONS, filtered);
 
-    apiClient.delete(`/quotations/${id}`).catch((err) => {
+    const targetId = quote._id || quote.id || id;
+    const syncPromise = apiClient.delete(`/quotations/${targetId}`).catch((err) => {
       console.warn('[MongoDB Quotation delete notice]:', err.message);
+      return null;
     });
 
-    return { success: true, message: `Quotation ${quote.quotationNumber} removed.` };
+    return { success: true, message: `Quotation ${quote.quotationNumber} removed.`, syncPromise };
   }
 }
 

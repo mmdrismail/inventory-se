@@ -4,6 +4,7 @@ const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
 const Customer = require('../models/Customer');
 const Quotation = require('../models/Quotation');
+const { recalculateCustomerFinancials } = require('./customerController');
 
 // Safe query helper supporting MongoDB ObjectId, custom String ID, or Invoice Number
 const findSaleQuery = (id) => {
@@ -225,15 +226,13 @@ exports.createSale = async (req, res, next) => {
       } catch (err) {
         console.warn('Customer auto-create warning:', err.message);
       }
-    } else if (activeCustomer && isCompleted) {
-      activeCustomer.totalSales = (activeCustomer.totalSales || 0) + totalVal;
-      activeCustomer.totalPaid = (activeCustomer.totalPaid || 0) + paidVal;
-      activeCustomer.totalDue = (activeCustomer.totalDue || 0) + dueVal;
-      activeCustomer.balance = activeCustomer.totalDue;
-      if (req.body.customerCompany) activeCustomer.companyName = req.body.customerCompany;
+    } else if (activeCustomer) {
+      if (req.body.customerCompany !== undefined && req.body.customerCompany.trim()) activeCustomer.companyName = req.body.customerCompany.trim();
       if (req.body.customerRole) activeCustomer.designationRole = req.body.customerRole;
-      if (req.body.customerPhone) activeCustomer.phone = req.body.customerPhone;
-      if (req.body.customerAddress) activeCustomer.address = req.body.customerAddress;
+      if (req.body.customerPhone !== undefined && req.body.customerPhone.trim()) activeCustomer.phone = req.body.customerPhone.trim();
+      if (req.body.customerEmail !== undefined && req.body.customerEmail.trim()) activeCustomer.email = req.body.customerEmail.trim();
+      if (req.body.customerAddress !== undefined && req.body.customerAddress.trim()) activeCustomer.address = req.body.customerAddress.trim();
+      if (req.body.customerLocation !== undefined && req.body.customerLocation.trim()) activeCustomer.location = req.body.customerLocation.trim();
       await activeCustomer.save();
     }
 
@@ -263,6 +262,10 @@ exports.createSale = async (req, res, next) => {
       cashierName: req.user ? req.user.name : 'Cashier Staff',
       notes: notes || '',
     });
+
+    if (activeCustomerId) {
+      await recalculateCustomerFinancials(activeCustomerId);
+    }
 
     if (req.body.quotationId) {
       try {
@@ -299,8 +302,15 @@ exports.updateSale = async (req, res, next) => {
       });
     }
 
-    if (req.body.items && Array.isArray(req.body.items)) {
-      req.body.items = req.body.items.map((it) => {
+    const prevCustomerId = sale.customerId;
+    const updates = { ...req.body };
+    delete updates._id;
+    delete updates.__v;
+    delete updates.createdAt;
+    delete updates.id;
+
+    if (updates.items && Array.isArray(updates.items)) {
+      updates.items = updates.items.map((it) => {
         const quantity = Number(it.quantity) || 1;
         const unitPrice = Number(it.unitPrice !== undefined ? it.unitPrice : (it.price !== undefined ? it.price : it.sellingPrice)) || 0;
         const lineTotal = Number(it.lineTotal !== undefined ? it.lineTotal : (it.subtotal !== undefined ? it.subtotal : (it.total !== undefined ? it.total : quantity * unitPrice))) || 0;
@@ -316,18 +326,55 @@ exports.updateSale = async (req, res, next) => {
     }
 
     // Auto-recalculate financial balances if totals are updated
-    if (req.body.totalAmount !== undefined || req.body.total !== undefined) {
-      const tot = Number(req.body.totalAmount !== undefined ? req.body.totalAmount : req.body.total) || 0;
-      const paid = Number(req.body.paidAmount !== undefined ? req.body.paidAmount : sale.paidAmount) || 0;
-      req.body.totalAmount = tot;
-      req.body.total = tot;
-      req.body.dueAmount = Math.max(0, tot - paid);
+    if (updates.totalAmount !== undefined || updates.total !== undefined) {
+      const tot = Number(updates.totalAmount !== undefined ? updates.totalAmount : updates.total) || 0;
+      const paid = Number(updates.paidAmount !== undefined ? updates.paidAmount : sale.paidAmount) || 0;
+      updates.totalAmount = tot;
+      updates.total = tot;
+      updates.dueAmount = Math.max(0, tot - paid);
     }
 
-    const updated = await Sale.findOneAndUpdate(saleQuery, req.body, {
+    // Resolve and update linked Customer profile directly on backend as well
+    const custName = updates.customerName || sale.customerName;
+    if (updates.autoSaveCustomer !== false && custName && custName.trim() && custName !== 'Walk-in Retail Customer') {
+      let targetCustomer = null;
+      const candidateCustId = updates.customerId !== undefined ? updates.customerId : sale.customerId;
+      if (candidateCustId && mongoose.Types.ObjectId.isValid(candidateCustId)) {
+        targetCustomer = await Customer.findById(candidateCustId);
+      }
+      if (!targetCustomer && updates.customerPhone && updates.customerPhone.trim()) {
+        targetCustomer = await Customer.findOne({ phone: updates.customerPhone.trim() });
+      }
+      if (!targetCustomer) {
+        const escapedName = custName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        targetCustomer = await Customer.findOne({ name: new RegExp(`^${escapedName}$`, 'i') });
+      }
+
+      if (targetCustomer) {
+        if (updates.customerName !== undefined) targetCustomer.name = updates.customerName.trim();
+        if (updates.customerCompany !== undefined) targetCustomer.companyName = updates.customerCompany.trim();
+        if (updates.customerRole !== undefined) targetCustomer.designationRole = updates.customerRole;
+        if (updates.customerPhone !== undefined) targetCustomer.phone = updates.customerPhone.trim();
+        if (updates.customerEmail !== undefined) targetCustomer.email = updates.customerEmail.trim();
+        if (updates.customerAddress !== undefined) targetCustomer.address = updates.customerAddress.trim();
+        if (updates.customerLocation !== undefined) targetCustomer.location = updates.customerLocation.trim();
+        await targetCustomer.save();
+        updates.customerId = targetCustomer._id;
+      }
+    }
+
+    const updated = await Sale.findOneAndUpdate(saleQuery, updates, {
       new: true,
       runValidators: true,
     });
+
+    // Recalculate financials for previous and current linked customer
+    if (prevCustomerId && String(prevCustomerId) !== String(updated.customerId)) {
+      await recalculateCustomerFinancials(prevCustomerId);
+    }
+    if (updated.customerId) {
+      await recalculateCustomerFinancials(updated.customerId);
+    }
 
     res.json({
       success: true,
@@ -363,6 +410,7 @@ exports.cancelSale = async (req, res, next) => {
     // If sale was completed, restore stock
     if (sale.status === 'completed') {
       for (const item of sale.items) {
+        if (!item.productId || !mongoose.Types.ObjectId.isValid(item.productId)) continue;
         const prod = await Product.findById(item.productId);
         if (prod) {
           const newQty = prod.quantity + Number(item.quantity);
@@ -384,6 +432,10 @@ exports.cancelSale = async (req, res, next) => {
 
     sale.status = 'cancelled';
     await sale.save();
+
+    if (sale.customerId) {
+      await recalculateCustomerFinancials(sale.customerId);
+    }
 
     res.json({
       success: true,

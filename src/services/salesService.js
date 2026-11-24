@@ -32,12 +32,21 @@ class SalesService {
     const sales = this.getAll();
     const { subtotal, discount, total } = calculateSaleTotals(saleData.items || [], saleData.discount);
     const totalVal = total;
-    let paidVal = Number(saleData.paidAmount !== undefined ? saleData.paidAmount : (saleData.paymentStatus === 'paid' ? totalVal : (saleData.paymentStatus === 'due' ? 0 : 0)));
+    let paidVal = Number(
+      saleData.paidAmount !== undefined
+        ? saleData.paidAmount
+        : saleData.paymentStatus === 'paid'
+        ? totalVal
+        : saleData.paymentStatus === 'due'
+        ? 0
+        : 0
+    );
     if (saleData.paymentStatus === 'paid') paidVal = totalVal;
     const dueVal = Math.max(0, totalVal - paidVal);
 
     // Auto-upsert customer profile if details provided and not generic
     let customerId = saleData.customerId;
+    let custSyncPromise = null;
     if (
       saleData.autoSaveCustomer !== false &&
       saleData.customerName &&
@@ -55,7 +64,8 @@ class SalesService {
         location: saleData.customerLocation || saleData.customerAddress,
       });
       if (cust && (cust.id || cust._id)) {
-        customerId = cust.id || cust._id;
+        customerId = cust._id || cust.id;
+        custSyncPromise = cust._syncPromise;
       }
     }
 
@@ -65,29 +75,39 @@ class SalesService {
       customerService.updateFinancials(customerId, totalVal, paidVal, dueVal);
     }
 
+    const now = new Date().toISOString();
+    const invNo =
+      saleData.invoiceNo?.trim() ||
+      saleData.invoiceNumber?.trim() ||
+      `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const newSale = {
       ...saleData,
       id: `sal-${Date.now()}`,
-      invoiceNo: saleData.invoiceNo?.trim() || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNo: invNo,
+      invoiceNumber: invNo,
       customerId,
       customerName: saleData.customerName || 'Walk-in Retail Customer',
       customerCompany: saleData.customerCompany || '',
       customerRole: saleData.customerRole || 'owner',
       customerPhone: saleData.customerPhone || '',
+      customerEmail: saleData.customerEmail || '',
       customerAddress: saleData.customerAddress || '',
       customerLocation: saleData.customerLocation || '',
-      date: saleData.date || new Date().toISOString(),
+      date: saleData.date || now,
       status: saleData.status || 'completed',
       paymentStatus: saleData.paymentStatus || 'paid',
       subtotal,
       discount,
       total,
+      totalAmount: total,
       paidAmount: paidVal,
       dueAmount: dueVal,
       requisitionRef: saleData.requisitionRef || '',
       quotationId: saleData.quotationId || null,
       notes: saleData.notes?.trim() || '',
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     // If completed immediately, validate stock and deduct
@@ -101,40 +121,67 @@ class SalesService {
     sales.unshift(newSale);
     storageService.setItem(STORAGE_KEYS.SALES, sales);
 
-    // Live sync to MongoDB Atlas
-    apiClient.post('/sales', {
-      customerId: newSale.customerId,
-      items: (newSale.items || []).map((it) => ({
-        productId: it.productId || it.id,
-        productName: it.productName || it.name,
-        sku: it.sku,
-        quantity: Number(it.quantity) || 1,
-        unitPrice: Number(it.unitPrice || it.sellingPrice) || 0,
-        lineTotal: Number(it.lineTotal || it.subtotal || ((it.quantity || 1) * (it.unitPrice || it.sellingPrice || 0))) || 0,
-        subtotal: Number(it.subtotal || (it.quantity * it.unitPrice)) || 0,
-      })),
-      subtotal: newSale.subtotal,
-      discount: newSale.discount,
-      totalAmount: newSale.total,
-      paymentMethod: newSale.paymentMethod || 'cash',
-      paymentStatus: newSale.paymentStatus,
-      status: newSale.status,
-      notes: newSale.notes,
-    }).then((res) => {
-      if (res?.data?._id) {
-        const cur = storageService.getItem(STORAGE_KEYS.SALES, []);
-        const idx = cur.findIndex((s) => s.id === newSale.id);
-        if (idx !== -1) {
-          cur[idx].id = res.data._id;
-          cur[idx]._id = res.data._id;
-          storageService.setItem(STORAGE_KEYS.SALES, cur);
+    // Live sync to MongoDB Atlas (wait for customer upsert first if temp customer was created)
+    const syncPromise = Promise.resolve(custSyncPromise)
+      .then((custRes) => {
+        const resolvedCustId = custRes?.data?._id || newSale.customerId;
+        return apiClient.post(
+          '/sales',
+          {
+            invoiceNumber: newSale.invoiceNumber,
+            customerId: resolvedCustId,
+            customerName: newSale.customerName,
+            customerCompany: newSale.customerCompany,
+            customerRole: newSale.customerRole,
+            customerPhone: newSale.customerPhone,
+            customerEmail: newSale.customerEmail,
+            customerAddress: newSale.customerAddress,
+            customerLocation: newSale.customerLocation,
+            autoSaveCustomer: saleData.autoSaveCustomer !== false,
+            items: (newSale.items || []).map((it) => ({
+              productId: it.productId || it.id,
+              productName: it.productName || it.name,
+              sku: it.sku,
+              quantity: Number(it.quantity) || 1,
+              unitPrice: Number(it.unitPrice || it.sellingPrice) || 0,
+              lineTotal:
+                Number(it.lineTotal || it.subtotal || (it.quantity || 1) * (it.unitPrice || it.sellingPrice || 0)) || 0,
+              subtotal: Number(it.subtotal || it.quantity * it.unitPrice) || 0,
+            })),
+            subtotal: newSale.subtotal,
+            discount: newSale.discount,
+            totalAmount: newSale.total,
+            paidAmount: newSale.paidAmount,
+            dueAmount: newSale.dueAmount,
+            paymentMethod: newSale.paymentMethod || 'cash',
+            paymentStatus: newSale.paymentStatus,
+            status: newSale.status,
+            requisitionRef: newSale.requisitionRef,
+            quotationId: newSale.quotationId,
+            notes: newSale.notes,
+          },
+          { tempId: newSale.id, storageKey: STORAGE_KEYS.SALES }
+        );
+      })
+      .then((res) => {
+        if (res?.data?._id) {
+          const cur = storageService.getItem(STORAGE_KEYS.SALES, []);
+          const idx = cur.findIndex((s) => s.id === newSale.id);
+          if (idx !== -1) {
+            cur[idx].id = res.data._id;
+            cur[idx]._id = res.data._id;
+            if (res.data.customerId) cur[idx].customerId = res.data.customerId;
+            storageService.setItem(STORAGE_KEYS.SALES, cur);
+          }
         }
-      }
-    }).catch((err) => {
-      console.warn('[MongoDB Sales sync]:', err.message);
-    });
+        return res;
+      })
+      .catch((err) => {
+        console.warn('[MongoDB Sales sync]:', err.message);
+        return null;
+      });
 
-    return { success: true, sale: newSale };
+    return { success: true, sale: newSale, syncPromise };
   }
 
   /**
@@ -149,21 +196,28 @@ class SalesService {
 
     const existing = sales[index];
     const items = saleData.items || existing.items || [];
-    const { subtotal, discount, total } = calculateSaleTotals(items, saleData.discount !== undefined ? saleData.discount : existing.discount);
+    const { subtotal, discount, total } = calculateSaleTotals(
+      items,
+      saleData.discount !== undefined ? saleData.discount : existing.discount
+    );
     const totalVal = total;
-    let paidVal = Number(saleData.paidAmount !== undefined ? saleData.paidAmount : (saleData.paymentStatus === 'paid' ? totalVal : (saleData.paymentStatus === 'due' ? 0 : existing.paidAmount || 0)));
+    let paidVal = Number(
+      saleData.paidAmount !== undefined
+        ? saleData.paidAmount
+        : saleData.paymentStatus === 'paid'
+        ? totalVal
+        : saleData.paymentStatus === 'due'
+        ? 0
+        : existing.paidAmount || 0
+    );
     if (saleData.paymentStatus === 'paid') paidVal = totalVal;
     const dueVal = Math.max(0, totalVal - paidVal);
 
     // Auto-upsert customer profile if details provided
     let customerId = saleData.customerId !== undefined ? saleData.customerId : existing.customerId;
     const custName = saleData.customerName || existing.customerName;
-    if (
-      saleData.autoSaveCustomer !== false &&
-      custName &&
-      custName.trim() &&
-      !isGenericClientName(custName)
-    ) {
+    let custSyncPromise = null;
+    if (saleData.autoSaveCustomer !== false && custName && custName.trim() && !isGenericClientName(custName)) {
       const cust = customerService.upsertCustomer({
         id: customerId,
         name: custName,
@@ -175,7 +229,8 @@ class SalesService {
         location: saleData.customerLocation || saleData.customerAddress || existing.customerLocation,
       });
       if (cust && (cust.id || cust._id)) {
-        customerId = cust.id || cust._id;
+        customerId = cust._id || cust.id;
+        custSyncPromise = cust._syncPromise;
       }
     }
 
@@ -184,17 +239,19 @@ class SalesService {
       ...saleData,
       id: existing.id,
       _id: existing._id,
-      invoiceNo: existing.invoiceNo,
+      invoiceNo: existing.invoiceNo || existing.invoiceNumber,
+      invoiceNumber: existing.invoiceNumber || existing.invoiceNo,
       customerId,
       customerName: custName || 'Walk-in Retail Customer',
-      customerCompany: saleData.customerCompany !== undefined ? saleData.customerCompany : (existing.customerCompany || ''),
+      customerCompany: saleData.customerCompany !== undefined ? saleData.customerCompany : existing.customerCompany || '',
       customerRole: saleData.customerRole || existing.customerRole || 'owner',
-      customerPhone: saleData.customerPhone !== undefined ? saleData.customerPhone : (existing.customerPhone || ''),
-      customerAddress: saleData.customerAddress !== undefined ? saleData.customerAddress : (existing.customerAddress || ''),
-      customerLocation: saleData.customerLocation !== undefined ? saleData.customerLocation : (existing.customerLocation || ''),
+      customerPhone: saleData.customerPhone !== undefined ? saleData.customerPhone : existing.customerPhone || '',
+      customerEmail: saleData.customerEmail !== undefined ? saleData.customerEmail : existing.customerEmail || '',
+      customerAddress: saleData.customerAddress !== undefined ? saleData.customerAddress : existing.customerAddress || '',
+      customerLocation: saleData.customerLocation !== undefined ? saleData.customerLocation : existing.customerLocation || '',
       items,
       subtotal,
-      discount: saleData.discount !== undefined ? Number(saleData.discount) : (existing.discount || 0),
+      discount: saleData.discount !== undefined ? Number(saleData.discount) : existing.discount || 0,
       total,
       totalAmount: total,
       paidAmount: paidVal,
@@ -208,36 +265,59 @@ class SalesService {
 
     // Live sync to MongoDB Atlas
     const mongoId = existing._id || existing.id;
+    let syncPromise = Promise.resolve(custSyncPromise);
     if (mongoId) {
-      apiClient.put(`/sales/${mongoId}`, {
-        customerId: updatedSale.customerId,
-        customerName: updatedSale.customerName,
-        customerCompany: updatedSale.customerCompany,
-        customerRole: updatedSale.customerRole,
-        customerPhone: updatedSale.customerPhone,
-        customerEmail: updatedSale.customerEmail,
-        customerAddress: updatedSale.customerAddress,
-        customerLocation: updatedSale.customerLocation,
-        items: (updatedSale.items || []).map((it) => ({
-          productId: it.productId || it.id,
-          productName: it.productName || it.name,
-          sku: it.sku,
-          quantity: Number(it.quantity) || 1,
-          unitPrice: Number(it.unitPrice || it.sellingPrice || it.price) || 0,
-          lineTotal: Number(it.lineTotal || (Number(it.quantity || 1) * Number(it.unitPrice || it.price || 0))) || 0,
-        })),
-        subtotal: updatedSale.subtotal,
-        discount: updatedSale.discount,
-        totalAmount: updatedSale.total,
-        paymentStatus: updatedSale.paymentStatus,
-        status: updatedSale.status,
-        notes: updatedSale.notes,
-      }).catch((err) => {
-        console.warn('[MongoDB Sales update sync]:', err.message);
-      });
+      syncPromise = Promise.allSettled([
+        custSyncPromise,
+        apiClient.put(`/sales/${mongoId}`, {
+          customerId: updatedSale.customerId,
+          customerName: updatedSale.customerName,
+          customerCompany: updatedSale.customerCompany,
+          customerRole: updatedSale.customerRole,
+          customerPhone: updatedSale.customerPhone,
+          customerEmail: updatedSale.customerEmail,
+          customerAddress: updatedSale.customerAddress,
+          customerLocation: updatedSale.customerLocation,
+          autoSaveCustomer: saleData.autoSaveCustomer !== false,
+          items: (updatedSale.items || []).map((it) => ({
+            productId: it.productId || it.id,
+            productName: it.productName || it.name,
+            sku: it.sku,
+            quantity: Number(it.quantity) || 1,
+            unitPrice: Number(it.unitPrice || it.sellingPrice || it.price) || 0,
+            lineTotal: Number(it.lineTotal || Number(it.quantity || 1) * Number(it.unitPrice || it.price || 0)) || 0,
+          })),
+          subtotal: updatedSale.subtotal,
+          discount: updatedSale.discount,
+          totalAmount: updatedSale.total,
+          paidAmount: updatedSale.paidAmount,
+          dueAmount: updatedSale.dueAmount,
+          paymentStatus: updatedSale.paymentStatus,
+          status: updatedSale.status,
+          showRate: updatedSale.showRate,
+          showLineTotal: updatedSale.showLineTotal,
+          showGrandTotal: updatedSale.showGrandTotal,
+          notes: updatedSale.notes,
+        }),
+      ])
+        .then(([, saleRes]) => {
+          if (saleRes?.status === 'fulfilled' && saleRes.value?.data?._id) {
+            const cur = storageService.getItem(STORAGE_KEYS.SALES, []);
+            const idx = cur.findIndex((s) => s.id === mongoId || s._id === mongoId);
+            if (idx !== -1) {
+              cur[idx] = { ...cur[idx], ...saleRes.value.data, id: saleRes.value.data._id, _id: saleRes.value.data._id };
+              storageService.setItem(STORAGE_KEYS.SALES, cur);
+            }
+          }
+          return saleRes?.value || null;
+        })
+        .catch((err) => {
+          console.warn('[MongoDB Sales update sync]:', err.message);
+          return null;
+        });
     }
 
-    return { success: true, sale: updatedSale };
+    return { success: true, sale: updatedSale, syncPromise };
   }
 
   /**
@@ -245,7 +325,7 @@ class SalesService {
    */
   completeSale(id, performedBy = 'Sales Executive') {
     const sales = this.getAll();
-    const index = sales.findIndex((s) => s.id === id);
+    const index = sales.findIndex((s) => s.id === id || s._id === id);
     if (index === -1) {
       return { success: false, message: 'Sale invoice not found.' };
     }
@@ -265,10 +345,17 @@ class SalesService {
 
     sale.status = 'completed';
     sale.completedAt = new Date().toISOString();
+    sale.updatedAt = new Date().toISOString();
     sales[index] = sale;
     storageService.setItem(STORAGE_KEYS.SALES, sales);
 
-    return { success: true, sale };
+    const mongoId = sale._id || sale.id;
+    const syncPromise = apiClient.put(`/sales/${mongoId}`, { status: 'completed' }).catch((err) => {
+      console.warn('[MongoDB completeSale sync]:', err.message);
+      return null;
+    });
+
+    return { success: true, sale, syncPromise };
   }
 
   /**
@@ -277,7 +364,7 @@ class SalesService {
    */
   cancelSale(id, performedBy = 'Admin') {
     const sales = this.getAll();
-    const index = sales.findIndex((s) => s.id === id);
+    const index = sales.findIndex((s) => s.id === id || s._id === id);
     if (index === -1) {
       return { success: false, message: 'Sale invoice not found.' };
     }
@@ -296,10 +383,17 @@ class SalesService {
 
     sale.status = 'cancelled';
     sale.cancelledAt = new Date().toISOString();
+    sale.updatedAt = new Date().toISOString();
     sales[index] = sale;
     storageService.setItem(STORAGE_KEYS.SALES, sales);
 
-    return { success: true, sale };
+    const mongoId = sale._id || sale.id;
+    const syncPromise = apiClient.put(`/sales/${mongoId}/cancel`, {}).catch((err) => {
+      console.warn('[MongoDB cancelSale sync]:', err.message);
+      return null;
+    });
+
+    return { success: true, sale, syncPromise };
   }
 }
 

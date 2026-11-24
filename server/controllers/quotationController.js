@@ -173,16 +173,71 @@ exports.createQuotation = async (req, res, next) => {
 // @access  Private
 exports.updateQuotation = async (req, res, next) => {
   try {
-    const updated = await Quotation.findOneAndUpdate(findQuotationQuery(req.params.id), req.body, {
-      new: true,
-      runValidators: true,
-    });
-    if (!updated) {
+    const query = findQuotationQuery(req.params.id);
+    const existing = await Quotation.findOne(query);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: 'Quotation not found.',
       });
     }
+
+    const updates = { ...req.body };
+    delete updates._id;
+    delete updates.__v;
+    delete updates.createdAt;
+    delete updates.id;
+
+    if (updates.items && Array.isArray(updates.items)) {
+      updates.items = updates.items.map((it) => {
+        const quantity = Number(it.quantity) || 1;
+        const unitPrice = Number(it.unitPrice || it.rate || it.price) || 0;
+        const lineTotal = Number(it.lineTotal || it.amount || quantity * unitPrice) || 0;
+        return {
+          productId: it.productId || null,
+          name: it.name || it.productName || 'Equipment Part',
+          description: it.description || '',
+          quantity,
+          unit: it.unit || 'pc',
+          unitPrice,
+          lineTotal,
+        };
+      });
+    }
+
+    // Also link & update customer profile in MongoDB if customer info is provided
+    const custName = updates.customerName || existing.customerName;
+    if (updates.autoSaveCustomer !== false && custName && custName.trim() && custName !== 'Direct Client' && custName !== 'Client Representative') {
+      let targetCustomer = null;
+      const candId = updates.customerId !== undefined ? updates.customerId : existing.customerId;
+      if (candId && mongoose.Types.ObjectId.isValid(candId)) {
+        targetCustomer = await Customer.findById(candId);
+      }
+      if (!targetCustomer && updates.customerPhone && updates.customerPhone.trim()) {
+        targetCustomer = await Customer.findOne({ phone: updates.customerPhone.trim() });
+      }
+      if (!targetCustomer) {
+        const escapedName = custName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        targetCustomer = await Customer.findOne({ name: new RegExp(`^${escapedName}$`, 'i') });
+      }
+      if (targetCustomer) {
+        if (updates.customerName !== undefined) targetCustomer.name = updates.customerName.trim();
+        if (updates.customerCompany !== undefined) targetCustomer.companyName = updates.customerCompany.trim();
+        if (updates.customerRole !== undefined) targetCustomer.designationRole = updates.customerRole;
+        if (updates.customerPhone !== undefined) targetCustomer.phone = updates.customerPhone.trim();
+        if (updates.customerEmail !== undefined) targetCustomer.email = updates.customerEmail.trim();
+        if (updates.customerAddress !== undefined) targetCustomer.address = updates.customerAddress.trim();
+        if (updates.customerLocation !== undefined) targetCustomer.location = updates.customerLocation.trim();
+        await targetCustomer.save();
+        updates.customerId = targetCustomer._id;
+      }
+    }
+
+    const updated = await Quotation.findByIdAndUpdate(existing._id, updates, {
+      new: true,
+      runValidators: true,
+    });
+
     res.json({
       success: true,
       message: 'Quotation updated successfully.',

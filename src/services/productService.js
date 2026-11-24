@@ -86,14 +86,14 @@ class ProductService {
 
   update(id, updates) {
     const products = this.getAll();
-    const index = products.findIndex((p) => p.id === id);
+    const index = products.findIndex((p) => p.id === id || p._id === id);
     if (index === -1) {
       return { success: false, message: 'Product not found.' };
     }
 
     // If SKU changed, check uniqueness
     if (updates.sku && updates.sku.trim().toLowerCase() !== products[index].sku.toLowerCase()) {
-      const skuExists = products.some((p) => p.id !== id && p.sku.toLowerCase() === updates.sku.trim().toLowerCase());
+      const skuExists = products.some((p) => (p.id !== id && p._id !== id) && p.sku.toLowerCase() === updates.sku.trim().toLowerCase());
       if (skuExists) {
         return { success: false, message: `Another product already has the SKU "${updates.sku}".` };
       }
@@ -113,21 +113,27 @@ class ProductService {
     storageService.setItem(STORAGE_KEYS.PRODUCTS, products);
 
     // Live sync to MongoDB Atlas backend
-    apiClient.put(`/products/${id}`, updates).catch(() => {});
+    const targetId = updatedProduct._id || updatedProduct.id || id;
+    const syncPromise = apiClient.put(`/products/${targetId}`, updates).catch((err) => {
+      console.warn('[MongoDB Product update notice]:', err.message);
+      return null;
+    });
 
-    return { success: true, product: updatedProduct };
+    return { success: true, product: updatedProduct, syncPromise };
   }
 
   remove(id) {
     const products = this.getAll();
-    const product = products.find((p) => p.id === id);
+    const product = products.find((p) => p.id === id || p._id === id);
     if (!product) {
       return { success: false, message: 'Product not found.' };
     }
 
+    const prodIds = new Set([product.id, product._id, id].filter(Boolean));
+
     // Safety check: is product referenced in purchases?
     const purchases = storageService.getItem(STORAGE_KEYS.PURCHASES, []);
-    const inPurchases = purchases.some((pur) => pur.items?.some((item) => item.productId === id));
+    const inPurchases = purchases.some((pur) => pur.items?.some((item) => prodIds.has(item.productId)));
     if (inPurchases) {
       return {
         success: false,
@@ -137,7 +143,7 @@ class ProductService {
 
     // Safety check: is product referenced in sales?
     const sales = storageService.getItem(STORAGE_KEYS.SALES, []);
-    const inSales = sales.some((sal) => sal.items?.some((item) => item.productId === id));
+    const inSales = sales.some((sal) => sal.items?.some((item) => prodIds.has(item.productId)));
     if (inSales) {
       return {
         success: false,
@@ -147,7 +153,7 @@ class ProductService {
 
     // Safety check: is product in open customer orders?
     const orders = storageService.getItem(STORAGE_KEYS.ORDERS, []);
-    const inOrders = orders.some((ord) => ord.items?.some((item) => item.productId === id));
+    const inOrders = orders.some((ord) => ord.items?.some((item) => prodIds.has(item.productId)));
     if (inOrders) {
       return {
         success: false,
@@ -155,13 +161,17 @@ class ProductService {
       };
     }
 
-    const filtered = products.filter((p) => p.id !== id);
+    const filtered = products.filter((p) => p.id !== id && p._id !== id);
     storageService.setItem(STORAGE_KEYS.PRODUCTS, filtered);
 
     // Live sync to MongoDB Atlas backend
-    apiClient.delete(`/products/${id}`).catch(() => {});
+    const targetId = product._id || product.id || id;
+    const syncPromise = apiClient.delete(`/products/${targetId}`).catch((err) => {
+      console.warn('[MongoDB Product delete notice]:', err.message);
+      return null;
+    });
 
-    return { success: true, message: `Product "${product.name}" deleted successfully.` };
+    return { success: true, message: `Product "${product.name}" deleted successfully.`, syncPromise };
   }
 
   importCSV(parsedRows, _performedBy = 'Admin') {

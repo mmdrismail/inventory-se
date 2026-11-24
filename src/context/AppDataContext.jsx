@@ -44,8 +44,9 @@ export const AppDataProvider = ({ children }) => {
   const [settings, setSettings] = useState(() => settingsService.getSettings());
   const [cart, setCart] = useState(() => storageService.getItem(STORAGE_KEYS.CART, []));
 
-  // UI state: Toasts and Confirm Modals
+  // UI & Live MongoDB Sync state
   const [toasts, setToasts] = useState([]);
+  const [syncState, setSyncState] = useState(() => apiClient.getSyncSnapshot());
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -56,33 +57,81 @@ export const AppDataProvider = ({ children }) => {
     onConfirm: null,
   });
 
+  // Two-way timestamp reconciliation: preserves & pushes newer localStorage edits (like offline updates) up to MongoDB
+  const reconcileAndPushNewerLocal = (localList, remoteList, pushFn) => {
+    const localMap = new Map();
+    for (const item of localList || []) {
+      const k = item._id || item.id;
+      if (k) localMap.set(String(k), item);
+    }
+
+    const pushPromises = [];
+    const merged = (remoteList || []).map((remote) => {
+      const rid = String(remote._id || remote.id);
+      const local = localMap.get(rid);
+      if (local && local.updatedAt && remote.updatedAt) {
+        const localTime = new Date(local.updatedAt).getTime();
+        const remoteTime = new Date(remote.updatedAt).getTime();
+        // If local item was updated > 2s more recently than MongoDB, push local edits UP to MongoDB!
+        if (!Number.isNaN(localTime) && !Number.isNaN(remoteTime) && localTime > remoteTime + 2000) {
+          if (typeof pushFn === 'function') {
+            pushPromises.push(pushFn(rid, local));
+          }
+          return { ...remote, ...local, id: rid, _id: rid };
+        }
+      }
+      return { ...remote, id: rid, _id: rid };
+    });
+
+    return { merged, pushPromises };
+  };
+
   // Synchronize state with MongoDB Atlas backend if online
-  const syncWithBackend = async () => {
+  const syncWithBackend = async (forceFresh = false) => {
     try {
+      // Do not overwrite local state while a mutation HTTP request is actively in-flight
+      if (apiClient.activeMutations > 0 && !forceFresh) {
+        return;
+      }
+
       const isUp = await apiClient.isBackendAvailable();
       if (!isUp) return;
 
-      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, ordsRes, setsRes, lotsRes] = await Promise.allSettled([
-        apiClient.get('/products'),
-        apiClient.get('/categories'),
-        apiClient.get('/suppliers'),
-        apiClient.get('/customers'),
-        apiClient.get('/purchases'),
-        apiClient.get('/sales'),
-        apiClient.get('/quotations'),
-        apiClient.get('/orders'),
-        apiClient.get('/settings'),
-        apiClient.get('/lots'),
-      ]);
+      // Flush any offline-queued mutations FIRST so MongoDB gets local updates before we pull!
+      if (apiClient.getPendingQueue().length > 0) {
+        await apiClient.flushPendingQueue();
+      }
+
+      const reqConfig = { bypassCache: true };
+      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, ordsRes, setsRes, lotsRes] =
+        await Promise.allSettled([
+          apiClient.get('/products', {}, reqConfig),
+          apiClient.get('/categories', {}, reqConfig),
+          apiClient.get('/suppliers', {}, reqConfig),
+          apiClient.get('/customers', {}, reqConfig),
+          apiClient.get('/purchases', {}, reqConfig),
+          apiClient.get('/sales', {}, reqConfig),
+          apiClient.get('/quotations', {}, reqConfig),
+          apiClient.get('/orders', {}, reqConfig),
+          apiClient.get('/settings', {}, reqConfig),
+          apiClient.get('/lots', {}, reqConfig),
+        ]);
+
+      // Skip applying stale fetch results if a new user mutation started mid-fetch
+      if (apiClient.activeMutations > 0) {
+        return;
+      }
 
       if (prodsRes.status === 'fulfilled' && prodsRes.value?.success && Array.isArray(prodsRes.value.data) && prodsRes.value.data.length > 0) {
-        const normalized = prodsRes.value.data.map((p) => ({
-          ...p,
-          id: p._id || p.id,
-          _id: p._id || p.id,
-        }));
-        setProducts(normalized);
-        storageService.setItem(STORAGE_KEYS.PRODUCTS, normalized);
+        const localProds = storageService.getItem(STORAGE_KEYS.PRODUCTS, []);
+        const { merged, pushPromises } = reconcileAndPushNewerLocal(
+          localProds,
+          prodsRes.value.data,
+          (id, item) => apiClient.put(`/products/${id}`, item).catch(() => null)
+        );
+        setProducts(merged);
+        storageService.setItem(STORAGE_KEYS.PRODUCTS, merged);
+        if (pushPromises.length > 0) await Promise.allSettled(pushPromises);
       }
 
       if (catsRes.status === 'fulfilled' && catsRes.value?.success && Array.isArray(catsRes.value.data) && catsRes.value.data.length > 0) {
@@ -111,13 +160,30 @@ export const AppDataProvider = ({ children }) => {
       }
 
       if (custsRes.status === 'fulfilled' && custsRes.value?.success && Array.isArray(custsRes.value.data) && custsRes.value.data.length > 0) {
-        const normalized = custsRes.value.data.map((c) => ({
-          ...c,
-          id: c._id || c.id,
-          _id: c._id || c.id,
-        }));
-        setCustomers(normalized);
-        storageService.setItem(STORAGE_KEYS.CUSTOMERS, normalized);
+        const localCusts = storageService.getItem(STORAGE_KEYS.CUSTOMERS, []);
+        const { merged, pushPromises } = reconcileAndPushNewerLocal(
+          localCusts,
+          custsRes.value.data,
+          (id, item) =>
+            apiClient
+              .put(`/customers/${id}`, {
+                name: item.name,
+                companyName: item.companyName,
+                designationRole: item.designationRole,
+                phone: item.phone,
+                companyPhone: item.companyPhone,
+                email: item.email,
+                address: item.address,
+                location: item.location,
+                city: item.city,
+                customerType: item.customerType,
+                notes: item.notes,
+              })
+              .catch(() => null)
+        );
+        setCustomers(merged);
+        storageService.setItem(STORAGE_KEYS.CUSTOMERS, merged);
+        if (pushPromises.length > 0) await Promise.allSettled(pushPromises);
       }
 
       if (pursRes.status === 'fulfilled' && pursRes.value?.success && Array.isArray(pursRes.value.data) && pursRes.value.data.length > 0) {
@@ -137,9 +203,10 @@ export const AppDataProvider = ({ children }) => {
       }
 
       if (salesRes.status === 'fulfilled' && salesRes.value?.success && Array.isArray(salesRes.value.data) && salesRes.value.data.length > 0) {
-        const normalized = salesRes.value.data.map((s) => {
+        const localSales = storageService.getItem(STORAGE_KEYS.SALES, []);
+        const rawNormalized = salesRes.value.data.map((s) => {
           const tot = Number(s.total !== undefined ? s.total : s.totalAmount) || 0;
-          const paid = Number(s.paidAmount !== undefined ? s.paidAmount : (s.paymentStatus === 'paid' ? tot : 0)) || 0;
+          const paid = Number(s.paidAmount !== undefined ? s.paidAmount : s.paymentStatus === 'paid' ? tot : 0) || 0;
           const due = Math.max(0, tot - paid);
           const inv = s.invoiceNo || s.invoiceNumber || `INV-${s._id || s.id}`;
           return {
@@ -155,12 +222,19 @@ export const AppDataProvider = ({ children }) => {
             date: s.date || s.createdAt,
           };
         });
-        setSales(normalized);
-        storageService.setItem(STORAGE_KEYS.SALES, normalized);
+        const { merged, pushPromises } = reconcileAndPushNewerLocal(
+          localSales,
+          rawNormalized,
+          (id, item) => apiClient.put(`/sales/${id}`, item).catch(() => null)
+        );
+        setSales(merged);
+        storageService.setItem(STORAGE_KEYS.SALES, merged);
+        if (pushPromises.length > 0) await Promise.allSettled(pushPromises);
       }
 
       if (quotesRes.status === 'fulfilled' && quotesRes.value?.success && Array.isArray(quotesRes.value.data) && quotesRes.value.data.length > 0) {
-        const normalized = quotesRes.value.data.map((q) => {
+        const localQuotes = storageService.getItem(STORAGE_KEYS.QUOTATIONS, []);
+        const rawNormalized = quotesRes.value.data.map((q) => {
           const tot = Number(q.totalAmount !== undefined ? q.totalAmount : q.total) || 0;
           return {
             ...q,
@@ -171,8 +245,14 @@ export const AppDataProvider = ({ children }) => {
             date: q.date || q.createdAt,
           };
         });
-        setQuotations(normalized);
-        storageService.setItem(STORAGE_KEYS.QUOTATIONS, normalized);
+        const { merged, pushPromises } = reconcileAndPushNewerLocal(
+          localQuotes,
+          rawNormalized,
+          (id, item) => apiClient.put(`/quotations/${id}`, item).catch(() => null)
+        );
+        setQuotations(merged);
+        storageService.setItem(STORAGE_KEYS.QUOTATIONS, merged);
+        if (pushPromises.length > 0) await Promise.allSettled(pushPromises);
       }
 
       if (ordsRes.status === 'fulfilled' && ordsRes.value?.success && Array.isArray(ordsRes.value.data) && ordsRes.value.data.length > 0) {
@@ -211,8 +291,8 @@ export const AppDataProvider = ({ children }) => {
     }
   };
 
-  // Reload all state from storage and backend
-  const reloadState = () => {
+  // Reload all state from storage, optionally skipping premature backend GET race
+  const reloadState = (skipBackendSync = false) => {
     setProducts(storageService.getItem(STORAGE_KEYS.PRODUCTS, []));
     setCategories(storageService.getItem(STORAGE_KEYS.CATEGORIES, []));
     setSuppliers(storageService.getItem(STORAGE_KEYS.SUPPLIERS, []));
@@ -224,7 +304,7 @@ export const AppDataProvider = ({ children }) => {
     setInventoryMovements(storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
     setOrders(storageService.getItem(STORAGE_KEYS.ORDERS, []));
     setUsers(storageService.getItem(STORAGE_KEYS.USERS, []));
-    
+
     const curSettings = settingsService.getSettings();
     setSettings(curSettings);
     if (curSettings.theme === 'dark') {
@@ -234,7 +314,21 @@ export const AppDataProvider = ({ children }) => {
     }
 
     setCart(storageService.getItem(STORAGE_KEYS.CART, []));
-    syncWithBackend();
+    if (!skipBackendSync) {
+      syncWithBackend();
+    }
+  };
+
+  // Update React UI immediately and trigger clean backend sync ONLY AFTER MongoDB commit finishes
+  const reloadAfterMutation = (res) => {
+    reloadState(true);
+    if (res?.syncPromise && typeof res.syncPromise.then === 'function') {
+      res.syncPromise.finally(() => {
+        if (apiClient.activeMutations === 0) {
+          syncWithBackend(true);
+        }
+      });
+    }
   };
 
   useEffect(() => {
@@ -244,7 +338,38 @@ export const AppDataProvider = ({ children }) => {
     } else {
       document.documentElement.classList.remove('dark');
     }
+
+    const unsubscribeSync = apiClient.subscribeSync((snapshot, evt) => {
+      setSyncState(snapshot);
+      if (evt?.type === 'mutation-error' && evt.error) {
+        addToast({
+          title: 'MongoDB সিঙ্ক সতর্কতা (Sync Error)',
+          message: `ডাটাবেজ আপডেটে সমস্যা: ${evt.error}`,
+          type: 'error',
+          duration: 6000,
+        });
+      }
+    });
+
     syncWithBackend();
+
+    // Auto-reconnect and flush pending offline queue every 20 seconds or on browser online event
+    const handleOnline = () => syncWithBackend(true);
+    window.addEventListener('online', handleOnline);
+    const syncTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        const snap = apiClient.getSyncSnapshot();
+        if (snap.pendingCount > 0 || snap.isOnline === false) {
+          syncWithBackend(true);
+        }
+      }
+    }, 20000);
+
+    return () => {
+      unsubscribeSync();
+      window.removeEventListener('online', handleOnline);
+      clearInterval(syncTimer);
+    };
   }, []);
 
   // Toast Helpers
@@ -287,7 +412,7 @@ export const AppDataProvider = ({ children }) => {
   const addProduct = (data, performedBy) => {
     const res = productService.create(data, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Product Created', message: `Product "${res.product.name}" added successfully.` });
     } else {
       addToast({ title: 'Creation Failed', message: res.message, type: 'error' });
@@ -298,7 +423,7 @@ export const AppDataProvider = ({ children }) => {
   const updateProduct = (id, updates) => {
     const res = productService.update(id, updates);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Product Updated', message: `Product "${res.product.name}" updated successfully.` });
     } else {
       addToast({ title: 'Update Failed', message: res.message, type: 'error' });
@@ -309,7 +434,7 @@ export const AppDataProvider = ({ children }) => {
   const deleteProduct = (id) => {
     const res = productService.remove(id);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Product Deleted', message: res.message });
     } else {
       addToast({ title: 'Cannot Delete', message: res.message, type: 'error' });
@@ -319,7 +444,7 @@ export const AppDataProvider = ({ children }) => {
 
   const importProductsCSV = (rows, performedBy) => {
     const res = productService.importCSV(rows, performedBy);
-    reloadState();
+    reloadState(true);
     if (res.imported > 0) {
       addToast({
         title: 'CSV Import Completed',
@@ -336,7 +461,7 @@ export const AppDataProvider = ({ children }) => {
   const addCategory = (data) => {
     const res = categoryService.create(data);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Category Created', message: `Category "${res.category.name}" created.` });
     } else {
       addToast({ title: 'Creation Failed', message: res.message, type: 'error' });
@@ -347,7 +472,7 @@ export const AppDataProvider = ({ children }) => {
   const updateCategory = (id, updates) => {
     const res = categoryService.update(id, updates);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Category Updated', message: `Category "${res.category.name}" updated.` });
     } else {
       addToast({ title: 'Update Failed', message: res.message, type: 'error' });
@@ -358,7 +483,7 @@ export const AppDataProvider = ({ children }) => {
   const deleteCategory = (id) => {
     const res = categoryService.remove(id);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Category Deleted', message: res.message });
     } else {
       addToast({ title: 'Cannot Delete', message: res.message, type: 'error' });
@@ -370,7 +495,7 @@ export const AppDataProvider = ({ children }) => {
   const addSupplier = (data) => {
     const res = supplierService.create(data);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Supplier Created', message: `Supplier "${res.supplier.name}" added.` });
     }
     return res;
@@ -379,7 +504,7 @@ export const AppDataProvider = ({ children }) => {
   const updateSupplier = (id, updates) => {
     const res = supplierService.update(id, updates);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Supplier Updated', message: `Supplier details saved.` });
     }
     return res;
@@ -388,7 +513,7 @@ export const AppDataProvider = ({ children }) => {
   const deleteSupplier = (id) => {
     const res = supplierService.remove(id);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Supplier Removed', message: res.message });
     } else {
       addToast({ title: 'Cannot Delete', message: res.message, type: 'error' });
@@ -400,7 +525,7 @@ export const AppDataProvider = ({ children }) => {
   const addCustomer = (data) => {
     const res = customerService.create(data);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Customer Created', message: `Customer "${res.customer.name}" registered.` });
     }
     return res;
@@ -409,7 +534,7 @@ export const AppDataProvider = ({ children }) => {
   const updateCustomer = (id, updates) => {
     const res = customerService.update(id, updates);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Customer Updated', message: 'Customer details updated.' });
     }
     return res;
@@ -418,7 +543,7 @@ export const AppDataProvider = ({ children }) => {
   const deleteCustomer = (id) => {
     const res = customerService.remove(id);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Customer Removed', message: res.message });
     } else {
       addToast({ title: 'Cannot Delete', message: res.message, type: 'error' });
@@ -430,7 +555,7 @@ export const AppDataProvider = ({ children }) => {
   const createPurchase = (data, performedBy) => {
     const res = purchaseService.create(data, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Purchase Order Created',
         message: `Order ${res.purchase.referenceNo} (${res.purchase.status.toUpperCase()}) saved.`,
@@ -444,7 +569,7 @@ export const AppDataProvider = ({ children }) => {
   const receivePurchase = (id, performedBy) => {
     const res = purchaseService.receivePurchase(id, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Purchase Received',
         message: `Stock levels updated and inventory movements logged.`,
@@ -458,7 +583,7 @@ export const AppDataProvider = ({ children }) => {
   const cancelPurchase = (id, performedBy) => {
     const res = purchaseService.cancelPurchase(id, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Purchase Cancelled',
         message: `Purchase order cancelled and inventory changes reversed.`,
@@ -473,7 +598,7 @@ export const AppDataProvider = ({ children }) => {
   const createSale = (data, performedBy) => {
     const res = salesService.create(data, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Sale Recorded',
         message: `Invoice ${res.sale.invoiceNo} (${res.sale.status.toUpperCase()}) created successfully.`,
@@ -487,7 +612,7 @@ export const AppDataProvider = ({ children }) => {
   const updateSale = (id, data, performedBy) => {
     const res = salesService.update(id, data, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Sale Updated',
         message: `Invoice ${res.sale.invoiceNo} updated successfully.`,
@@ -501,7 +626,7 @@ export const AppDataProvider = ({ children }) => {
   const completeSale = (id, performedBy) => {
     const res = salesService.completeSale(id, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Sale Completed',
         message: `Stock deducted and inventory movement recorded.`,
@@ -515,7 +640,7 @@ export const AppDataProvider = ({ children }) => {
   const cancelSale = (id, performedBy) => {
     const res = salesService.cancelSale(id, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Sale Cancelled',
         message: `Sale cancelled and items restored to available inventory.`,
@@ -530,7 +655,7 @@ export const AppDataProvider = ({ children }) => {
   const createQuotation = (data, preparedBy = 'Sales Executive') => {
     const res = quotationService.create(data, preparedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'দরপত্র তৈরি সম্পন্ন (Quotation Created)',
         message: `Quotation #${res.quotation.quotationNumber} successfully created.`,
@@ -545,7 +670,7 @@ export const AppDataProvider = ({ children }) => {
   const updateQuotation = (id, updates) => {
     const res = quotationService.update(id, updates);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'দরপত্র আপডেট হয়েছে',
         message: `Quotation updated successfully.`,
@@ -559,7 +684,7 @@ export const AppDataProvider = ({ children }) => {
   const deleteQuotation = (id) => {
     const res = quotationService.remove(id);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Quotation Removed', message: res.message });
     }
     return res;
@@ -606,11 +731,13 @@ export const AppDataProvider = ({ children }) => {
     });
 
     if (res.success) {
-      quotationService.update(id, {
+      const qRes = quotationService.update(id, {
         status: 'converted',
         convertedSaleId: res.sale.id,
       });
-      reloadState();
+      reloadAfterMutation({
+        syncPromise: Promise.allSettled([res.syncPromise, qRes?.syncPromise]),
+      });
       addToast({
         title: 'ইনভয়েসে রূপান্তর সম্পন্ন',
         message: `কোটেশন #${quote.quotationNumber} সফলভাবে সেলস ইনভয়েস #${res.sale.invoiceNo}-এ রূপান্তরিত হয়েছে।`,
@@ -624,7 +751,7 @@ export const AppDataProvider = ({ children }) => {
   const createLotPurchase = (data) => {
     const res = lotService.create(data);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'নিলাম লট এন্ট্রি সম্পন্ন',
         message: `Lot #${res.lot.lotNumber} (${res.lot.lotName || 'Bulk Scrap'}) created.`,
@@ -637,7 +764,7 @@ export const AppDataProvider = ({ children }) => {
   const updateLotPurchase = (id, updates) => {
     const res = lotService.update(id, updates);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'লট আপডেট হয়েছে',
         message: 'Lot purchase details updated.',
@@ -649,7 +776,7 @@ export const AppDataProvider = ({ children }) => {
   const deleteLotPurchase = (id) => {
     const res = lotService.delete(id);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Lot Removed', message: 'Lot deleted from system.' });
     }
     return res;
@@ -658,7 +785,7 @@ export const AppDataProvider = ({ children }) => {
   const distributeLotToInventory = (id, performedBy = 'Warehouse Master') => {
     const res = lotService.distributeToInventory(id, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'ওয়্যারহাউজে মালামাল বণ্টন সম্পন্ন',
         message: res.message,
@@ -674,7 +801,7 @@ export const AppDataProvider = ({ children }) => {
   const adjustStock = (data) => {
     const res = inventoryService.adjustStock(data);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Stock Adjusted',
         message: `New quantity for "${res.product.name}" is ${res.newQuantity}.`,
@@ -689,7 +816,7 @@ export const AppDataProvider = ({ children }) => {
   const createOrder = (orderData) => {
     const res = orderService.create(orderData);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       clearCart();
       addToast({
         title: 'Order Placed!',
@@ -704,7 +831,7 @@ export const AppDataProvider = ({ children }) => {
   const updateOrderStatus = (id, newStatus, performedBy) => {
     const res = orderService.updateStatus(id, newStatus, performedBy);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({
         title: 'Order Status Updated',
         message: `Order #${res.order.orderNumber} changed to "${newStatus.toUpperCase()}".`,
@@ -719,7 +846,7 @@ export const AppDataProvider = ({ children }) => {
   const addUser = (data) => {
     const res = userService.create(data);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Demo User Created', message: `User "${res.user.name}" created.` });
     } else {
       addToast({ title: 'User Creation Failed', message: res.message, type: 'error' });
@@ -730,7 +857,7 @@ export const AppDataProvider = ({ children }) => {
   const updateUser = (id, updates, currentUserId) => {
     const res = userService.update(id, updates, currentUserId);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'User Updated', message: 'User details saved.' });
     } else {
       addToast({ title: 'Update Failed', message: res.message, type: 'error' });
@@ -741,7 +868,7 @@ export const AppDataProvider = ({ children }) => {
   const toggleUserStatus = (id, currentUserId) => {
     const res = userService.toggleStatus(id, currentUserId);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'Status Changed', message: `User status set to ${res.user.status}.` });
     } else {
       addToast({ title: 'Action Denied', message: res.message, type: 'error' });
@@ -752,7 +879,7 @@ export const AppDataProvider = ({ children }) => {
   const deleteUser = (id, currentUserId) => {
     const res = userService.remove(id, currentUserId);
     if (res.success) {
-      reloadState();
+      reloadAfterMutation(res);
       addToast({ title: 'User Removed', message: res.message });
     } else {
       addToast({ title: 'Cannot Delete', message: res.message, type: 'error' });
@@ -762,7 +889,7 @@ export const AppDataProvider = ({ children }) => {
 
   const resetUsers = () => {
     const res = userService.resetUsers();
-    reloadState();
+    reloadState(true);
     addToast({ title: 'Demo Users Reset', message: 'Default demo user accounts restored.' });
     return res;
   };
@@ -772,6 +899,11 @@ export const AppDataProvider = ({ children }) => {
     const res = settingsService.updateSettings(updates);
     if (res.success) {
       setSettings(res.settings);
+      if (res.syncPromise) {
+        res.syncPromise.finally(() => {
+          if (apiClient.activeMutations === 0) syncWithBackend(true);
+        });
+      }
       addToast({ title: 'Settings Saved', message: 'System preferences have been saved.' });
     }
     return res;
@@ -942,6 +1074,8 @@ export const AppDataProvider = ({ children }) => {
     resetAllDemoData,
     reloadState,
     syncWithBackend,
+    syncState,
+    syncNow: () => syncWithBackend(true),
   };
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

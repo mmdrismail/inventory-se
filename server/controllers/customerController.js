@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Customer = require('../models/Customer');
 const Sale = require('../models/Sale');
+const Quotation = require('../models/Quotation');
 
 // Safe query helper supporting MongoDB ObjectId or custom String ID
 const findCustomerQuery = (id) => {
@@ -8,8 +9,54 @@ const findCustomerQuery = (id) => {
   if (mongoose.Types.ObjectId.isValid(id)) {
     return { _id: id };
   }
-  return { $or: [{ id: String(id) }, { phone: String(id) }] };
+  return { $or: [{ id: String(id) }, { clientSideId: String(id) }, { phone: String(id) }] };
 };
+
+// Recalculate customer lifetime financials from active sales invoices
+const recalculateCustomerFinancials = async (customerId) => {
+  if (!customerId) return null;
+  try {
+    const queryIds = [String(customerId)];
+    if (mongoose.Types.ObjectId.isValid(customerId)) {
+      queryIds.push(new mongoose.Types.ObjectId(customerId));
+    }
+    const sales = await Sale.find({
+      customerId: { $in: queryIds },
+      status: { $ne: 'cancelled' },
+    }).lean();
+
+    let totalSales = 0;
+    let totalPaid = 0;
+    let totalDue = 0;
+    for (const s of sales) {
+      const tot = Number(s.totalAmount !== undefined ? s.totalAmount : s.total) || 0;
+      const paid = Number(s.paidAmount !== undefined ? s.paidAmount : (s.paymentStatus === 'paid' ? tot : 0)) || 0;
+      const due = Math.max(0, tot - paid);
+      totalSales += tot;
+      totalPaid += paid;
+      totalDue += due;
+    }
+
+    const custQuery = mongoose.Types.ObjectId.isValid(customerId)
+      ? { _id: customerId }
+      : { $or: [{ id: String(customerId) }, { clientSideId: String(customerId) }] };
+
+    return await Customer.findOneAndUpdate(
+      custQuery,
+      {
+        totalSales: Math.round(totalSales * 100) / 100,
+        totalPaid: Math.round(totalPaid * 100) / 100,
+        totalDue: Math.round(totalDue * 100) / 100,
+        balance: Math.round(totalDue * 100) / 100,
+      },
+      { new: true }
+    );
+  } catch (err) {
+    console.warn('recalculateCustomerFinancials warning:', err.message);
+    return null;
+  }
+};
+exports.recalculateCustomerFinancials = recalculateCustomerFinancials;
 
 // @desc    Get all customers
 // @route   GET /api/customers
@@ -87,7 +134,15 @@ exports.getCustomerById = async (req, res, next) => {
 // @access  Private
 exports.createCustomer = async (req, res, next) => {
   try {
-    const customer = await Customer.create(req.body);
+    const payload = { ...req.body };
+    delete payload._id;
+    delete payload.__v;
+    if (payload.id && !payload.clientSideId) {
+      payload.clientSideId = String(payload.id);
+    }
+    delete payload.id;
+
+    const customer = await Customer.create(payload);
     res.status(201).json({
       success: true,
       message: 'Customer registered successfully.',
@@ -103,16 +158,61 @@ exports.createCustomer = async (req, res, next) => {
 // @access  Private
 exports.updateCustomer = async (req, res, next) => {
   try {
-    const updated = await Customer.findOneAndUpdate(findCustomerQuery(req.params.id), req.body, {
-      new: true,
-      runValidators: true,
-    });
-    if (!updated) {
+    const updates = { ...req.body };
+    const skipPropagate = Boolean(updates._skipPropagate);
+    delete updates._id;
+    delete updates.__v;
+    delete updates.createdAt;
+    delete updates.id;
+    delete updates._skipPropagate;
+
+    let target = await Customer.findOne(findCustomerQuery(req.params.id));
+
+    // Fallback lookup by phone or exact case-insensitive name if temp frontend ID (e.g. cust-...) was passed
+    if (!target && !mongoose.Types.ObjectId.isValid(req.params.id)) {
+      if (updates.phone && String(updates.phone).trim()) {
+        target = await Customer.findOne({ phone: String(updates.phone).trim() });
+      }
+      if (!target && updates.name && String(updates.name).trim()) {
+        const escaped = String(updates.name).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        target = await Customer.findOne({ name: new RegExp(`^${escaped}$`, 'i') });
+      }
+    }
+
+    if (!target) {
       return res.status(404).json({
         success: false,
         message: 'Customer not found.',
       });
     }
+
+    const updated = await Customer.findByIdAndUpdate(target._id, updates, {
+      new: true,
+      runValidators: true,
+    });
+
+    // Propagate updated customer profile fields to linked sales & quotations in MongoDB
+    if (updated && !skipPropagate) {
+      const custIds = [updated._id, String(updated._id)];
+      if (updated.clientSideId) custIds.push(updated.clientSideId);
+
+      const snapshotUpdates = {};
+      if (updates.name !== undefined) snapshotUpdates.customerName = updated.name;
+      if (updates.companyName !== undefined) snapshotUpdates.customerCompany = updated.companyName;
+      if (updates.designationRole !== undefined) snapshotUpdates.customerRole = updated.designationRole;
+      if (updates.phone !== undefined) snapshotUpdates.customerPhone = updated.phone;
+      if (updates.email !== undefined) snapshotUpdates.customerEmail = updated.email;
+      if (updates.address !== undefined) snapshotUpdates.customerAddress = updated.address;
+      if (updates.location !== undefined) snapshotUpdates.customerLocation = updated.location;
+
+      if (Object.keys(snapshotUpdates).length > 0) {
+        await Promise.allSettled([
+          Sale.updateMany({ customerId: { $in: custIds } }, { $set: snapshotUpdates }),
+          Quotation.updateMany({ customerId: { $in: custIds } }, { $set: snapshotUpdates }),
+        ]);
+      }
+    }
+
     res.json({
       success: true,
       message: 'Customer updated successfully.',

@@ -26,11 +26,12 @@ class SettingsService {
     }
 
     // Live sync to MongoDB Atlas
-    apiClient.put('/settings', updates).catch((err) => {
+    const syncPromise = apiClient.put('/settings', updates).catch((err) => {
       console.warn('[MongoDB Settings sync]:', err.message);
+      return null;
     });
 
-    return { success: true, settings: updated };
+    return { success: true, settings: updated, syncPromise };
   }
 
   resetSettings() {

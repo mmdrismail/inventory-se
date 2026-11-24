@@ -76,7 +76,22 @@ const quotationSchema = new mongoose.Schema(
     },
     customerRole: {
       type: String,
-      enum: ['owner', 'agent', 'purchaser', 'supplier_rep', 'wholesale', 'retail', 'manager', 'other'],
+      enum: [
+        'owner',
+        'agent',
+        'purchaser',
+        'supplier_rep',
+        'wholesale',
+        'retail',
+        'manager',
+        'other',
+        'managing_director',
+        'purchase_manager',
+        'project_director',
+        'contractor',
+        'retail_customer',
+        '',
+      ],
       default: 'owner',
     },
     customerPhone: {
