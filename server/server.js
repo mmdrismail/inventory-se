@@ -52,9 +52,7 @@ app.use((req, res, next) => {
 
 // Support Chrome Private Network Access (PNA) preflight so live HTTPS sites (e.g. GitHub Pages) can reach local/private backend cleanly
 app.use((req, res, next) => {
-  if (req.headers['access-control-request-private-network']) {
-    res.setHeader('Access-Control-Allow-Private-Network', 'true');
-  }
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
   next();
 });
 
@@ -105,9 +103,14 @@ app.use('/api', apiRateLimiter);
 // Automatic cache invalidation on any POST/PUT/DELETE
 app.use(cacheInvalidator());
 
-// Request logger
+// Request logger with status & origin visibility
 app.use((req, res, next) => {
-  console.log(`\x1b[36m[API Request]\x1b[0m ${req.method} ${req.originalUrl}`);
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const origin = req.headers.origin || 'direct';
+    console.log(`\x1b[36m[API Request]\x1b[0m ${req.method} ${req.originalUrl} | ${res.statusCode} (${ms}ms) | ${origin}`);
+  });
   next();
 });
 

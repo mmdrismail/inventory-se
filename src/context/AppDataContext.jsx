@@ -57,33 +57,176 @@ export const AppDataProvider = ({ children }) => {
     onConfirm: null,
   });
 
-  // Two-way timestamp reconciliation: preserves & pushes newer localStorage edits (like offline updates) up to MongoDB
-  const reconcileAndPushNewerLocal = (localList, remoteList, pushFn) => {
-    const localMap = new Map();
-    for (const item of localList || []) {
-      const k = item._id || item.id;
-      if (k) localMap.set(String(k), item);
+  const normalizeReconcileKey = (val) => String(val || '').trim().toLowerCase();
+  const normalizeReconcilePhone = (val) => {
+    const digits = String(val || '').replace(/\D+/g, '');
+    return digits.length >= 6 ? digits : '';
+  };
+
+  // Two-way timestamp reconciliation: preserves & pushes newer localStorage edits (and temp-ID offline records) up to MongoDB
+  const reconcileAndPushNewerLocal = (localList, remoteList, pushFn, options = {}) => {
+    const {
+      getFallbackKeys,
+      createFn,
+      shouldAutoCreate,
+      entityTag = 'item',
+    } = options;
+
+    if (!globalThis.__stocklinePendingTempCreates) {
+      globalThis.__stocklinePendingTempCreates = new Set();
+    }
+    const pendingTempCreates = globalThis.__stocklinePendingTempCreates;
+
+    const TEMP_LOCAL_ID_RE = /^(cust|sal|quote)-\d{10,}$/;
+    const IGNORED_DIFF_KEYS = new Set([
+      'id',
+      '_id',
+      '__v',
+      'createdAt',
+      'updatedAt',
+      'totalSales',
+      'totalPaid',
+      'totalDue',
+    ]);
+    const isNonEmpty = (val) =>
+      Array.isArray(val) ? val.length > 0 : val !== undefined && val !== null && String(val).trim() !== '';
+
+    const locals = Array.isArray(localList) ? localList : [];
+    const remotes = Array.isArray(remoteList) ? remoteList : [];
+
+    const localById = new Map();
+    for (const item of locals) {
+      const k = item?._id || item?.id;
+      if (k) localById.set(String(k), item);
     }
 
-    const pushPromises = [];
-    const merged = (remoteList || []).map((remote) => {
-      const rid = String(remote._id || remote.id);
-      const local = localMap.get(rid);
-      if (local && local.updatedAt && remote.updatedAt) {
-        const localTime = new Date(local.updatedAt).getTime();
-        const remoteTime = new Date(remote.updatedAt).getTime();
-        // If local item was updated > 2s more recently than MongoDB, push local edits UP to MongoDB!
-        if (!Number.isNaN(localTime) && !Number.isNaN(remoteTime) && localTime > remoteTime + 2000) {
-          if (typeof pushFn === 'function') {
-            pushPromises.push(pushFn(rid, local));
-          }
-          return { ...remote, ...local, id: rid, _id: rid };
+    // Count remote fallback keys so ambiguous keys never mismatch distinct records
+    const remoteKeyCounts = new Map();
+    if (typeof getFallbackKeys === 'function') {
+      for (const remote of remotes) {
+        const keys = new Set(getFallbackKeys(remote).filter(Boolean));
+        for (const k of keys) {
+          remoteKeyCounts.set(k, (remoteKeyCounts.get(k) || 0) + 1);
         }
+      }
+    }
+
+    const matchedLocals = new Set();
+    const primaryMatches = new Map();
+    for (const remote of remotes) {
+      const rid = String(remote._id || remote.id);
+      const exactLocal = localById.get(rid);
+      if (exactLocal) {
+        primaryMatches.set(rid, exactLocal);
+        matchedLocals.add(exactLocal);
+      }
+    }
+
+    const findFallbackLocal = (remote) => {
+      if (typeof getFallbackKeys !== 'function') return null;
+      const keys = getFallbackKeys(remote).filter((k) => k && remoteKeyCounts.get(k) === 1);
+      for (const key of keys) {
+        const candidates = locals.filter((loc) => !matchedLocals.has(loc) && getFallbackKeys(loc).includes(key));
+        if (candidates.length === 1) return candidates[0];
+      }
+      return null;
+    };
+
+    const pushPromises = [];
+    const mergeAndMaybePush = (rid, remote, local) => {
+      const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : NaN;
+      const remoteTime = remote?.updatedAt ? new Date(remote.updatedAt).getTime() : NaN;
+      const isNewerLocal =
+        !Number.isNaN(localTime) &&
+        ((!Number.isNaN(remoteTime) && localTime > remoteTime + 2000) || Number.isNaN(remoteTime));
+
+      if (isNewerLocal) {
+        const nextItem = { ...remote, ...local, id: rid, _id: rid };
+        if (typeof pushFn === 'function') {
+          pushPromises.push(pushFn(rid, nextItem));
+        }
+        return nextItem;
+      }
+
+      if (local && !local._id) {
+        let filledAny = false;
+        const patched = { ...remote };
+        for (const [k, v] of Object.entries(local)) {
+          if (IGNORED_DIFF_KEYS.has(k)) continue;
+          if (isNonEmpty(v) && !isNonEmpty(patched[k])) {
+            patched[k] = v;
+            filledAny = true;
+          }
+        }
+        if (filledAny) {
+          const nextItem = { ...patched, id: rid, _id: rid };
+          if (typeof pushFn === 'function') {
+            pushPromises.push(pushFn(rid, nextItem));
+          }
+          return nextItem;
+        }
+      }
+
+      return { ...remote, id: rid, _id: rid };
+    };
+
+    const merged = remotes.map((remote) => {
+      const rid = String(remote._id || remote.id);
+      const local = primaryMatches.get(rid) || findFallbackLocal(remote);
+      if (local) {
+        matchedLocals.add(local);
+        return mergeAndMaybePush(rid, remote, local);
       }
       return { ...remote, id: rid, _id: rid };
     });
 
+    // Auto-create local-only dynamic temp-ID records (never static seed IDs like cust-1..cust-10)
+    for (const local of locals) {
+      if (matchedLocals.has(local) || local?._id) continue;
+      const localId = String(local?.id || '');
+      if (!TEMP_LOCAL_ID_RE.test(localId)) continue;
+      if (typeof shouldAutoCreate === 'function' && !shouldAutoCreate(local)) continue;
+
+      const preserved = { ...local, id: localId };
+      merged.push(preserved);
+
+      const dedupeKey = `${entityTag}:${localId}`;
+      if (typeof createFn === 'function' && !pendingTempCreates.has(dedupeKey)) {
+        pendingTempCreates.add(dedupeKey);
+        const promise = Promise.resolve(createFn(preserved))
+          .then((res) => {
+            const created = res?.data?._id ? res.data : res?._id ? res : null;
+            if (!created) {
+              pendingTempCreates.delete(dedupeKey);
+              return null;
+            }
+            const createdId = String(created._id || created.id);
+            const idx = merged.findIndex((m) => String(m.id || m._id) === localId);
+            if (idx !== -1) {
+              merged[idx] = { ...preserved, ...created, id: createdId, _id: createdId };
+            }
+            return { __created: true, data: created };
+          })
+          .catch(() => {
+            pendingTempCreates.delete(dedupeKey);
+            return null;
+          });
+        pushPromises.push(promise);
+      }
+    }
+
     return { merged, pushPromises };
+  };
+
+  const settleReconcilePushes = async (pushPromises, merged, setState, storageKey) => {
+    if (!pushPromises || pushPromises.length === 0) return;
+    const results = await Promise.allSettled(pushPromises);
+    const hasCreated = results.some((r) => r.status === 'fulfilled' && r.value?.__created);
+    if (hasCreated) {
+      const snapshot = [...merged];
+      setState(snapshot);
+      storageService.setItem(storageKey, snapshot);
+    }
   };
 
   // Synchronize state with MongoDB Atlas backend if online
@@ -161,29 +304,40 @@ export const AppDataProvider = ({ children }) => {
 
       if (custsRes.status === 'fulfilled' && custsRes.value?.success && Array.isArray(custsRes.value.data) && custsRes.value.data.length > 0) {
         const localCusts = storageService.getItem(STORAGE_KEYS.CUSTOMERS, []);
+        const buildCustomerPayload = (item) => ({
+          name: item.name,
+          companyName: item.companyName,
+          designationRole: item.designationRole,
+          phone: item.phone,
+          companyPhone: item.companyPhone,
+          email: item.email,
+          address: item.address,
+          location: item.location,
+          city: item.city,
+          customerType: item.customerType,
+          notes: item.notes,
+        });
         const { merged, pushPromises } = reconcileAndPushNewerLocal(
           localCusts,
           custsRes.value.data,
-          (id, item) =>
-            apiClient
-              .put(`/customers/${id}`, {
-                name: item.name,
-                companyName: item.companyName,
-                designationRole: item.designationRole,
-                phone: item.phone,
-                companyPhone: item.companyPhone,
-                email: item.email,
-                address: item.address,
-                location: item.location,
-                city: item.city,
-                customerType: item.customerType,
-                notes: item.notes,
-              })
-              .catch(() => null)
+          (id, item) => apiClient.put(`/customers/${id}`, buildCustomerPayload(item)).catch(() => null),
+          {
+            entityTag: 'customer',
+            getFallbackKeys: (c) => {
+              const keys = [];
+              const phone = normalizeReconcilePhone(c?.phone);
+              if (phone) keys.push(`phone:${phone}`);
+              const name = normalizeReconcileKey(c?.name);
+              if (name) keys.push(`name:${name}`);
+              return keys;
+            },
+            shouldAutoCreate: (c) => Boolean(c?.name && c.name !== 'Rahim Test Customer'),
+            createFn: (item) => apiClient.post('/customers', buildCustomerPayload(item)).catch(() => null),
+          }
         );
         setCustomers(merged);
         storageService.setItem(STORAGE_KEYS.CUSTOMERS, merged);
-        if (pushPromises.length > 0) await Promise.allSettled(pushPromises);
+        await settleReconcilePushes(pushPromises, merged, setCustomers, STORAGE_KEYS.CUSTOMERS);
       }
 
       if (pursRes.status === 'fulfilled' && pursRes.value?.success && Array.isArray(pursRes.value.data) && pursRes.value.data.length > 0) {
@@ -225,11 +379,26 @@ export const AppDataProvider = ({ children }) => {
         const { merged, pushPromises } = reconcileAndPushNewerLocal(
           localSales,
           rawNormalized,
-          (id, item) => apiClient.put(`/sales/${id}`, item).catch(() => null)
+          (id, item) => apiClient.put(`/sales/${id}`, item).catch(() => null),
+          {
+            entityTag: 'sale',
+            getFallbackKeys: (s) => {
+              const inv = normalizeReconcileKey(s?.invoiceNumber || s?.invoiceNo);
+              return inv ? [`inv:${inv}`] : [];
+            },
+            shouldAutoCreate: (s) => {
+              const inv = normalizeReconcileKey(s?.invoiceNumber || s?.invoiceNo);
+              return Boolean(s?.customerName && !inv.startsWith('inv-test-'));
+            },
+            createFn: (item) => {
+              const { id: _tid, _id: _oid, ...payload } = item;
+              return apiClient.post('/sales', payload).catch(() => null);
+            },
+          }
         );
         setSales(merged);
         storageService.setItem(STORAGE_KEYS.SALES, merged);
-        if (pushPromises.length > 0) await Promise.allSettled(pushPromises);
+        await settleReconcilePushes(pushPromises, merged, setSales, STORAGE_KEYS.SALES);
       }
 
       if (quotesRes.status === 'fulfilled' && quotesRes.value?.success && Array.isArray(quotesRes.value.data) && quotesRes.value.data.length > 0) {
@@ -248,11 +417,26 @@ export const AppDataProvider = ({ children }) => {
         const { merged, pushPromises } = reconcileAndPushNewerLocal(
           localQuotes,
           rawNormalized,
-          (id, item) => apiClient.put(`/quotations/${id}`, item).catch(() => null)
+          (id, item) => apiClient.put(`/quotations/${id}`, item).catch(() => null),
+          {
+            entityTag: 'quotation',
+            getFallbackKeys: (q) => {
+              const qn = normalizeReconcileKey(q?.quotationNumber);
+              return qn ? [`qt:${qn}`] : [];
+            },
+            shouldAutoCreate: (q) => {
+              const qn = normalizeReconcileKey(q?.quotationNumber);
+              return Boolean((q?.customerName || q?.quotationNumber) && !qn.startsWith('qt-test-'));
+            },
+            createFn: (item) => {
+              const { id: _tid, _id: _oid, ...payload } = item;
+              return apiClient.post('/quotations', payload).catch(() => null);
+            },
+          }
         );
         setQuotations(merged);
         storageService.setItem(STORAGE_KEYS.QUOTATIONS, merged);
-        if (pushPromises.length > 0) await Promise.allSettled(pushPromises);
+        await settleReconcilePushes(pushPromises, merged, setQuotations, STORAGE_KEYS.QUOTATIONS);
       }
 
       if (ordsRes.status === 'fulfilled' && ordsRes.value?.success && Array.isArray(ordsRes.value.data) && ordsRes.value.data.length > 0) {

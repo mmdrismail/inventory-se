@@ -4,6 +4,7 @@
 const http = require('http');
 const dotenv = require('dotenv');
 const path = require('path');
+const mongoose = require('mongoose');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -66,6 +67,22 @@ async function runAllTests() {
   // Give MongoDB a moment to settle connection
   await new Promise((r) => setTimeout(r, 2000));
 
+  let testCatId = null;
+  let testSupplierId = null;
+  let testCustomerId = null;
+  let testProductId = null;
+  let testPurchaseId = null;
+  let testSaleId = null;
+  let testQuotationId = null;
+  let convertedSaleId = null;
+  let testOrderId = null;
+  let testUserId = null;
+  const testQuotationNumber = `QT-TEST-${Date.now()}`;
+  const testPoNumber = `PO-TEST-${Date.now()}`;
+  const testInvoiceNo = `INV-TEST-${Date.now()}`;
+  const testOrderNumber = `ORD-TEST-${Date.now()}`;
+  const testStartTime = new Date();
+
   try {
     // 0. System Health Checks
     console.log(`\x1b[34m--- [0. Health & Core Infrastructure] ---\x1b[0m`);
@@ -113,7 +130,6 @@ async function runAllTests() {
 
     // 2. Category Module
     console.log(`\n\x1b[34m--- [2. Categories Module] ---\x1b[0m`);
-    let testCatId = null;
     const testCatName = `TestCat_${Date.now()}`;
     {
       const res = await request('/api/categories');
@@ -138,7 +154,6 @@ async function runAllTests() {
 
     // 3. Supplier Module
     console.log(`\n\x1b[34m--- [3. Suppliers Module] ---\x1b[0m`);
-    let testSupplierId = null;
     {
       const res = await request('/api/suppliers');
       record('Suppliers', 'GET all suppliers', res.status === 200 && Array.isArray(res.data.data));
@@ -168,7 +183,6 @@ async function runAllTests() {
 
     // 4. Customer Module
     console.log(`\n\x1b[34m--- [4. Customers Module] ---\x1b[0m`);
-    let testCustomerId = null;
     {
       const res = await request('/api/customers');
       record('Customers', 'GET all customers', res.status === 200 && Array.isArray(res.data.data));
@@ -197,7 +211,6 @@ async function runAllTests() {
 
     // 5. Product Module
     console.log(`\n\x1b[34m--- [5. Products Module] ---\x1b[0m`);
-    let testProductId = null;
     {
       const res = await request('/api/products');
       record('Products', 'GET all products', res.status === 200 && Array.isArray(res.data.data));
@@ -235,7 +248,6 @@ async function runAllTests() {
 
     // 6. Purchases Module & Stock Updates
     console.log(`\n\x1b[34m--- [6. Purchases Module] ---\x1b[0m`);
-    let testPurchaseId = null;
     {
       const res = await request('/api/purchases');
       record('Purchases', 'GET all purchases', res.status === 200 && Array.isArray(res.data.data));
@@ -244,7 +256,7 @@ async function runAllTests() {
       const res = await request('/api/purchases', {
         method: 'POST',
         body: JSON.stringify({
-          poNumber: `PO-TEST-${Date.now()}`,
+          poNumber: testPoNumber,
           supplierId: testSupplierId,
           supplierName: 'Apex Test Supplier Corp',
           items: [
@@ -274,7 +286,6 @@ async function runAllTests() {
 
     // 7. Sales Module & Stock Deduction
     console.log(`\n\x1b[34m--- [7. Sales Module] ---\x1b[0m`);
-    let testSaleId = null;
     {
       const res = await request('/api/sales');
       record('Sales', 'GET all sales records', res.status === 200 && Array.isArray(res.data.data));
@@ -283,7 +294,7 @@ async function runAllTests() {
       const res = await request('/api/sales', {
         method: 'POST',
         body: JSON.stringify({
-          invoiceNo: `INV-TEST-${Date.now()}`,
+          invoiceNo: testInvoiceNo,
           customerId: testCustomerId,
           customerName: 'Rahim Test Customer',
           items: [
@@ -310,7 +321,6 @@ async function runAllTests() {
 
     // 7.1. Quotations Module (দরপত্র ও কোটেশন)
     console.log(`\n\x1b[34m--- [7.1. Quotations Module] ---\x1b[0m`);
-    let testQuotationId = null;
     {
       const res = await request('/api/quotations');
       record('Quotations', 'GET all quotations', res.status === 200 && Array.isArray(res.data.data));
@@ -319,7 +329,7 @@ async function runAllTests() {
       const res = await request('/api/quotations', {
         method: 'POST',
         body: JSON.stringify({
-          quotationNumber: `QT-TEST-${Date.now()}`,
+          quotationNumber: testQuotationNumber,
           customerName: 'ইঞ্জিঃ রফিকুল ইসলাম',
           customerCompany: 'কর্ণফুলী কোল্ড স্টোরেজ লিমিটেড',
           customerRole: 'purchaser',
@@ -361,11 +371,13 @@ async function runAllTests() {
         }),
       });
       record('Quotations', 'POST convert quotation to official sales invoice', res.status === 200 && res.data.success);
+      if (res.status === 200 && res.data.success) {
+        convertedSaleId = res.data?.data?.sale?._id || res.data?.sale?._id || res.data?.data?._id || null;
+      }
     }
 
     // 8. Orders Module (e-commerce / customer shop orders)
     console.log(`\n\x1b[34m--- [8. Orders Module] ---\x1b[0m`);
-    let testOrderId = null;
     {
       const res = await request('/api/orders');
       record('Orders', 'GET all customer orders', res.status === 200 && Array.isArray(res.data.data));
@@ -374,7 +386,7 @@ async function runAllTests() {
       const res = await request('/api/orders', {
         method: 'POST',
         body: JSON.stringify({
-          orderNumber: `ORD-TEST-${Date.now()}`,
+          orderNumber: testOrderNumber,
           customerName: 'Online Shopper',
           customerEmail: 'shopper@test.com',
           customerPhone: '+880 1711 000000',
@@ -435,9 +447,17 @@ async function runAllTests() {
 
     // 11. Settings Module
     console.log(`\n\x1b[34m--- [11. Settings Module] ---\x1b[0m`);
+    let originalSettings = null;
     {
       const res = await request('/api/settings');
       record('Settings', 'GET system configuration settings', res.status === 200 && res.data.data?.companyName !== undefined);
+      if (res.status === 200 && res.data.data) {
+        originalSettings = {
+          companyName: res.data.data.companyName,
+          currency: res.data.data.currency,
+          currencySymbol: res.data.data.currencySymbol,
+        };
+      }
     }
     {
       const res = await request('/api/settings', {
@@ -449,11 +469,16 @@ async function runAllTests() {
         }),
       });
       record('Settings', 'PUT update company settings & currency', res.status === 200 && res.data.data?.currency === 'BDT');
+      if (originalSettings) {
+        await request('/api/settings', {
+          method: 'PUT',
+          body: JSON.stringify(originalSettings),
+        }).catch(() => {});
+      }
     }
 
     // 12. Users Management Module
     console.log(`\n\x1b[34m--- [12. Users Management Module] ---\x1b[0m`);
-    let testUserId = null;
     {
       const res = await request('/api/users');
       record('Users', 'GET list of staff and administrator users', res.status === 200 && Array.isArray(res.data.data));
@@ -482,32 +507,62 @@ async function runAllTests() {
       record('Users', 'DELETE remove test staff user', delRes.status === 200);
     }
 
-    // Cleanup Temporary Artifacts
-    console.log(`\n\x1b[34m--- [Cleanup Test Data] ---\x1b[0m`);
-    if (testQuotationId) {
-      await request(`/api/quotations/${testQuotationId}`, { method: 'DELETE' });
-      console.log('✔ Cleaned up test quotation');
-    }
-    if (testProductId) {
-      await request(`/api/products/${testProductId}`, { method: 'DELETE' });
-      console.log('✔ Cleaned up test product');
-    }
-    if (testCustomerId) {
-      await request(`/api/customers/${testCustomerId}`, { method: 'DELETE' });
-      console.log('✔ Cleaned up test customer');
-    }
-    if (testSupplierId) {
-      await request(`/api/suppliers/${testSupplierId}`, { method: 'DELETE' });
-      console.log('✔ Cleaned up test supplier');
-    }
-    if (testCatId) {
-      await request(`/api/categories/${testCatId}`, { method: 'DELETE' });
-      console.log('✔ Cleaned up test category');
-    }
-
   } catch (err) {
     console.error('Fatal Test Suite Error:', err);
   } finally {
+    // Cleanup Temporary Artifacts (runs even on errors so stockline_db stays spotless)
+    console.log(`\n\x1b[34m--- [Cleanup Test Data] ---\x1b[0m`);
+    try {
+      const toObjId = (id) => (id && mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null);
+      if (testUserId) await request(`/api/users/${testUserId}`, { method: 'DELETE' }).catch(() => {});
+      if (testQuotationId) await request(`/api/quotations/${testQuotationId}`, { method: 'DELETE' }).catch(() => {});
+
+      if (mongoose.connection?.readyState === 1 && mongoose.connection.db) {
+        const db = mongoose.connection.db;
+        const saleOr = [{ invoiceNumber: testInvoiceNo }, { invoiceNo: testInvoiceNo }, { notes: new RegExp(testQuotationNumber) }];
+        if (toObjId(testSaleId)) saleOr.push({ _id: toObjId(testSaleId) });
+        if (toObjId(convertedSaleId)) saleOr.push({ _id: toObjId(convertedSaleId) });
+        await db.collection('sales').deleteMany({ $or: saleOr });
+
+        const purOr = [{ purchaseNumber: testPoNumber }, { poNumber: testPoNumber }];
+        if (toObjId(testPurchaseId)) purOr.push({ _id: toObjId(testPurchaseId) });
+        await db.collection('purchases').deleteMany({ $or: purOr });
+
+        const ordOr = [{ orderNumber: testOrderNumber }];
+        if (toObjId(testOrderId)) ordOr.push({ _id: toObjId(testOrderId) });
+        await db.collection('orders').deleteMany({ $or: ordOr });
+
+        const quoteOr = [{ quotationNumber: testQuotationNumber }];
+        if (toObjId(testQuotationId)) quoteOr.push({ _id: toObjId(testQuotationId) });
+        await db.collection('quotations').deleteMany({ $or: quoteOr });
+
+        const smOr = [
+          { referenceNumber: { $in: [testInvoiceNo, testPoNumber, testOrderNumber, testQuotationNumber] } },
+          { reference: { $in: [testInvoiceNo, testPoNumber, testOrderNumber, testQuotationNumber] } },
+          { reason: 'Automated inventory verification test', createdAt: { $gte: testStartTime } },
+          { reason: new RegExp(`${testInvoiceNo}|${testPoNumber}|${testQuotationNumber}`) },
+        ];
+        if (testProductId) {
+          smOr.push({ productId: testProductId }, { productId: toObjId(testProductId) }, { product: toObjId(testProductId) });
+        }
+        await db.collection('stockmovements').deleteMany({ $or: smOr });
+
+        if (toObjId(testProductId)) await db.collection('products').deleteOne({ _id: toObjId(testProductId) });
+        if (toObjId(testCustomerId)) await db.collection('customers').deleteOne({ _id: toObjId(testCustomerId) });
+        if (toObjId(testSupplierId)) await db.collection('suppliers').deleteOne({ _id: toObjId(testSupplierId) });
+        if (toObjId(testCatId)) await db.collection('categories').deleteOne({ _id: toObjId(testCatId) });
+        if (toObjId(testUserId)) await db.collection('users').deleteOne({ _id: toObjId(testUserId) });
+      } else {
+        if (testProductId) await request(`/api/products/${testProductId}`, { method: 'DELETE' }).catch(() => {});
+        if (testCustomerId) await request(`/api/customers/${testCustomerId}`, { method: 'DELETE' }).catch(() => {});
+        if (testSupplierId) await request(`/api/suppliers/${testSupplierId}`, { method: 'DELETE' }).catch(() => {});
+        if (testCatId) await request(`/api/categories/${testCatId}`, { method: 'DELETE' }).catch(() => {});
+      }
+      console.log('✔ Cleaned up all test artifacts (categories, suppliers, customers, products, purchases, sales, quotations, orders, stock movements, users)');
+    } catch (cleanupErr) {
+      console.error('Cleanup warning:', cleanupErr.message);
+    }
+
     console.log(`\n\x1b[35m====================================================\x1b[0m`);
     console.log(`\x1b[35m  TEST RESULTS: ${results.passed} Passed, ${results.failed} Failed  \x1b[0m`);
     console.log(`\x1b[35m====================================================\x1b[0m\n`);
