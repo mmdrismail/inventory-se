@@ -4,6 +4,20 @@ import { customerService } from './customerService';
 import { calculateSaleTotals } from '../utils/calculations';
 import { apiClient } from './apiClient';
 
+const isGenericClientName = (name) => {
+  if (!name) return true;
+  const n = String(name).trim().toLowerCase();
+  return (
+    n === 'walk-in retail customer' ||
+    n === 'direct client' ||
+    n === 'valued client' ||
+    n === 'counter direct sale' ||
+    n === 'সাধারণ ক্লায়েন্ট' ||
+    n === 'সাধারণ গ্রাহক' ||
+    n.includes('walk-in')
+  );
+};
+
 class SalesService {
   getAll() {
     return storageService.getItem(STORAGE_KEYS.SALES, []);
@@ -11,7 +25,7 @@ class SalesService {
 
   getById(id) {
     const sales = this.getAll();
-    return sales.find((s) => s.id === id) || null;
+    return sales.find((s) => s.id === id || s._id === id) || null;
   }
 
   create(saleData, performedBy = 'Sales Executive') {
@@ -22,40 +36,8 @@ class SalesService {
     if (saleData.paymentStatus === 'paid') paidVal = totalVal;
     const dueVal = Math.max(0, totalVal - paidVal);
 
-    // Auto-upsert customer profile if details provided
+    // Auto-upsert customer profile if details provided and not generic
     let customerId = saleData.customerId;
-    if (saleData.customerName && saleData.customerName.trim() && saleData.customerName !== 'Walk-in Retail Customer') {
-      const cust = customerService.upsertCustomer({
-        id: saleData.customerId,
-        name: saleData.customerName,
-        companyName: saleData.customerCompany,
-        designationRole: saleData.customerRole,
-        phone: saleData.customerPhone,
-        email: saleData.customerEmail,
-        address: saleData.customerAddress,
-        location: saleData.customerLocation || saleData.customerAddress,
-      });
-      if (cust && cust.id) {
-        customerId = cust.id;
-      }
-    }
-
-    const isCompleted = saleData.status === 'completed' || !saleData.status;
-
-    const isGenericClientName = (name) => {
-      if (!name) return true;
-      const n = name.trim().toLowerCase();
-      return (
-        n === 'walk-in retail customer' ||
-        n === 'direct client' ||
-        n === 'valued client' ||
-        n === 'counter direct sale' ||
-        n === 'সাধারণ ক্লায়েন্ট' ||
-        n === 'সাধারণ গ্রাহক' ||
-        n.includes('walk-in')
-      );
-    };
-
     if (
       saleData.autoSaveCustomer !== false &&
       saleData.customerName &&
@@ -76,6 +58,8 @@ class SalesService {
         customerId = cust.id || cust._id;
       }
     }
+
+    const isCompleted = saleData.status === 'completed' || !saleData.status;
 
     if (customerId && isCompleted) {
       customerService.updateFinancials(customerId, totalVal, paidVal, dueVal);
@@ -174,19 +158,24 @@ class SalesService {
     // Auto-upsert customer profile if details provided
     let customerId = saleData.customerId !== undefined ? saleData.customerId : existing.customerId;
     const custName = saleData.customerName || existing.customerName;
-    if (custName && custName.trim() && custName !== 'Walk-in Retail Customer') {
+    if (
+      saleData.autoSaveCustomer !== false &&
+      custName &&
+      custName.trim() &&
+      !isGenericClientName(custName)
+    ) {
       const cust = customerService.upsertCustomer({
         id: customerId,
         name: custName,
         companyName: saleData.customerCompany !== undefined ? saleData.customerCompany : existing.customerCompany,
-        designationRole: saleData.customerRole || existing.customerRole,
+        designationRole: saleData.customerRole || existing.customerRole || 'owner',
         phone: saleData.customerPhone !== undefined ? saleData.customerPhone : existing.customerPhone,
         email: saleData.customerEmail !== undefined ? saleData.customerEmail : existing.customerEmail,
         address: saleData.customerAddress !== undefined ? saleData.customerAddress : existing.customerAddress,
         location: saleData.customerLocation || saleData.customerAddress || existing.customerLocation,
       });
-      if (cust && cust.id) {
-        customerId = cust.id;
+      if (cust && (cust.id || cust._id)) {
+        customerId = cust.id || cust._id;
       }
     }
 
@@ -213,24 +202,6 @@ class SalesService {
       paymentStatus: saleData.paymentStatus || existing.paymentStatus || 'paid',
       updatedAt: new Date().toISOString(),
     };
-
-    if (
-      saleData.autoSaveCustomer !== false &&
-      custName &&
-      custName.trim() &&
-      !isGenericClientName(custName)
-    ) {
-      customerService.upsertCustomer({
-        id: customerId,
-        name: custName,
-        companyName: updatedSale.customerCompany,
-        designationRole: updatedSale.customerRole,
-        phone: updatedSale.customerPhone,
-        email: updatedSale.customerEmail,
-        address: updatedSale.customerAddress,
-        location: updatedSale.customerLocation || updatedSale.customerAddress,
-      });
-    }
 
     sales[index] = updatedSale;
     storageService.setItem(STORAGE_KEYS.SALES, sales);

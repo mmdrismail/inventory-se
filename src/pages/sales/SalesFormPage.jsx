@@ -387,33 +387,40 @@ export const SalesFormPage = () => {
     };
 
     setTimeout(() => {
-      let res;
-      if (isEditing) {
-        res = updateSale(id, payload, 'Sales Executive');
-      } else {
-        res = createSale(payload, 'Sales Executive');
-      }
-      setIsSubmitting(false);
-
-      if (res.success) {
-        playSuccessChime();
+      try {
+        let res;
         if (isEditing) {
-          navigate(`/sales/${id}`);
-        } else if (statusToSave === 'completed') {
-          setCompletedSale({
-            ...res.sale,
-            showRate,
-            showLineTotal,
-            showGrandTotal,
-          });
+          res = updateSale(id, payload, 'Sales Executive');
         } else {
-          navigate('/sales');
+          res = createSale(payload, 'Sales Executive');
         }
-      } else {
+        setIsSubmitting(false);
+
+        if (res && res.success) {
+          playSuccessChime();
+          if (isEditing) {
+            navigate(`/sales/${id}`);
+          } else if (statusToSave === 'completed') {
+            setCompletedSale({
+              ...res.sale,
+              showRate,
+              showLineTotal,
+              showGrandTotal,
+            });
+          } else {
+            navigate('/sales');
+          }
+        } else {
+          playErrorTone();
+          setErrors({ form: res?.message || 'Error saving invoice.' });
+        }
+      } catch (err) {
+        console.error('Error saving sale:', err);
+        setIsSubmitting(false);
         playErrorTone();
-        setErrors({ form: res.message });
+        setErrors({ form: err?.message || 'An unexpected error occurred while saving invoice.' });
       }
-    }, 250);
+    }, 150);
   };
 
   return (

@@ -3,6 +3,20 @@ import { apiClient } from './apiClient';
 import { customerService } from './customerService';
 import { INITIAL_QUOTATIONS } from '../data/seedData';
 
+const isGenericClientName = (name) => {
+  if (!name) return true;
+  const n = String(name).trim().toLowerCase();
+  return (
+    n === 'walk-in retail customer' ||
+    n === 'direct client' ||
+    n === 'valued client' ||
+    n === 'client representative' ||
+    n === 'সাধারণ ক্লায়েন্ট' ||
+    n === 'সাধারণ গ্রাহক' ||
+    n.includes('direct client')
+  );
+};
+
 class QuotationService {
   getAll() {
     return storageService.getItem(STORAGE_KEYS.QUOTATIONS, INITIAL_QUOTATIONS);
@@ -43,19 +57,6 @@ class QuotationService {
 
     // Auto-upsert customer if customer information provided and autoSave is enabled
     let customerId = data.customerId;
-    const isGenericClientName = (name) => {
-      if (!name) return true;
-      const n = String(name).trim().toLowerCase();
-      return (
-        n === 'walk-in retail customer' ||
-        n === 'direct client' ||
-        n === 'valued client' ||
-        n === 'client representative' ||
-        n === 'সাধারণ ক্লায়েন্ট' ||
-        n === 'সাধারণ গ্রাহক' ||
-        n.includes('direct client')
-      );
-    };
 
     if (
       data.autoSaveCustomer !== false &&
@@ -73,8 +74,8 @@ class QuotationService {
         address: data.customerAddress,
         location: data.customerLocation || data.customerAddress,
       });
-      if (cust && cust.id) {
-        customerId = cust.id;
+      if (cust && (cust.id || cust._id)) {
+        customerId = cust.id || cust._id;
       }
     }
 
@@ -159,6 +160,24 @@ class QuotationService {
       ...updates,
       updatedAt: new Date().toISOString(),
     };
+
+    if (
+      updates.autoSaveCustomer !== false &&
+      updates.customerName &&
+      updates.customerName.trim() &&
+      !isGenericClientName(updates.customerName)
+    ) {
+      customerService.upsertCustomer({
+        id: quotes[index].customerId,
+        name: updates.customerName,
+        companyName: updates.customerCompany,
+        designationRole: updates.customerRole,
+        phone: updates.customerPhone,
+        email: updates.customerEmail,
+        address: updates.customerAddress,
+        location: updates.customerLocation || updates.customerAddress,
+      });
+    }
 
     storageService.setItem(STORAGE_KEYS.QUOTATIONS, quotes);
 
