@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { StockBadge } from '../../components/common/Badge';
@@ -30,6 +31,13 @@ export const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { products, categories, suppliers, inventoryMovements, deleteProduct, confirmAction, settings } = useAppData();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
 
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [selectedVariantForLabel, setSelectedVariantForLabel] = useState(null);
@@ -52,10 +60,10 @@ export const ProductDetailPage = () => {
   if (!product) {
     return (
       <div className="py-12 text-center space-y-4">
-        <h2 className="text-xl font-bold">Product Not Found</h2>
-        <p className="text-sm text-slate-500">The requested product could not be located.</p>
+        <h2 className="text-xl font-bold">{l({ bn: 'পণ্যটি খুঁজে পাওয়া যায়নি', en: 'Product Not Found', obro: 'Product Not Found' })}</h2>
+        <p className="text-sm text-slate-500">{l({ bn: 'অনুরোধকৃত পণ্যটি ডেটাবেজে বিদ্যমান নেই।', en: 'The requested product could not be located.', obro: 'Product paowa jayni.' })}</p>
         <Link to="/products">
-          <Button variant="primary">Return to Catalog</Button>
+          <Button variant="primary">{l({ bn: 'পণ্য তালিকায় ফিরে যান', en: 'Return to Catalog', obro: 'Return to Catalog' })}</Button>
         </Link>
       </div>
     );
@@ -74,24 +82,52 @@ export const ProductDetailPage = () => {
   const getConditionBadge = (cond) => {
     switch (cond) {
       case 'original_oem':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300">Original OEM (জেনুইন)</span>;
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300">
+            {l({ bn: 'জেনুইন (Original OEM)', en: 'Original OEM', obro: 'Original OEM' })}
+          </span>
+        );
       case 'reconditioned':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">Reconditioned (রিকন্ডিশন)</span>;
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300">
+            {l({ bn: 'রিকন্ডিশন্ড (Reconditioned)', en: 'Reconditioned', obro: 'Reconditioned' })}
+          </span>
+        );
       case 'std_overhaul':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300">STD Overhaul (ওভারহল)</span>;
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300">
+            {l({ bn: 'ওভারহল (STD Overhaul)', en: 'STD Overhaul', obro: 'STD Overhaul' })}
+          </span>
+        );
       case 'used':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">Used (ব্যবহারযোগ্য)</span>;
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            {l({ bn: 'ব্যবহারযোগ্য (Used)', en: 'Used', obro: 'Used' })}
+          </span>
+        );
       case 'new':
       default:
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">Brand New (নতুন)</span>;
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">
+            {l({ bn: 'নতুন (Brand New)', en: 'Brand New', obro: 'Brand New' })}
+          </span>
+        );
     }
   };
 
   const handleDelete = () => {
     confirmAction({
-      title: `Delete "${product.name}"?`,
-      message: `Are you sure you want to delete SKU ${product.sku}? This action cannot be reversed.`,
-      confirmText: 'Delete Product',
+      title: l({
+        bn: `"${product.name}" পণ্যটি মুছে ফেলতে চান?`,
+        en: `Delete "${product.name}"?`,
+        obro: `Delete "${product.name}"?`,
+      }),
+      message: l({
+        bn: `আপনি কি নিশ্চিত যে SKU ${product.sku} মুছে ফেলবেন? এটি অপরিবর্তনীয়।`,
+        en: `Are you sure you want to delete SKU ${product.sku}? This action cannot be reversed.`,
+        obro: `SKU ${product.sku} delete korte chan?`,
+      }),
+      confirmText: l({ bn: 'পণ্য মুছুন', en: 'Delete Product', obro: 'Delete Product' }),
       isDestructive: true,
       onConfirm: () => {
         const res = deleteProduct(product.id);
@@ -116,7 +152,7 @@ export const ProductDetailPage = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Products</span>
+          <span>{l({ bn: 'পণ্য তালিকায় ফিরে যান', en: 'Back to Products', obro: 'Back to Products' })}</span>
         </Link>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -128,12 +164,12 @@ export const ProductDetailPage = () => {
             onClick={() => handlePrintLabel(null)}
             className="border-emerald-500 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
           >
-            প্রিন্ট বারকোড লেবেল
+            {l({ bn: 'প্রিন্ট বারকোড লেবেল', en: 'Print Barcode Label', obro: 'Print Barcode Label' })}
           </Button>
 
           <Link to={`/products/${product.id}/edit`}>
             <Button variant="outline" size="sm" icon={Edit2}>
-              Edit Product
+              {l({ bn: 'পণ্য সম্পাদনা (Edit)', en: 'Edit Product', obro: 'Edit Product' })}
             </Button>
           </Link>
           <button

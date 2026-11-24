@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppData } from '../../context/AppDataContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input, Select } from '../../components/forms/FormControls';
@@ -20,6 +21,13 @@ import {
 export const UserManagementPage = () => {
   const { users, addUser, updateUser, toggleUserStatus, deleteUser, resetUsers, confirmAction } = useAppData();
   const { currentUser } = useAuth();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -76,7 +84,13 @@ export const UserManagementPage = () => {
 
   const handleToggle = (user) => {
     if (user.id === currentUser?.id) {
-      alert('You cannot deactivate your own active session account.');
+      alert(
+        l({
+          bn: 'আপনি আপনার নিজের সক্রিয় অ্যাকাউন্ট নিষ্ক্রিয় করতে পারবেন না।',
+          en: 'You cannot deactivate your own active session account.',
+          obro: 'Apnar nijer active account deactivate kora jabe na.',
+        })
+      );
       return;
     }
     toggleUserStatus(user.id, currentUser?.id);
@@ -84,14 +98,32 @@ export const UserManagementPage = () => {
 
   const handleDelete = (user) => {
     if (user.id === currentUser?.id) {
-      alert('You cannot delete your own active administrator account.');
+      alert(
+        l({
+          bn: 'আপনি আপনার নিজের প্রশাসক অ্যাকাউন্ট মুছে ফেলতে পারবেন না।',
+          en: 'You cannot delete your own active administrator account.',
+          obro: 'Apnar nijer admin account delete kora jabe na.',
+        })
+      );
       return;
     }
 
     confirmAction({
-      title: `Delete User "${user.name}"?`,
-      message: 'Are you sure you want to remove this demo user from the system?',
-      confirmText: 'Delete User',
+      title: l({
+        bn: `ইউজার "${user.name}" মুছে ফেলবেন?`,
+        en: `Delete User "${user.name}"?`,
+        obro: `User "${user.name}" delete korben?`,
+      }),
+      message: l({
+        bn: 'আপনি কি নিশ্চিত যে এই ডেমো ইউজারটিকে সিস্টেম থেকে মুছে ফেলবেন?',
+        en: 'Are you sure you want to remove this demo user from the system?',
+        obro: 'Ei demo user-ke system theke muche felte chan?',
+      }),
+      confirmText: l({
+        bn: 'মুছে ফেলুন',
+        en: 'Delete User',
+        obro: 'Delete User',
+      }),
       isDestructive: true,
       onConfirm: () => {
         deleteUser(user.id, currentUser?.id);
@@ -101,9 +133,21 @@ export const UserManagementPage = () => {
 
   const handleResetDefaults = () => {
     confirmAction({
-      title: 'Reset Demo Users?',
-      message: 'This will restore the 4 default accounts (admin@stockline.io, manager@stockline.io, staff@stockline.io, customer@stockline.io).',
-      confirmText: 'Reset Demo Accounts',
+      title: l({
+        bn: 'ডেমো অ্যাকাউন্ট রিসেট করবেন?',
+        en: 'Reset Demo Users?',
+        obro: 'Demo Users Reset Korben?',
+      }),
+      message: l({
+        bn: 'এটি ৪টি মূল ডিফল্ট অ্যাকাউন্ট পুনরুদ্ধার করবে (admin@stockline.io, manager@stockline.io, staff@stockline.io, customer@stockline.io)।',
+        en: 'This will restore the 4 default accounts (admin@stockline.io, manager@stockline.io, staff@stockline.io, customer@stockline.io).',
+        obro: 'Eti 4-ti default account restore korbe.',
+      }),
+      confirmText: l({
+        bn: 'ডেমো অ্যাকাউন্ট রিসেট করুন',
+        en: 'Reset Demo Accounts',
+        obro: 'Reset Demo Accounts',
+      }),
       onConfirm: () => {
         resetUsers();
       },
@@ -113,11 +157,23 @@ export const UserManagementPage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      setErrors({ name: 'User name is required.' });
+      setErrors({
+        name: l({
+          bn: 'ব্যবহারকারীর নাম আবশ্যক।',
+          en: 'User name is required.',
+          obro: 'User name required.',
+        }),
+      });
       return;
     }
     if (!formData.email.trim()) {
-      setErrors({ email: 'Email address is required.' });
+      setErrors({
+        email: l({
+          bn: 'ইমেইল ঠিকানা আবশ্যক।',
+          en: 'Email address is required.',
+          obro: 'Email address required.',
+        }),
+      });
       return;
     }
 
@@ -144,19 +200,35 @@ export const UserManagementPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            User Roles & Permissions
+            {l({
+              bn: 'ইউজার রোল ও পারমিশন ব্যবস্থাপনা',
+              en: 'User Roles & Permissions',
+              obro: 'User Roles & Access Permissions',
+            })}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Configure simulated administrative personas and access privileges.
+            {l({
+              bn: 'সিস্টেমের প্রশাসনিক ভূমিকা, কর্মী অ্যাক্সেস এবং অধিকার কনফিগার করুন।',
+              en: 'Configure simulated administrative personas and access privileges.',
+              obro: 'Administrative persona ebong access privileges configure korun.',
+            })}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" icon={RotateCcw} onClick={handleResetDefaults}>
-            Reset Demo Accounts
+            {l({
+              bn: 'ডেমো অ্যাকাউন্ট রিসেট',
+              en: 'Reset Demo Accounts',
+              obro: 'Reset Demo Accounts',
+            })}
           </Button>
           <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenAdd}>
-            Add Demo User
+            {l({
+              bn: '+ নতুন ইউজার যোগ করুন',
+              en: 'Add Demo User',
+              obro: '+ Add Demo User',
+            })}
           </Button>
         </div>
       </div>
@@ -168,7 +240,11 @@ export const UserManagementPage = () => {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by user name, email, or department..."
+              placeholder={l({
+                bn: 'ব্যবহারকারীর নাম, ইমেইল বা বিভাগ দিয়ে খুঁজুন...',
+                en: 'Search by user name, email, or department...',
+                obro: 'Search by user name, email, or department...',
+              })}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -181,11 +257,17 @@ export const UserManagementPage = () => {
               onChange={(e) => setRoleFilter(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">All Roles ({users.length})</option>
-              <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
-              <option value="staff">Staff</option>
-              <option value="customer">Customer</option>
+              <option value="">
+                {l({
+                  bn: `সকল রোল (${users.length})`,
+                  en: `All Roles (${users.length})`,
+                  obro: `Shokol Roles (${users.length})`,
+                })}
+              </option>
+              <option value="admin">{l({ bn: 'অ্যাডমিন (Admin)', en: 'Admin', obro: 'Admin' })}</option>
+              <option value="manager">{l({ bn: 'ম্যানেজার (Manager)', en: 'Manager', obro: 'Manager' })}</option>
+              <option value="staff">{l({ bn: 'স্টাফ (Staff)', en: 'Staff', obro: 'Staff' })}</option>
+              <option value="customer">{l({ bn: 'গ্রাহক (Customer)', en: 'Customer', obro: 'Customer' })}</option>
             </select>
           </div>
         </div>
@@ -195,9 +277,21 @@ export const UserManagementPage = () => {
       <Card className="overflow-hidden">
         {filteredUsers.length === 0 ? (
           <EmptyState
-            title="No users found"
-            description="Try modifying your search or add a new demo user."
-            actionText="Add User"
+            title={l({
+              bn: 'কোনো ব্যবহারকারী পাওয়া যায়নি',
+              en: 'No users found',
+              obro: 'Kono user paowa jayni',
+            })}
+            description={l({
+              bn: 'অনুসন্ধানের শর্ত পরিবর্তন করুন অথবা নতুন ডেমো ইউজার যোগ করুন।',
+              en: 'Try modifying your search or add a new demo user.',
+              obro: 'Search modify korun ba notun demo user add korun.',
+            })}
+            actionText={l({
+              bn: 'নতুন ইউজার যোগ করুন',
+              en: 'Add User',
+              obro: 'Add User',
+            })}
             onAction={handleOpenAdd}
           />
         ) : (
@@ -205,12 +299,12 @@ export const UserManagementPage = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase text-[10px] tracking-wider select-none">
                 <tr>
-                  <th className="py-3 px-4">User</th>
-                  <th className="py-3 px-3">Role</th>
-                  <th className="py-3 px-3">Department</th>
-                  <th className="py-3 px-3">Registered</th>
-                  <th className="py-3 px-3 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4">{l({ bn: 'ব্যবহারকারী', en: 'User', obro: 'User' })}</th>
+                  <th className="py-3 px-3">{l({ bn: 'রোল / ভূমিকা', en: 'Role', obro: 'Role' })}</th>
+                  <th className="py-3 px-3">{l({ bn: 'বিভাগ / দায়িত্ব', en: 'Department', obro: 'Department' })}</th>
+                  <th className="py-3 px-3">{l({ bn: 'নিবন্ধন তারিখ', en: 'Registered', obro: 'Registered' })}</th>
+                  <th className="py-3 px-3 text-center">{l({ bn: 'অবস্থা', en: 'Status', obro: 'Status' })}</th>
+                  <th className="py-3 px-4 text-right">{l({ bn: 'অ্যাকশন', en: 'Actions', obro: 'Actions' })}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -230,7 +324,7 @@ export const UserManagementPage = () => {
                               <span>{u.name}</span>
                               {isCurrent && (
                                 <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold uppercase">
-                                  You
+                                  {l({ bn: 'আপনি', en: 'You', obro: 'You' })}
                                 </span>
                               )}
                             </div>
@@ -251,7 +345,13 @@ export const UserManagementPage = () => {
                               : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
                           }`}
                         >
-                          {u.role}
+                          {u.role === 'admin'
+                            ? l({ bn: 'অ্যাডমিন', en: 'ADMIN', obro: 'ADMIN' })
+                            : u.role === 'manager'
+                            ? l({ bn: 'ম্যানেজার', en: 'MANAGER', obro: 'MANAGER' })
+                            : u.role === 'staff'
+                            ? l({ bn: 'স্টাফ', en: 'STAFF', obro: 'STAFF' })
+                            : l({ bn: 'গ্রাহক', en: 'CUSTOMER', obro: 'CUSTOMER' })}
                         </span>
                       </td>
 
@@ -265,7 +365,9 @@ export const UserManagementPage = () => {
 
                       <td className="py-3 px-3 text-center">
                         <Badge variant={u.status === 'active' ? 'emerald' : 'slate'} size="sm">
-                          {u.status}
+                          {u.status === 'active'
+                            ? l({ bn: 'সক্রিয়', en: 'ACTIVE', obro: 'ACTIVE' })
+                            : l({ bn: 'নিষ্ক্রিয়', en: 'INACTIVE', obro: 'INACTIVE' })}
                         </Badge>
                       </td>
 
@@ -274,14 +376,18 @@ export const UserManagementPage = () => {
                           <button
                             onClick={() => handleToggle(u)}
                             disabled={isCurrent}
-                            title={u.status === 'active' ? 'Deactivate User' : 'Activate User'}
+                            title={
+                              u.status === 'active'
+                                ? l({ bn: 'অ্যাকাউন্ট নিষ্ক্রিয় করুন', en: 'Deactivate User', obro: 'Deactivate User' })
+                                : l({ bn: 'অ্যাকাউন্ট সক্রিয় করুন', en: 'Activate User', obro: 'Activate User' })
+                            }
                             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
                           >
                             <Power className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleOpenEdit(u)}
-                            title="Edit Role & Details"
+                            title={l({ bn: 'রোল ও তথ্য সম্পাদনা', en: 'Edit Role & Details', obro: 'Edit Role & Details' })}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                           >
                             <Edit2 className="h-4 w-4" />
@@ -289,7 +395,7 @@ export const UserManagementPage = () => {
                           <button
                             onClick={() => handleDelete(u)}
                             disabled={isCurrent}
-                            title="Delete User"
+                            title={l({ bn: 'ইউজার মুছে ফেলুন', en: 'Delete User', obro: 'Delete User' })}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-30"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -309,7 +415,11 @@ export const UserManagementPage = () => {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingUser ? 'Edit Demo User' : 'Create New Demo User'}
+        title={
+          editingUser
+            ? l({ bn: 'ইউজার তথ্য সম্পাদনা', en: 'Edit Demo User', obro: 'Edit User Info' })
+            : l({ bn: 'নতুন ডেমো ইউজার তৈরি করুন', en: 'Create New Demo User', obro: 'Create New Demo User' })
+        }
         maxWidth="max-w-md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -320,17 +430,17 @@ export const UserManagementPage = () => {
           )}
 
           <Input
-            label="Full Name"
+            label={l({ bn: 'পূর্ণ নাম', en: 'Full Name', obro: 'Full Name' })}
             name="name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             error={errors.name}
-            placeholder="e.g. Tanvir Hasan"
+            placeholder={l({ bn: 'যেমন: তানভীর হাসান', en: 'e.g. Tanvir Hasan', obro: 'Jemon: Tanvir Hasan' })}
             required
           />
 
           <Input
-            label="Email Address"
+            label={l({ bn: 'ইমেইল ঠিকানা', en: 'Email Address', obro: 'Email Address' })}
             type="email"
             name="email"
             value={formData.email}
@@ -341,43 +451,72 @@ export const UserManagementPage = () => {
           />
 
           <Select
-            label="Assigned Demo Role"
+            label={l({ bn: 'নির্ধারিত ভূমিকা (Role)', en: 'Assigned Demo Role', obro: 'Assigned Demo Role' })}
             name="role"
             value={formData.role}
             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             options={[
-              { value: 'admin', label: 'Admin (Full Access)' },
-              { value: 'manager', label: 'Manager (Operations & Reports)' },
-              { value: 'staff', label: 'Staff (POS & Customer Sales)' },
-              { value: 'customer', label: 'Customer (Storefront & My Orders)' },
+              {
+                value: 'admin',
+                label: l({ bn: 'অ্যাডমিন (সকল ক্ষমতা)', en: 'Admin (Full Access)', obro: 'Admin (Full Access)' }),
+              },
+              {
+                value: 'manager',
+                label: l({
+                  bn: 'ম্যানেজার (অপারেশন ও রিপোর্ট)',
+                  en: 'Manager (Operations & Reports)',
+                  obro: 'Manager (Operations & Reports)',
+                }),
+              },
+              {
+                value: 'staff',
+                label: l({
+                  bn: 'স্টাফ (পিওএস ও বিক্রয় কাউন্টার)',
+                  en: 'Staff (POS & Customer Sales)',
+                  obro: 'Staff (POS & Customer Sales)',
+                }),
+              },
+              {
+                value: 'customer',
+                label: l({
+                  bn: 'গ্রাহক (অনলাইন শপ ও অর্ডার)',
+                  en: 'Customer (Storefront & My Orders)',
+                  obro: 'Customer (Storefront & My Orders)',
+                }),
+              },
             ]}
           />
 
           <Input
-            label="Department / Assignment"
+            label={l({ bn: 'বিভাগ / দায়িত্বের ক্ষেত্র', en: 'Department / Assignment', obro: 'Department / Assignment' })}
             name="department"
             value={formData.department}
             onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-            placeholder="e.g. Warehouse Inventory"
+            placeholder={l({ bn: 'যেমন: ওয়্যারহাউস ইনভেন্টরি', en: 'e.g. Warehouse Inventory', obro: 'Warehouse Inventory' })}
           />
 
           <Select
-            label="Account Status"
+            label={l({ bn: 'অ্যাকাউন্ট স্ট্যাটাস', en: 'Account Status', obro: 'Account Status' })}
             name="status"
             value={formData.status}
             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
             options={[
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive / Suspended' },
+              { value: 'active', label: l({ bn: 'সক্রিয় (Active)', en: 'Active', obro: 'Active' }) },
+              {
+                value: 'inactive',
+                label: l({ bn: 'স্থগিত / নিষ্ক্রিয় (Inactive)', en: 'Inactive / Suspended', obro: 'Inactive / Suspended' }),
+              },
             ]}
           />
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <Button variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              {l({ bn: 'বাতিল', en: 'Cancel', obro: 'Cancel' })}
             </Button>
             <Button type="submit" variant="primary">
-              {editingUser ? 'Save Changes' : 'Create User'}
+              {editingUser
+                ? l({ bn: 'আপডেট সংরক্ষণ করুন', en: 'Save Changes', obro: 'Save Changes' })
+                : l({ bn: 'ইউজার তৈরি করুন', en: 'Create User', obro: 'Create User' })}
             </Button>
           </div>
         </form>

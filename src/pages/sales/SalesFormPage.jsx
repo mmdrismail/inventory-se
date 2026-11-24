@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link, useLocation, useParams } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input, Select } from '../../components/forms/FormControls';
@@ -26,6 +27,14 @@ import { playBarcodeBeep, playSuccessChime, playErrorTone } from '../../utils/so
 
 export const SalesFormPage = () => {
   const { customers, products, sales, quotations, createSale, updateSale, settings } = useAppData();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
+
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
@@ -432,13 +441,13 @@ export const SalesFormPage = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Sales List</span>
+          <span>{l({ bn: 'বিক্রয় তালিকায় ফিরে যান', en: 'Back to Sales List', obro: 'Back to Sales List' })}</span>
         </Link>
 
         {prefill && (
           <div className="flex items-center gap-2 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 px-3 py-1 rounded-lg text-xs text-purple-700 dark:text-purple-300 font-semibold">
             <FileSpreadsheet className="h-4 w-4" />
-            <span>Converted from Quotation #{prefill.quotationNumber}</span>
+            <span>{l({ bn: `দরপত্র #${prefill.quotationNumber} থেকে রূপান্তরকৃত`, en: `Converted from Quotation #${prefill.quotationNumber}`, obro: `Converted from Quotation #${prefill.quotationNumber}` })}</span>
           </div>
         )}
       </div>
@@ -446,12 +455,22 @@ export const SalesFormPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>
-            {isEditing ? 'বিক্রয় চালান সংশোধন (Edit Sales Invoice)' : 'Record Sale / POS Invoice'}
+            {isEditing
+              ? l({ bn: 'বিক্রয় চালান সংশোধন', en: 'Edit Sales Invoice', obro: 'Edit Sales Invoice' })
+              : l({ bn: 'নতুন বিক্রয় চালান (POS)', en: 'Record Sale / POS Invoice', obro: 'Record Sale / POS Invoice' })}
           </CardTitle>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {isEditing
-              ? `ইনভয়েস #${invoiceNo}-এর সকল তথ্য ও মালামাল আপডেট করুন`
-              : 'Create a point-of-sale invoice with full international customer role & enterprise management.'}
+              ? l({
+                  bn: `ইনভয়েস #${invoiceNo}-এর সকল তথ্য ও মালামাল আপডেট করুন`,
+                  en: `Update all items and details for Invoice #${invoiceNo}`,
+                  obro: `Invoice #${invoiceNo} update korun`,
+                })
+              : l({
+                  bn: 'কাস্টমার প্রোফাইল, কর্পোরেট রোল এবং আধুনিক মাল্টি-টায়ার প্রাইসিংসহ বিক্রয় মেমো তৈরি করুন।',
+                  en: 'Create a point-of-sale invoice with full international customer role & enterprise management.',
+                  obro: 'Point-of-sale invoice create korun with customer role & pricing.',
+                })}
           </p>
         </CardHeader>
 
@@ -924,7 +943,7 @@ export const SalesFormPage = () => {
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
             <Button variant="secondary" onClick={() => navigate('/sales')}>
-              বাতিল করুন (Cancel)
+              {l({ bn: 'বাতিল করুন', en: 'Cancel', obro: 'Cancel' })}
             </Button>
 
             <div className="flex items-center gap-2">
@@ -936,7 +955,7 @@ export const SalesFormPage = () => {
                   onClick={() => handleSubmit(existingSale?.status || 'completed')}
                   className="shadow-md shadow-emerald-500/20 font-bold"
                 >
-                  ইনভয়েস আপডেট করুন (Update Invoice)
+                  {l({ bn: 'ইনভয়েস আপডেট করুন', en: 'Update Invoice', obro: 'Update Invoice' })}
                 </Button>
               ) : (
                 <>
@@ -946,7 +965,7 @@ export const SalesFormPage = () => {
                     isLoading={isSubmitting}
                     onClick={() => handleSubmit('draft')}
                   >
-                    খসড়া সেভ (Save as Draft)
+                    {l({ bn: 'ড্রাফট সেভ করুন', en: 'Save as Draft', obro: 'Save as Draft' })}
                   </Button>
                   <Button
                     variant="primary"
@@ -955,7 +974,7 @@ export const SalesFormPage = () => {
                     onClick={() => handleSubmit('completed')}
                     className="shadow-md shadow-emerald-500/20 font-bold"
                   >
-                    বিক্রি সম্পন্ন ও প্রিন্ট করুন (Complete & Print)
+                    {l({ bn: 'বিক্রয় সম্পন্ন ও প্রিন্ট করুন', en: 'Complete & Print', obro: 'Complete & Print' })}
                   </Button>
                 </>
               )}

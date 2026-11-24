@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
@@ -26,6 +27,13 @@ export const ProductFormPage = () => {
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const navigate = useNavigate();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
 
   const { products, categories, suppliers, addProduct, updateProduct } = useAppData();
 
@@ -305,15 +313,23 @@ export const ProductFormPage = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Product List</span>
+          <span>{l({ bn: 'পণ্য তালিকায় ফিরে যান', en: 'Back to Product List', obro: 'Back to Product List' })}</span>
         </Link>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>{isEditMode ? 'Edit Product & Machinery Details' : 'Add New Machinery / Spare Part'}</CardTitle>
+          <CardTitle>
+            {isEditMode
+              ? l({ bn: 'পণ্যের তথ্য ও স্পেকস সম্পাদন', en: 'Edit Product & Machinery Details', obro: 'Edit Product Details' })
+              : l({ bn: 'নতুন পণ্য ও স্পেয়ার পার্টস যোগ করুন', en: 'Add New Machinery / Spare Part', obro: 'Add New Product / Part' })}
+          </CardTitle>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            আন্তর্জাতিক সুপারশপ ও ওয়্যারহাউজ স্ট্যান্ডার্ড: পার্টস স্পেসিফিকেশন, ভ্যারিয়েন্ট, ভিন্ন ভিন্ন দাম ও র‍্যাক লোকেশন সেট করুন।
+            {l({
+              bn: 'আন্তর্জাতিক সুপারশপ ও ওয়্যারহাউজ স্ট্যান্ডার্ড: পার্টস স্পেসিফিকেশন, ভ্যারিয়েন্ট, ভিন্ন ভিন্ন দাম ও র‍্যাক লোকেশন সেট করুন।',
+              en: 'Standard warehouse inventory: Configure part specs, variants, tier pricing, and rack location.',
+              obro: 'Warehouse inventory: Part specs, variants, tier pricing o rack location configure korun.',
+            })}
           </p>
         </CardHeader>
 

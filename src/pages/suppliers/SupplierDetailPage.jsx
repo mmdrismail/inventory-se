@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
@@ -10,6 +11,13 @@ import { ArrowLeft, Truck, Mail, Phone, MapPin, ShoppingCart, Eye, Plus } from '
 export const SupplierDetailPage = () => {
   const { id } = useParams();
   const { suppliers, purchases, settings } = useAppData();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
 
   const supplier = suppliers.find((s) => s.id === id);
 
@@ -26,9 +34,9 @@ export const SupplierDetailPage = () => {
   if (!supplier) {
     return (
       <div className="py-12 text-center space-y-4">
-        <h2 className="text-xl font-bold">Supplier Not Found</h2>
+        <h2 className="text-xl font-bold">{l({ bn: 'সরবরাহকারী পাওয়া যায়নি', en: 'Supplier Not Found', obro: 'Supplier Not Found' })}</h2>
         <Link to="/suppliers">
-          <Button variant="primary">Return to Supplier Directory</Button>
+          <Button variant="primary">{l({ bn: 'সরবরাহকারী তালিকায় ফিরুন', en: 'Return to Supplier Directory', obro: 'Supplier Directory-te Ferot Jan' })}</Button>
         </Link>
       </div>
     );
@@ -43,12 +51,12 @@ export const SupplierDetailPage = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Suppliers</span>
+          <span>{l({ bn: 'সরবরাহকারী তালিকায় ফিরে যান', en: 'Back to Suppliers', obro: 'Back to Suppliers' })}</span>
         </Link>
 
         <Link to="/purchases/new">
           <Button variant="primary" size="sm" icon={Plus}>
-            Create Purchase Order
+            {l({ bn: 'নতুন ক্রয় অর্ডার (PO)', en: 'Create Purchase Order', obro: 'Create Purchase Order' })}
           </Button>
         </Link>
       </div>
@@ -66,7 +74,9 @@ export const SupplierDetailPage = () => {
                   {supplier.name}
                 </h1>
                 <Badge variant={supplier.status === 'active' ? 'emerald' : 'slate'} size="sm">
-                  {supplier.status}
+                  {supplier.status === 'active'
+                    ? l({ bn: 'সক্রিয়', en: 'ACTIVE', obro: 'ACTIVE' })
+                    : l({ bn: 'নিষ্ক্রিয়', en: 'INACTIVE', obro: 'INACTIVE' })}
                 </Badge>
               </div>
               <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
@@ -83,13 +93,15 @@ export const SupplierDetailPage = () => {
           {/* Quick Metrics */}
           <div className="flex sm:flex-col items-end gap-2 text-right">
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Spend</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                {l({ bn: 'মোট ক্রয় ব্যয়', en: 'Total Spend', obro: 'Total Spend' })}
+              </span>
               <span className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
                 {formatCurrency(totalSpent, settings.currency)}
               </span>
             </div>
             <div className="text-xs text-slate-500">
-              {supplierPurchases.length} purchase order{supplierPurchases.length === 1 ? '' : 's'}
+              {supplierPurchases.length} {l({ bn: 'টি পারচেজ অর্ডার', en: 'purchase order(s)', obro: 'PO' })}
             </div>
           </div>
         </div>
@@ -98,15 +110,15 @@ export const SupplierDetailPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 text-xs">
           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <Mail className="h-4 w-4 text-slate-400 shrink-0" />
-            <span>{supplier.email || 'No email registered'}</span>
+            <span>{supplier.email || l({ bn: 'ইমেইল নিবন্ধিত নেই', en: 'No email registered', obro: 'No email' })}</span>
           </div>
           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <Phone className="h-4 w-4 text-slate-400 shrink-0" />
-            <span>{supplier.phone || 'No phone registered'}</span>
+            <span>{supplier.phone || l({ bn: 'ফোন নিবন্ধিত নেই', en: 'No phone registered', obro: 'No phone' })}</span>
           </div>
           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
-            <span className="truncate">{supplier.address || 'No address registered'}</span>
+            <span className="truncate">{supplier.address || l({ bn: 'ঠিকানা নিবন্ধিত নেই', en: 'No address registered', obro: 'No address' })}</span>
           </div>
         </div>
       </Card>
@@ -117,10 +129,10 @@ export const SupplierDetailPage = () => {
           <div>
             <CardTitle className="flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-emerald-500" />
-              <span>Purchase Orders & Intake History</span>
+              <span>{l({ bn: 'পণ্য ক্রয় ও সরবরাহের ইতিহাস', en: 'Purchase Orders & Intake History', obro: 'Purchase Orders & Intake History' })}</span>
             </CardTitle>
             <p className="text-xs text-slate-400 mt-0.5">
-              Historical purchase orders issued to {supplier.name}
+              {supplier.name} {l({ bn: '-এর নিকট জারিকৃত অতীতের ক্রয় অর্ডারসমূহ', en: '- historical purchase orders', obro: '- historical purchase orders' })}
             </p>
           </div>
         </CardHeader>
@@ -129,20 +141,24 @@ export const SupplierDetailPage = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-y border-slate-200 dark:border-slate-800 text-slate-500 uppercase text-[10px]">
                 <tr>
-                  <th className="py-2.5 px-4">PO Reference</th>
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3 text-center">Items</th>
-                  <th className="py-2.5 px-3 text-right">Order Total</th>
-                  <th className="py-2.5 px-3 text-center">Payment</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
-                  <th className="py-2.5 px-4 text-right">Action</th>
+                  <th className="py-2.5 px-4">{l({ bn: 'পিও রেফারেন্স', en: 'PO Reference', obro: 'PO Reference' })}</th>
+                  <th className="py-2.5 px-3">{l({ bn: 'তারিখ', en: 'Date', obro: 'Date' })}</th>
+                  <th className="py-2.5 px-3 text-center">{l({ bn: 'আইটেম', en: 'Items', obro: 'Items' })}</th>
+                  <th className="py-2.5 px-3 text-right">{l({ bn: 'মোট মূল্য', en: 'Order Total', obro: 'Order Total' })}</th>
+                  <th className="py-2.5 px-3 text-center">{l({ bn: 'পেমেন্ট', en: 'Payment', obro: 'Payment' })}</th>
+                  <th className="py-2.5 px-3 text-center">{l({ bn: 'অবস্থা', en: 'Status', obro: 'Status' })}</th>
+                  <th className="py-2.5 px-4 text-right">{l({ bn: 'অ্যাকশন', en: 'Action', obro: 'Action' })}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {supplierPurchases.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="py-8 text-center text-slate-400">
-                      No purchase orders recorded for this supplier yet.
+                      {l({
+                        bn: 'এই সরবরাহকারীর জন্য এখনও কোনো ক্রয় অর্ডার তৈরি করা হয়নি।',
+                        en: 'No purchase orders recorded for this supplier yet.',
+                        obro: 'Kono purchase order record hoyni.',
+                      })}
                     </td>
                   </tr>
                 ) : (
@@ -170,7 +186,9 @@ export const SupplierDetailPage = () => {
                               : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
                           }`}
                         >
-                          {p.paymentStatus}
+                          {p.paymentStatus === 'paid'
+                            ? l({ bn: 'পরিশোধিত', en: 'PAID', obro: 'PAID' })
+                            : l({ bn: 'বকেয়া', en: 'PENDING', obro: 'PENDING' })}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-center">
@@ -183,7 +201,11 @@ export const SupplierDetailPage = () => {
                               : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                           }`}
                         >
-                          {p.status}
+                          {p.status === 'received'
+                            ? l({ bn: 'গৃহীত', en: 'RECEIVED', obro: 'RECEIVED' })
+                            : p.status === 'cancelled'
+                            ? l({ bn: 'বাতিল', en: 'CANCELLED', obro: 'CANCELLED' })
+                            : p.status}
                         </span>
                       </td>
                       <td className="py-2.5 px-4 text-right">

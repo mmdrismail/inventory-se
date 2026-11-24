@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
@@ -32,6 +33,13 @@ export const CustomerDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { customers, sales, orders, quotations, settings } = useAppData();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
 
   const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'quotations' | 'orders'
   const [activePrintQuotation, setActivePrintQuotation] = useState(null);
@@ -94,9 +102,9 @@ export const CustomerDetailPage = () => {
   if (!customer) {
     return (
       <div className="py-12 text-center space-y-4">
-        <h2 className="text-xl font-bold">Customer Not Found</h2>
+        <h2 className="text-xl font-bold">{l({ bn: 'গ্রাহক পাওয়া যায়নি', en: 'Customer Not Found', obro: 'Customer Not Found' })}</h2>
         <Link to="/customers">
-          <Button variant="primary">Return to Customers</Button>
+          <Button variant="primary">{l({ bn: 'গ্রাহক তালিকায় ফিরে যান', en: 'Return to Customers', obro: 'Return to Customers' })}</Button>
         </Link>
       </div>
     );
@@ -105,17 +113,17 @@ export const CustomerDetailPage = () => {
   const getRoleLabel = (role) => {
     switch (role) {
       case 'owner':
-        return 'কোম্পানির মালিক / স্বত্বাধিকারী (Owner)';
+        return l({ bn: 'কোম্পানির মালিক / স্বত্বাধিকারী', en: 'Company Owner', obro: 'Company Owner' });
       case 'agent':
-        return 'কোম্পানির প্রতিনিধি / এজেন্ট (Agent)';
+        return l({ bn: 'কোম্পানির প্রতিনিধি / এজেন্ট', en: 'Company Agent', obro: 'Company Agent' });
       case 'purchaser':
-        return 'ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার (Purchaser)';
+        return l({ bn: 'ক্রয় কর্মকর্তা / প্রকিউরমেন্ট ম্যানেজার', en: 'Purchasing Manager', obro: 'Purchasing Manager' });
       case 'supplier_rep':
-        return 'সরবরাহকারী / ভেন্ডর প্রতিনিধি (Supplier Rep)';
+        return l({ bn: 'সরবরাহকারী / ভেন্ডর প্রতিনিধি', en: 'Supplier / Vendor Rep', obro: 'Supplier Rep' });
       case 'wholesale':
-        return 'পাইকারি ডিলার / মার্চেন্ট (Wholesale)';
+        return l({ bn: 'পাইকারি ডিলার / মার্চেন্ট', en: 'Wholesale Dealer / Merchant', obro: 'Wholesale Dealer' });
       default:
-        return 'সাধারণ গ্রাহক (Retail)';
+        return l({ bn: 'সাধারণ খুচরা গ্রাহক', en: 'Retail Consumer', obro: 'Retail Customer' });
     }
   };
 
@@ -128,18 +136,18 @@ export const CustomerDetailPage = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Customers List</span>
+          <span>{l({ bn: 'গ্রাহক তালিকায় ফিরে যান', en: 'Back to Customers List', obro: 'Back to Customers List' })}</span>
         </Link>
 
         <div className="flex items-center gap-2">
           <Link to="/quotations/new">
             <Button variant="secondary" size="sm" icon={FileSpreadsheet}>
-              Create Quotation (দরপত্র)
+              {l({ bn: 'নতুন দরপত্র (Quotation)', en: 'Create Quotation', obro: 'Create Quotation' })}
             </Button>
           </Link>
           <Link to="/sales/new">
             <Button variant="primary" size="sm" icon={Plus}>
-              Record New Sale (ইনভয়েস)
+              {l({ bn: 'নতুন বিক্রয় (Record Sale)', en: 'Record New Sale', obro: 'Record New Sale' })}
             </Button>
           </Link>
         </div>

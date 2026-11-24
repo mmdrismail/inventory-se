@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
@@ -12,6 +13,14 @@ export const SaleDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { sales, customers, completeSale, cancelSale, confirmAction, settings } = useAppData();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
+
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
   // Single-line column & total visibility controls ("eta ek line e thakbe eigula")
@@ -33,9 +42,9 @@ export const SaleDetailPage = () => {
   if (!sale) {
     return (
       <div className="py-12 text-center space-y-4">
-        <h2 className="text-xl font-bold">Sale Invoice Not Found</h2>
+        <h2 className="text-xl font-bold">{l({ bn: 'বিক্রয় ইনভয়েসটি পাওয়া যায়নি', en: 'Sale Invoice Not Found', obro: 'Sale Invoice Not Found' })}</h2>
         <Link to="/sales">
-          <Button variant="primary">Return to Sales List</Button>
+          <Button variant="primary">{l({ bn: 'বিক্রয় তালিকায় ফিরে যান', en: 'Return to Sales List', obro: 'Sales List-e Ferot Jan' })}</Button>
         </Link>
       </div>
     );
@@ -47,9 +56,17 @@ export const SaleDetailPage = () => {
 
   const handleComplete = () => {
     confirmAction({
-      title: `Complete Invoice ${invoiceNumber}?`,
-      message: 'This will decrease on-hand inventory quantities for all sold items and record movements.',
-      confirmText: 'Complete Sale',
+      title: l({
+        bn: `ইনভয়েস ${invoiceNumber} সম্পন্ন করবেন?`,
+        en: `Complete Invoice ${invoiceNumber}?`,
+        obro: `Invoice ${invoiceNumber} complete korben?`,
+      }),
+      message: l({
+        bn: 'এটি বিক্রিত সকল আইটেমের স্টক ইনভেন্টরি থেকে হ্রাস করবে এবং মুভমেন্ট রেকর্ড সংরক্ষণ করবে।',
+        en: 'This will decrease on-hand inventory quantities for all sold items and record movements.',
+        obro: 'Eti sold item-er stock komiye movement record korbe.',
+      }),
+      confirmText: l({ bn: 'বিক্রয় সম্পন্ন করুন', en: 'Complete Sale', obro: 'Complete Sale' }),
       onConfirm: () => {
         completeSale(sale.id, 'Sales Executive');
       },
@@ -58,11 +75,23 @@ export const SaleDetailPage = () => {
 
   const handleCancel = () => {
     confirmAction({
-      title: `Cancel Sale Invoice ${invoiceNumber}?`,
+      title: l({
+        bn: `বিক্রয় ইনভয়েস ${invoiceNumber} বাতিল করবেন?`,
+        en: `Cancel Sale Invoice ${invoiceNumber}?`,
+        obro: `Invoice ${invoiceNumber} cancel korben?`,
+      }),
       message: sale.status === 'completed'
-        ? 'Warning: This sale has already deducted items from stock. Cancelling it will safely restore those quantities.'
-        : 'Are you sure you want to cancel this draft sale invoice?',
-      confirmText: 'Confirm Cancellation',
+        ? l({
+            bn: 'সতর্কতা: এই বিক্রয় থেকে ইতিমধ্যে স্টক কর্তন হয়েছে। এটি বাতিল করলে সেই পরিমাণ স্টক স্বয়ংক্রিয়ভাবে ইনভেন্টরিতে ফিরিয়ে দেওয়া হবে।',
+            en: 'Warning: This sale has already deducted items from stock. Cancelling it will safely restore those quantities.',
+            obro: 'Warning: Stock already deducted. Cancel korle stock inventory-te restore hobe.',
+          })
+        : l({
+            bn: 'আপনি কি নিশ্চিত যে এই ড্রাফট ইনভয়েসটি বাতিল করতে চান?',
+            en: 'Are you sure you want to cancel this draft sale invoice?',
+            obro: 'Ei draft invoice cancel korte chan?',
+          }),
+      confirmText: l({ bn: 'বাতিল নিশ্চিত করুন', en: 'Confirm Cancellation', obro: 'Confirm Cancellation' }),
       isDestructive: true,
       onConfirm: () => {
         cancelSale(sale.id, 'Admin');
@@ -79,29 +108,29 @@ export const SaleDetailPage = () => {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Back to Sales List</span>
+          <span>{l({ bn: 'বিক্রয় তালিকায় ফিরে যান', en: 'Back to Sales List', obro: 'Sales List-e Ferot Jan' })}</span>
         </Link>
 
         <div className="flex items-center gap-2">
           <Link to={`/sales/${sale.id}/edit`}>
             <Button variant="outline" size="sm" icon={Edit2}>
-              Edit Invoice
+              {l({ bn: 'ইনভয়েস এডিট করুন', en: 'Edit Invoice', obro: 'Edit Invoice' })}
             </Button>
           </Link>
 
           <Button variant="outline" size="sm" icon={Printer} onClick={() => setIsReceiptOpen(true)}>
-            Print Invoice / Challan
+            {l({ bn: 'প্রিন্ট মেমো / চালান', en: 'Print Invoice / Challan', obro: 'Print Invoice / Challan' })}
           </Button>
 
           {sale.status === 'draft' && (
             <Button variant="primary" size="sm" icon={CheckCircle2} onClick={handleComplete}>
-              Complete Sale Now
+              {l({ bn: 'এখনই সম্পন্ন করুন', en: 'Complete Sale Now', obro: 'Complete Sale Now' })}
             </Button>
           )}
 
           {sale.status !== 'cancelled' && (
             <Button variant="outline" size="sm" icon={XCircle} onClick={handleCancel}>
-              Cancel Invoice
+              {l({ bn: 'ইনভয়েস বাতিল করুন', en: 'Cancel Invoice', obro: 'Cancel Invoice' })}
             </Button>
           )}
         </div>
@@ -126,16 +155,25 @@ export const SaleDetailPage = () => {
                 {sale.status === 'completed' && <CheckCircle2 className="h-3 w-3" />}
                 {sale.status === 'draft' && <Clock className="h-3 w-3" />}
                 {sale.status === 'cancelled' && <XCircle className="h-3 w-3" />}
-                <span>{sale.status}</span>
+                <span>
+                  {sale.status === 'completed'
+                    ? l({ bn: 'সম্পন্ন', en: 'COMPLETED', obro: 'COMPLETED' })
+                    : sale.status === 'cancelled'
+                    ? l({ bn: 'বাতিল', en: 'CANCELLED', obro: 'CANCELLED' })
+                    : l({ bn: 'ড্রাফট', en: 'DRAFT', obro: 'DRAFT' })}
+                </span>
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Issued on {formatDateTime(saleDate)}
+              {l({ bn: 'ইস্যুর তারিখ: ', en: 'Issued on ', obro: 'Issued on ' })}
+              {formatDateTime(saleDate)}
             </p>
           </div>
 
           <div className="text-right">
-            <span className="text-[10px] uppercase font-bold text-slate-400 block">Grand Total</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">
+              {l({ bn: 'সর্বমোট মূল্য', en: 'Grand Total', obro: 'Grand Total' })}
+            </span>
             <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
               {formatCurrency(totalAmount, settings.currency)}
             </div>
@@ -146,7 +184,9 @@ export const SaleDetailPage = () => {
                   : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
               }`}
             >
-              {sale.paymentStatus}
+              {sale.paymentStatus === 'paid'
+                ? l({ bn: 'পরিশোধিত', en: 'PAID', obro: 'PAID' })
+                : l({ bn: 'বকেয়া', en: 'PENDING', obro: 'PENDING' })}
             </span>
           </div>
         </div>
@@ -155,7 +195,7 @@ export const SaleDetailPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 text-xs">
           <div>
             <span className="text-slate-400 font-semibold block uppercase text-[10px] mb-1">
-              Billed Customer
+              {l({ bn: 'গ্রাহকের বিবরণ', en: 'Billed Customer', obro: 'Billed Customer' })}
             </span>
             {sale.customerId ? (
               <Link
@@ -166,17 +206,17 @@ export const SaleDetailPage = () => {
               </Link>
             ) : (
               <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                {sale.customerName || 'Walk-in Retail Customer'}
+                {sale.customerName || l({ bn: 'খুচরা নগদ ক্রেতা', en: 'Walk-in Retail Customer', obro: 'Walk-in Customer' })}
               </span>
             )}
-            <p className="text-slate-500 mt-0.5">{customer?.phone || sale.customerPhone || 'Direct counter sale'}</p>
+            <p className="text-slate-500 mt-0.5">{customer?.phone || sale.customerPhone || l({ bn: 'কাউন্টার সরাসরি বিক্রয়', en: 'Direct counter sale', obro: 'Direct counter sale' })}</p>
           </div>
           <div>
             <span className="text-slate-400 font-semibold block uppercase text-[10px] mb-1">
-              Invoice Remarks
+              {l({ bn: 'ইনভয়েস মন্তব্য ও বিবরণ', en: 'Invoice Remarks', obro: 'Invoice Remarks' })}
             </span>
             <p className="text-slate-700 dark:text-slate-300">
-              {sale.notes || 'Standard retail transaction.'}
+              {sale.notes || l({ bn: 'সাধারণ নিয়মিত লেনদেন।', en: 'Standard retail transaction.', obro: 'Standard retail transaction.' })}
             </p>
           </div>
         </div>
@@ -185,7 +225,7 @@ export const SaleDetailPage = () => {
         <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/60 my-4 text-xs">
           <div className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300">
             <span className="text-[11px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-extrabold flex items-center gap-1.5">
-              <span>👁️ কলাম ও মোট মূল্য নিয়ন্ত্রণ:</span>
+              <span>{l({ bn: '👁️ কলাম ও মোট মূল্য নিয়ন্ত্রণ:', en: '👁️ Print Columns & Totals:', obro: '👁️ Column & Totals Toggle:' })}</span>
             </span>
           </div>
 
@@ -197,7 +237,7 @@ export const SaleDetailPage = () => {
                 onChange={(e) => setShowRate(e.target.checked)}
                 className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
               />
-              <span>দর / Rate কলাম</span>
+              <span>{l({ bn: 'দর / Rate কলাম', en: 'Rate / Unit Price', obro: 'Rate / Unit Price' })}</span>
             </label>
 
             <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 transition-colors select-none">
@@ -207,7 +247,7 @@ export const SaleDetailPage = () => {
                 onChange={(e) => setShowLineTotal(e.target.checked)}
                 className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
               />
-              <span>মোট টাকা / Amount কলাম</span>
+              <span>{l({ bn: 'মোট টাকা / Amount কলাম', en: 'Line Total Amount', obro: 'Line Total Amount' })}</span>
             </label>
 
             <label className="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700 dark:text-slate-300 hover:text-emerald-600 transition-colors select-none">
@@ -217,7 +257,7 @@ export const SaleDetailPage = () => {
                 onChange={(e) => setShowGrandTotal(e.target.checked)}
                 className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
               />
-              <span>সর্বমোট মূল্য / Grand Total</span>
+              <span>{l({ bn: 'সর্বমোট মূল্য / Grand Total', en: 'Grand Total Footer', obro: 'Grand Total Footer' })}</span>
             </label>
           </div>
         </div>
@@ -225,16 +265,16 @@ export const SaleDetailPage = () => {
         {/* Itemized Table */}
         <div className="pt-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-            Billed Items
+            {l({ bn: 'বিক্রিত পণ্যের বিবরণ', en: 'Billed Items', obro: 'Billed Items' })}
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-y border-slate-200 dark:border-slate-800 text-slate-500 uppercase text-[10px]">
                 <tr>
-                  <th className="py-2.5 px-4">Product Name</th>
-                  <th className="py-2.5 px-3 text-center">Quantity</th>
-                  {showRate && <th className="py-2.5 px-3 text-right">Unit Price</th>}
-                  {showLineTotal && <th className="py-2.5 px-4 text-right">Line Total</th>}
+                  <th className="py-2.5 px-4">{l({ bn: 'পণ্যের নাম ও স্পেকস', en: 'Product Name', obro: 'Product Name' })}</th>
+                  <th className="py-2.5 px-3 text-center">{l({ bn: 'পরিমাণ (Qty)', en: 'Quantity', obro: 'Qty' })}</th>
+                  {showRate && <th className="py-2.5 px-3 text-right">{l({ bn: 'দর / একক মূল্য', en: 'Unit Price', obro: 'Unit Price' })}</th>}
+                  {showLineTotal && <th className="py-2.5 px-4 text-right">{l({ bn: 'মোট টাকা', en: 'Line Total', obro: 'Line Total' })}</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -267,17 +307,17 @@ export const SaleDetailPage = () => {
         {showGrandTotal ? (
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col items-end gap-1.5 text-xs">
             <div className="flex justify-between w-64 text-slate-500">
-              <span>Subtotal:</span>
+              <span>{l({ bn: 'উপমোট (Subtotal):', en: 'Subtotal:', obro: 'Subtotal:' })}</span>
               <span className="font-mono">{formatCurrency(sale.subtotal !== undefined ? sale.subtotal : totalAmount, settings.currency)}</span>
             </div>
             {Number(sale.discount) > 0 && (
               <div className="flex justify-between w-64 text-emerald-600 font-semibold">
-                <span>Discount Applied:</span>
+                <span>{l({ bn: 'ছাড় / ডিসকাউন্ট:', en: 'Discount Applied:', obro: 'Discount Applied:' })}</span>
                 <span className="font-mono">-{formatCurrency(sale.discount, settings.currency)}</span>
               </div>
             )}
             <div className="flex justify-between w-64 text-base font-bold text-slate-900 dark:text-white pt-2 border-t border-slate-100 dark:border-slate-800">
-              <span>Grand Total:</span>
+              <span>{l({ bn: 'সর্বমোট প্রদেয়:', en: 'Grand Total:', obro: 'Grand Total:' })}</span>
               <span className="font-mono text-emerald-600 dark:text-emerald-400">
                 {formatCurrency(totalAmount, settings.currency)}
               </span>
@@ -290,7 +330,7 @@ export const SaleDetailPage = () => {
               onClick={() => setShowGrandTotal(true)}
               className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
             >
-              + সর্বমোট মূল্য দেখুন (Show Grand Total)
+              {l({ bn: '+ সর্বমোট মূল্য দেখুন (Show Grand Total)', en: '+ Show Grand Total', obro: '+ Show Grand Total' })}
             </button>
           </div>
         )}

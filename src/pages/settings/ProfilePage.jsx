@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/forms/FormControls';
@@ -9,6 +10,13 @@ import { User, Mail, Phone, Building, Shield, Save, CheckCircle2 } from 'lucide-
 export const ProfilePage = () => {
   const { currentUser, role, updateProfile } = useAuth();
   const { addToast } = useAppData();
+  const { language, t } = useLanguage();
+
+  const l = (texts) => {
+    if (language === 'en') return texts.en;
+    if (language === 'obro') return texts.obro || `${texts.bn} (${texts.en})`;
+    return texts.bn;
+  };
 
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
@@ -33,7 +41,10 @@ export const ProfilePage = () => {
     setTimeout(() => {
       updateProfile(formData);
       setIsSaving(false);
-      addToast({ title: 'Profile Updated', message: 'Your profile changes have been saved.' });
+      addToast({
+        title: l({ bn: 'প্রোফাইল সংরক্ষিত হয়েছে', en: 'Profile Updated', obro: 'Profile Updated' }),
+        message: l({ bn: 'আপনার প্রোফাইলের তথ্য সফলভাবে আপডেট হয়েছে।', en: 'Your profile changes have been saved.', obro: 'Profile changes saved.' }),
+      });
     }, 250);
   };
 
@@ -41,16 +52,16 @@ export const ProfilePage = () => {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          My Account Profile
+          {l({ bn: 'আমার অ্যাকাউন্ট প্রোফাইল', en: 'My Account Profile', obro: 'My Account Profile' })}
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Update personal contact information and display avatar.
+          {l({ bn: 'ব্যক্তিগত যোগাযোগের তথ্য এবং অবতার ছবি আপডেট করুন।', en: 'Update personal contact information and display avatar.', obro: 'Personal contact o display avatar update korun.' })}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
+          <CardTitle>{l({ bn: 'ব্যক্তিগত তথ্য', en: 'Personal Information', obro: 'Personal Information' })}</CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -68,11 +79,11 @@ export const ProfilePage = () => {
                     {formData.name}
                   </h3>
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                    Role: {role}
+                    {l({ bn: 'ভূমিকা: ', en: 'Role: ', obro: 'Role: ' })}{role}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Select an avatar preset or enter custom image link:
+                  {l({ bn: 'প্রিসেট ছবি নির্বাচন করুন অথবা নিজস্ব লিংক দিন:', en: 'Select an avatar preset or enter custom image link:', obro: 'Avatar preset select korun ba custom link din:' })}
                 </p>
                 <div className="flex items-center justify-center sm:justify-start gap-2">
                   {avatarPresets.map((preset, idx) => (
@@ -93,7 +104,7 @@ export const ProfilePage = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Full Name"
+                label={l({ bn: 'পূর্ণ নাম', en: 'Full Name', obro: 'Full Name' })}
                 icon={User}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -101,7 +112,7 @@ export const ProfilePage = () => {
               />
 
               <Input
-                label="Email Address"
+                label={l({ bn: 'ইমেইল ঠিকানা', en: 'Email Address', obro: 'Email Address' })}
                 icon={Mail}
                 type="email"
                 value={formData.email}
@@ -112,7 +123,7 @@ export const ProfilePage = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Phone Number"
+                label={l({ bn: 'ফোন নম্বর', en: 'Phone Number', obro: 'Phone Number' })}
                 icon={Phone}
                 type="tel"
                 value={formData.phone}
@@ -120,7 +131,7 @@ export const ProfilePage = () => {
               />
 
               <Input
-                label="Department"
+                label={l({ bn: 'বিভাগ / দায়িত্ব', en: 'Department', obro: 'Department' })}
                 icon={Building}
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
@@ -128,7 +139,7 @@ export const ProfilePage = () => {
             </div>
 
             <Input
-              label="Custom Avatar URL"
+              label={l({ bn: 'কাস্টম অবতার ইউআরএল', en: 'Custom Avatar URL', obro: 'Custom Avatar URL' })}
               value={formData.avatar}
               onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
               placeholder="https://..."
@@ -136,7 +147,7 @@ export const ProfilePage = () => {
 
             <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
               <Button type="submit" variant="primary" icon={Save} isLoading={isSaving}>
-                Save Profile
+                {l({ bn: 'প্রোফাইল সংরক্ষণ করুন', en: 'Save Profile', obro: 'Save Profile' })}
               </Button>
             </div>
           </form>
