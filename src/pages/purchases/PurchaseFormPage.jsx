@@ -7,6 +7,7 @@ import { Button } from '../../components/common/Button';
 import { BackLink } from '../../components/common/BackLink';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import { formatCurrency } from '../../utils/formatters';
+import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { ArrowLeft, Plus, Trash2, CheckCircle2, Clock, Barcode, Eye, Printer, Check } from 'lucide-react';
 import { QuickAddSupplierModal } from '../../components/suppliers/QuickAddSupplierModal';
 import { LotBarcodePrintModal } from '../../components/products/LotBarcodePrintModal';
@@ -45,6 +46,7 @@ export const PurchaseFormPage = () => {
     {
       productId: products[0]?.id || '',
       quantity: 10,
+      unit: normalizeUnit(products[0]?.unit),
       unitCost: products[0]?.costPrice || 0,
     },
   ]);
@@ -60,6 +62,7 @@ export const PurchaseFormPage = () => {
       {
         productId: firstProd?.id || '',
         quantity: 5,
+        unit: normalizeUnit(firstProd?.unit),
         unitCost: firstProd?.costPrice || 0,
       },
     ]);
@@ -96,6 +99,7 @@ export const PurchaseFormPage = () => {
           {
             productId: matched.id,
             quantity: 1,
+            unit: normalizeUnit(matched.unit),
             unitCost: matched.costPrice || 0,
           },
         ]);
@@ -131,7 +135,7 @@ export const PurchaseFormPage = () => {
         modelNumber: prod?.modelNumber || '',
         condition: prod?.condition || 'new',
         quantity: Number(line.quantity) || 1,
-        unit: prod?.unit || 'pc',
+        unit: normalizeUnit(line.unit || prod?.unit),
         allocatedCost: cost,
         staffPrice: staff,
         managerPrice: mgr,
@@ -167,11 +171,12 @@ export const PurchaseFormPage = () => {
       const updated = [...prev];
       const item = { ...updated[index], [field]: value };
 
-      // If product changed, update default unit cost
+      // If product changed, update default unit cost & unit
       if (field === 'productId') {
         const prod = products.find((p) => p.id === value);
         if (prod) {
           item.unitCost = prod.costPrice;
+          item.unit = normalizeUnit(prod.unit);
         }
       }
 
@@ -190,6 +195,7 @@ export const PurchaseFormPage = () => {
       productName: prod?.name || 'Item',
       sku: prod?.sku || '',
       quantity: qty,
+      unit: normalizeUnit(item.unit || prod?.unit),
       unitCost: cost,
       total: qty * cost,
     };
@@ -456,8 +462,26 @@ export const PurchaseFormPage = () => {
                       </select>
                     </div>
 
-                    {/* Quantity */}
+                    {/* Unit */}
                     <div className="w-full sm:w-28">
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                        {language === 'en' ? 'Unit' : 'একক (Unit)'}
+                      </label>
+                      <select
+                        value={normalizeUnit(line.unit)}
+                        onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                        className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-2 font-semibold text-slate-800 dark:text-slate-200 text-center"
+                      >
+                        {getUnitSelectOptions(line.unit, language).map((u) => (
+                          <option key={u.value} value={u.value}>
+                            {u.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Quantity */}
+                    <div className="w-full sm:w-24">
                       <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
                         {t('quantity_col_label', 'Quantity')}
                       </label>

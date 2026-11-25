@@ -324,8 +324,8 @@ export const SaleDetailPage = () => {
                     <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
                       {cleanItemName(item.productName || item.productId)}
                     </td>
-                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {item.quantity}
+                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {item.quantity} {item.unit || 'pc'}
                     </td>
                     {showRate && (
                       <td className="py-3 px-3 text-right font-mono text-slate-600 dark:text-slate-400">

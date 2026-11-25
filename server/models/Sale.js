@@ -20,6 +20,10 @@ const saleItemSchema = new mongoose.Schema({
     required: true,
     min: 0.01,
   },
+  unit: {
+    type: String,
+    default: 'pc',
+  },
   unitPrice: {
     type: Number,
     required: true,

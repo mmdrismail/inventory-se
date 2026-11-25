@@ -318,6 +318,7 @@ exports.convertQuotationToSale = async (req, res, next) => {
       productName: it.name,
       sku: 'QUOTE-ITEM',
       quantity: it.quantity,
+      unit: it.unit || 'pc',
       unitPrice: it.unitPrice,
       lineTotal: it.lineTotal,
     }));

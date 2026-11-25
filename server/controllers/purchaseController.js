@@ -88,6 +88,7 @@ exports.createPurchase = async (req, res, next) => {
         productName: it.productName || it.name || '',
         sku: it.sku || '',
         quantity,
+        unit: it.unit || 'pc',
         unitCost,
         lineTotal,
       };

@@ -9,6 +9,7 @@ import { Input, Select } from '../../components/forms/FormControls';
 import { Badge } from '../../components/common/Badge';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { formatCurrency } from '../../utils/formatters';
+import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { calculateSaleTotals, calculatePaymentBreakdown } from '../../utils/calculations';
 import {
   ArrowLeft,
@@ -121,6 +122,7 @@ export const SalesFormPage = () => {
             productName: it.productName || it.name || '',
             sku: it.sku || '',
             quantity: it.quantity || 1,
+            unit: normalizeUnit(it.unit),
             unitPrice: it.unitPrice !== undefined ? it.unitPrice : it.price || 0,
           }))
         );
@@ -140,6 +142,7 @@ export const SalesFormPage = () => {
           productId: prod?.id || 'custom',
           productName: it.name || prod?.name || '',
           quantity: it.quantity || 1,
+          unit: normalizeUnit(it.unit || prod?.unit),
           unitPrice: it.unitPrice || 0,
         };
       });
@@ -149,6 +152,7 @@ export const SalesFormPage = () => {
         productId: availableProducts[0]?.id || 'custom',
         productName: availableProducts[0]?.name || '',
         quantity: 1,
+        unit: normalizeUnit(availableProducts[0]?.unit),
         unitPrice: availableProducts[0]?.sellingPrice || 0,
       },
     ];
@@ -240,6 +244,7 @@ export const SalesFormPage = () => {
             productId: matched.id,
             productName: matched.name,
             quantity: 1,
+            unit: normalizeUnit(matched.unit),
             unitPrice: matched.sellingPrice || 0,
           },
         ]);
@@ -267,6 +272,7 @@ export const SalesFormPage = () => {
       {
         productId: firstAvailable?.id || '',
         quantity: 1,
+        unit: normalizeUnit(firstAvailable?.unit),
         unitPrice: firstAvailable?.sellingPrice || 0,
       },
     ]);
@@ -288,12 +294,14 @@ export const SalesFormPage = () => {
       if (field === 'productId') {
         if (value === 'custom') {
           item.productId = 'custom';
+          item.unit = item.unit || 'pc';
         } else {
           const prod = products.find((p) => p.id === value);
           if (prod) {
             item.productId = prod.id;
             item.unitPrice = prod.sellingPrice;
             item.productName = prod.name;
+            item.unit = normalizeUnit(prod.unit);
           }
         }
       }
@@ -314,6 +322,7 @@ export const SalesFormPage = () => {
       productName: item.productName || prod?.name || 'Equipment Part',
       sku: prod?.sku || '',
       quantity: qty,
+      unit: normalizeUnit(item.unit || prod?.unit),
       unitPrice: price,
       availableStock: prod ? available : 999,
       total: qty * price,
@@ -892,7 +901,7 @@ export const SalesFormPage = () => {
                           { value: 'custom', label: '➕ বিশেষ পার্টস / কাস্টম আইটেম (Custom Part / Quotation Item)' },
                           ...products.map((p) => ({
                             value: p.id,
-                            label: `${p.name} (মজুদ: ${p.quantity} ${p.unit || 'pcs'} · ৳${p.sellingPrice})`,
+                            label: `${p.name} (মজুদ: ${p.quantity} ${normalizeUnit(p.unit)} · ৳${p.sellingPrice})`,
                           })),
                         ]}
                       />
@@ -909,6 +918,21 @@ export const SalesFormPage = () => {
                     </div>
 
                     <div className="w-full sm:w-28">
+                      <select
+                        value={normalizeUnit(line.unit)}
+                        onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                        aria-label={l({ bn: 'একক (Unit)', en: 'Unit', obro: 'Unit' })}
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-2.5 py-2 text-xs font-semibold text-center focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      >
+                        {getUnitSelectOptions(line.unit, language).map((u) => (
+                          <option key={u.value} value={u.value}>
+                            {u.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="w-full sm:w-24">
                       <Input
                         type="number"
                         min="1"

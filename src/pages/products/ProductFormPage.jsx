@@ -7,6 +7,7 @@ import { Button } from '../../components/common/Button';
 import { BackLink } from '../../components/common/BackLink';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import { generateSKU } from '../../utils/formatters';
+import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { QuickAddSupplierModal } from '../../components/suppliers/QuickAddSupplierModal';
 import { generateStickerPriceDisplay, calculateTierDefaults } from '../../utils/priceCipher';
 import {
@@ -68,6 +69,7 @@ export const ProductFormPage = () => {
     sellingPrice: '',
     quantity: '',
     reorderLevel: '10',
+    unit: 'pc',
     imageUrl: '',
     isPublic: true,
     lotNumber: '',
@@ -111,6 +113,7 @@ export const ProductFormPage = () => {
           sellingPrice: String(existing.sellingPrice || existing.customerPrice || 0),
           quantity: String(existing.quantity || 0),
           reorderLevel: String(existing.reorderLevel || 10),
+          unit: normalizeUnit(existing.unit, 'pc'),
           imageUrl: existing.imageUrl || '',
           isPublic: existing.isPublic !== undefined ? existing.isPublic : true,
           lotNumber: existing.lotNumber || '',
@@ -667,8 +670,8 @@ export const ProductFormPage = () => {
               </div>
             </div>
 
-            {/* Stock Counts */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Stock Counts & Measurement Unit */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Input
                 label={isEditMode ? 'Current Stock Quantity' : 'Initial Stock Quantity'}
                 type="number"
@@ -678,6 +681,14 @@ export const ProductFormPage = () => {
                 error={errors.quantity}
                 placeholder="0"
                 required
+              />
+
+              <Select
+                label={l({ bn: 'একক (Unit)', en: 'Measurement Unit', obro: 'Unit (একক)' })}
+                name="unit"
+                value={normalizeUnit(formData.unit)}
+                onChange={handleChange}
+                options={getUnitSelectOptions(formData.unit, language)}
               />
 
               <Input

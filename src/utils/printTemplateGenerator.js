@@ -714,7 +714,7 @@ const getAuthenticStyles = (isThermal = false) => `
 
   .col-sl { width: 38px; text-align: center; background-color: #faf5ff; }
   .col-desc { text-align: left; background-color: #fffbeb; }
-  .col-qty { width: 62px; text-align: center; background-color: #f0fdf4; }
+  .col-qty { width: 78px; text-align: center; background-color: #f0fdf4; white-space: nowrap; }
   .col-rate { width: 85px; text-align: right; background-color: #fdf2f8; }
   .col-amount { width: 95px; text-align: right; background-color: #eff6ff; }
 
@@ -951,6 +951,7 @@ export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
         ${items
           .map((it, idx) => {
             const qty = Number(it.quantity) || 1;
+            const unit = it.unit || 'pc';
             const rate = Number(it.unitPrice !== undefined ? it.unitPrice : it.price) || 0;
             const amt = Number(it.lineTotal !== undefined ? it.lineTotal : it.total || qty * rate);
             return `
@@ -960,7 +961,7 @@ export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
                 ${cleanItemName(it.productName || it.name)}
                 ${cleanItemSku(it.sku) ? `<span style="font-size: 9.5px; color: #64748b; font-weight: normal; margin-left: 4px;">(${cleanItemSku(it.sku)})</span>` : ''}
               </td>
-              <td class="col-qty font-mono font-bold">${qty}</td>
+              <td class="col-qty font-mono font-bold">${qty} ${unit}</td>
               ${showRate ? `<td class="col-rate font-mono">${formatCurrency(rate, p.currencySymbol)}</td>` : ''}
               ${showLineTotal ? `<td class="col-amount font-mono font-bold">${formatCurrency(amt, p.currencySymbol)}</td>` : ''}
             </tr>
@@ -1117,6 +1118,7 @@ export const generateChallanHtml = (sale, settings = {}, options = {}) => {
         ${items
           .map((it, idx) => {
             const qty = Number(it.quantity) || 1;
+            const unit = it.unit || 'pc';
             return `
             <tr>
               <td class="col-sl font-mono font-semibold">${idx + 1}</td>
@@ -1124,7 +1126,7 @@ export const generateChallanHtml = (sale, settings = {}, options = {}) => {
                 ${cleanItemName(it.productName || it.name)}
                 ${cleanItemSku(it.sku) ? `<span style="font-size: 10px; color: #64748b; font-weight: normal; margin-left: 6px;">[SKU: ${cleanItemSku(it.sku)}]</span>` : ''}
               </td>
-              <td class="col-qty font-mono font-bold" style="font-size: 13px; color: #0369a1;">${qty} pcs</td>
+              <td class="col-qty font-mono font-bold" style="font-size: 13px; color: #0369a1;">${qty} ${unit}</td>
             </tr>
           `;
           })
@@ -1274,6 +1276,7 @@ export const generateOfficialPadHtml = (sale, settings = {}, options = {}) => {
             ${items
               .map((it, idx) => {
                 const qty = Number(it.quantity) || 1;
+                const unit = it.unit || 'pc';
                 const rate = Number(it.unitPrice !== undefined ? it.unitPrice : it.price) || 0;
                 const amt = Number(it.lineTotal !== undefined ? it.lineTotal : it.total || qty * rate);
                 return `
@@ -1283,7 +1286,7 @@ export const generateOfficialPadHtml = (sale, settings = {}, options = {}) => {
                     ${cleanItemName(it.productName || it.name)}
                     ${cleanItemSku(it.sku) ? `<div style="font-size: 9px; color: #64748b; font-weight: normal;">SKU: ${cleanItemSku(it.sku)}</div>` : ''}
                   </td>
-                  <td class="col-qty font-mono font-bold">${qty}</td>
+                  <td class="col-qty font-mono font-bold">${qty} ${unit}</td>
                   ${showRate ? `<td class="col-rate font-mono">${formatCurrency(rate, p.currencySymbol)}</td>` : ''}
                   ${showLineTotal ? `<td class="col-amount font-mono font-bold">${formatCurrency(amt, p.currencySymbol)}</td>` : ''}
                 </tr>
@@ -1406,6 +1409,7 @@ export const generateThermalReceiptHtml = (sale, settings = {}, options = {}) =>
         ${items
           .map((it) => {
             const qty = Number(it.quantity) || 1;
+            const unit = it.unit || 'pc';
             const rate = Number(it.unitPrice !== undefined ? it.unitPrice : it.price) || 0;
             const amt = Number(it.lineTotal !== undefined ? it.lineTotal : it.total || qty * rate);
             return `
@@ -1414,7 +1418,7 @@ export const generateThermalReceiptHtml = (sale, settings = {}, options = {}) =>
             </tr>
             <tr style="border-bottom: 1px dotted #e2e8f0;">
               <td style="font-size: 9px; color: #64748b;">${cleanItemSku(it.sku)}</td>
-              <td style="text-align: center;">${qty} x ${rate}</td>
+              <td style="text-align: center;">${qty} ${unit} x ${rate}</td>
               <td style="text-align: right; font-weight: 700;">${formatCurrency(amt, p.currencySymbol)}</td>
             </tr>
           `;

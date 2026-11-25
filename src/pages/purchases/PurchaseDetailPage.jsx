@@ -36,7 +36,7 @@ export const PurchaseDetailPage = () => {
         modelNumber: prod?.modelNumber || '',
         condition: prod?.condition || 'new',
         quantity: Number(line.quantity) || 1,
-        unit: prod?.unit || 'pc',
+        unit: line.unit || prod?.unit || 'pc',
         allocatedCost: cost,
         staffPrice: staff,
         managerPrice: mgr,
@@ -221,8 +221,8 @@ export const PurchaseDetailPage = () => {
                     <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
                       {item.productName || item.productId}
                     </td>
-                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {item.quantity}
+                    <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {item.quantity} {item.unit || 'pc'}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-slate-600 dark:text-slate-400">
                       {formatCurrency(item.unitCost, settings.currency)}

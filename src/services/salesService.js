@@ -158,6 +158,7 @@ class SalesService {
               productName: it.productName || it.name,
               sku: it.sku,
               quantity: Number(it.quantity) || 1,
+              unit: it.unit || 'pc',
               unitPrice: Number(it.unitPrice || it.sellingPrice) || 0,
               lineTotal:
                 Number(it.lineTotal || it.subtotal || (it.quantity || 1) * (it.unitPrice || it.sellingPrice || 0)) || 0,
@@ -325,6 +326,7 @@ class SalesService {
             productName: it.productName || it.name,
             sku: it.sku,
             quantity: Number(it.quantity) || 1,
+            unit: it.unit || 'pc',
             unitPrice: Number(it.unitPrice || it.sellingPrice || it.price) || 0,
             lineTotal: Number(it.lineTotal || Number(it.quantity || 1) * Number(it.unitPrice || it.price || 0)) || 0,
           })),

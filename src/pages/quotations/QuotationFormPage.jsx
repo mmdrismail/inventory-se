@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/commo
 import { Button } from '../../components/common/Button';
 import { BackLink } from '../../components/common/BackLink';
 import { formatCurrency } from '../../utils/formatters';
+import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
 import {
@@ -158,7 +159,7 @@ export const QuotationFormPage = () => {
             productId: it.productId || '',
             name: it.name || it.productName || '',
             quantity: Number(it.quantity) || 1,
-            unit: it.unit || 'pc',
+            unit: normalizeUnit(it.unit),
             unitPrice: Number(it.unitPrice || it.rate || it.price) || 0,
             lineTotal: Number(it.lineTotal || it.amount || 0),
           }))
@@ -288,7 +289,7 @@ export const QuotationFormPage = () => {
         if (prod) {
           cur.name = prod.name;
           cur.unitPrice = prod.price || 0;
-          cur.unit = prod.unit || 'pc';
+          cur.unit = normalizeUnit(prod.unit);
         }
       }
 
@@ -914,17 +915,15 @@ export const QuotationFormPage = () => {
                     {/* Unit */}
                     <td className="py-2.5 px-2 text-center">
                       <select
-                        value={it.unit}
+                        value={normalizeUnit(it.unit)}
                         onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
                         className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center"
                       >
-                        <option value="pc">{l({ bn: 'পিস (pc)', en: 'pc', obro: 'pc (পিস)' })}</option>
-                        <option value="set">{l({ bn: 'সেট (set)', en: 'set', obro: 'set (সেট)' })}</option>
-                        <option value="kg">{l({ bn: 'কেজি (kg)', en: 'kg', obro: 'kg (কেজি)' })}</option>
-                        <option value="can">{l({ bn: 'ক্যান (can)', en: 'can', obro: 'can (ক্যান)' })}</option>
-                        <option value="cylinder">{l({ bn: 'সিলিন্ডার (cylinder)', en: 'cylinder', obro: 'cylinder (সিলিন্ডার)' })}</option>
-                        <option value="drum">{l({ bn: 'ড্রাম (drum)', en: 'drum', obro: 'drum (ড্রাম)' })}</option>
-                        <option value="box">{l({ bn: 'বক্স (box)', en: 'box', obro: 'box (বক্স)' })}</option>
+                        {getUnitSelectOptions(it.unit, language).map((u) => (
+                          <option key={u.value} value={u.value}>
+                            {u.label}
+                          </option>
+                        ))}
                       </select>
                     </td>
 

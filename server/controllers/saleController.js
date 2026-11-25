@@ -125,6 +125,7 @@ exports.createSale = async (req, res, next) => {
         productName: it.productName || it.name || '',
         sku: it.sku || '',
         quantity,
+        unit: it.unit || 'pc',
         unitPrice,
         lineTotal,
       };
@@ -352,6 +353,7 @@ exports.updateSale = async (req, res, next) => {
           productName: it.productName || it.name || '',
           sku: it.sku || '',
           quantity,
+          unit: it.unit || 'pc',
           unitPrice,
           lineTotal,
         });

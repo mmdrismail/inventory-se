@@ -7,6 +7,7 @@ import { Modal } from '../../components/common/Modal';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import { EmptyState, Pagination } from '../../components/common/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { getUnitSelectOptions } from '../../utils/units';
 import { exportToCSV } from '../../utils/csv';
 import { QuickAddSupplierModal } from '../../components/suppliers/QuickAddSupplierModal';
 import { LotBarcodePrintModal } from '../../components/products/LotBarcodePrintModal';
@@ -1150,11 +1151,17 @@ export const PurchaseListPage = () => {
                         <select
                           value={it.unit || 'pc'}
                           onChange={(e) => handleUpdateLotItem(idx, 'unit', e.target.value)}
-                          className="w-16 px-1 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent text-[11px]"
+                          className="w-24 px-1.5 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-[11px]"
                         >
-                          <option value="pc">pc</option>
-                          <option value="unit">unit</option>
-                          <option value="set">set</option>
+                          {getUnitSelectOptions(
+                            it.unit || 'pc',
+                            language,
+                            [{ value: 'unit', bn: 'ইউনিট (unit)', en: 'unit', obro: 'unit' }]
+                          ).map((u) => (
+                            <option key={u.value} value={u.value}>
+                              {u.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     </div>

@@ -50,6 +50,7 @@ class PurchaseService {
         productName: it.productName || it.name,
         sku: it.sku,
         quantity: Number(it.quantity) || 1,
+        unit: it.unit || 'pc',
         unitCost: Number(it.unitCost || it.costPrice) || 0,
         lineTotal: Number(it.lineTotal || it.total || (it.quantity * (it.unitCost || it.costPrice || 0))) || 0,
         total: Number(it.total) || 0,

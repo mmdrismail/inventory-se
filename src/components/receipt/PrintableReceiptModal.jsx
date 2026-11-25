@@ -23,6 +23,7 @@ import {
   Download,
 } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
+import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import {
@@ -128,7 +129,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
           productName: it.productName || it.name || '',
           sku: it.sku || '',
           quantity: qty,
-          unit: it.unit || 'pc',
+          unit: normalizeUnit(it.unit),
           unitPrice: rate,
           lineTotal: Number(it.lineTotal !== undefined ? it.lineTotal : (it.total || qty * rate)),
           description: it.description || '',
@@ -857,7 +858,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         <th className="py-2 px-2 text-center w-10">#</th>
                         <th className="py-2 px-3">পণ্যের নাম ও বিবরণ (Product Description)</th>
                         <th className="py-2 px-2 text-center w-24">পরিমাণ (Qty)</th>
-                        <th className="py-2 px-2 text-center w-20">একক (Unit)</th>
+                        <th className="py-2 px-2 text-center w-28">একক (Unit)</th>
                         <th className="py-2 px-3 text-right w-32">দর / রেট (৳ Rate)</th>
                         <th className="py-2 px-3 text-right w-36">মোট মূল্য (৳ Total)</th>
                         <th className="py-2 px-2 text-center w-12">মুছুন</th>
@@ -889,13 +890,17 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                             />
                           </td>
                           <td className="py-1.5 px-2">
-                            <input
-                              type="text"
-                              value={it.unit || 'pc'}
+                            <select
+                              value={normalizeUnit(it.unit)}
                               onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
-                              placeholder="pc / set"
                               className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-center"
-                            />
+                            >
+                              {getUnitSelectOptions(it.unit, currentGlobalLang).map((u) => (
+                                <option key={u.value} value={u.value}>
+                                  {u.label}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="py-1.5 px-2">
                             <input
@@ -1196,7 +1201,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     <tr className="bg-[#38bdf8] text-slate-900 font-bold border border-sky-600 text-center">
                       <th className="py-1 px-1.5 w-10 border border-sky-600">{profile.t.sl}</th>
                       <th className="py-1 px-2 border border-sky-600 text-left">{profile.t.itemDesc}</th>
-                      <th className="py-1 px-1.5 w-16 border border-sky-600">{profile.t.qty}</th>
+                      <th className="py-1 px-1.5 w-20 border border-sky-600">{profile.t.qty}</th>
                       {showRate && <th className="py-1 px-2 w-24 border border-sky-600 text-right">{profile.t.rate}</th>}
                       {showLineTotal && <th className="py-1 px-2 w-28 border border-sky-600 text-right">{profile.t.amount}</th>}
                     </tr>
@@ -1213,7 +1218,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                             {cleanItemName(it.productName || it.name)}
                             {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 font-normal ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
-                          <td className="py-1 px-1.5 text-center font-mono font-bold bg-[#f0fdf4] border-r border-slate-300">{qty}</td>
+                          <td className="py-1 px-1.5 text-center font-mono font-bold bg-[#f0fdf4] border-r border-slate-300 whitespace-nowrap">{qty} {it.unit || 'pc'}</td>
                           {showRate && <td className="py-1 px-2 text-right font-mono bg-[#fdf2f8] border-r border-slate-300">{formatCurrency(rate, profile.currencySymbol)}</td>}
                           {showLineTotal && <td className="py-1 px-2 text-right font-mono font-bold bg-[#eff6ff] border-r border-slate-300">{formatCurrency(amt, profile.currencySymbol)}</td>}
                         </tr>
@@ -1383,8 +1388,8 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                             {cleanItemName(it.productName || it.name)}
                             {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 font-normal ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
-                          <td className="py-1.5 px-3 text-center font-mono font-bold text-sky-700 text-sm bg-[#f0fdf4] border-r border-slate-300">
-                            {qty} pcs
+                          <td className="py-1.5 px-3 text-center font-mono font-bold text-sky-700 text-sm bg-[#f0fdf4] border-r border-slate-300 whitespace-nowrap">
+                            {qty} {it.unit || 'pc'}
                           </td>
                         </tr>
                       );
@@ -1498,7 +1503,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     <tr className="bg-slate-100 text-slate-800 font-bold border-y border-slate-400">
                       <th className="py-1 px-1.5 w-8 text-center">{profile.t.sl}</th>
                       <th className="py-1 px-2">{profile.t.itemDesc}</th>
-                      <th className="py-1 px-1.5 w-14 text-center">{profile.t.qty}</th>
+                      <th className="py-1 px-1.5 w-20 text-center">{profile.t.qty}</th>
                       {showRate && <th className="py-1 px-2 w-24 text-right">{profile.t.rate}</th>}
                       {showLineTotal && <th className="py-1 px-2 w-28 text-right">{profile.t.amount}</th>}
                     </tr>
@@ -1515,7 +1520,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                             {cleanItemName(it.productName || it.name)}
                             {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
-                          <td className="py-1 px-1.5 text-center font-mono font-bold">{qty}</td>
+                          <td className="py-1 px-1.5 text-center font-mono font-bold whitespace-nowrap">{qty} {it.unit || 'pc'}</td>
                           {showRate && <td className="py-1 px-2 text-right font-mono">{formatCurrency(rate, profile.currencySymbol)}</td>}
                           {showLineTotal && <td className="py-1 px-2 text-right font-mono font-bold">{formatCurrency(amt, profile.currencySymbol)}</td>}
                         </tr>
@@ -1644,7 +1649,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     <tr className="bg-slate-100 text-slate-800 font-bold border-y border-slate-400">
                       <th className="py-1 px-1.5 w-8 text-center">{profile.t.sl}</th>
                       <th className="py-1 px-2">{profile.t.itemDesc}</th>
-                      <th className="py-1 px-1.5 w-16 text-center">{profile.t.qty}</th>
+                      <th className="py-1 px-1.5 w-20 text-center">{profile.t.qty}</th>
                       {showRate && <th className="py-1 px-2 w-24 text-right">{profile.t.rate}</th>}
                       {showLineTotal && <th className="py-1 px-2 w-28 text-right">{profile.t.amount}</th>}
                     </tr>
@@ -1661,7 +1666,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                             {cleanItemName(it.productName || it.name)}
                             {cleanItemSku(it.sku) && <span className="text-[10px] text-slate-500 ml-1">({cleanItemSku(it.sku)})</span>}
                           </td>
-                          <td className="py-1 px-1.5 text-center font-mono font-bold">{qty} {it.unit || 'pc'}</td>
+                          <td className="py-1 px-1.5 text-center font-mono font-bold whitespace-nowrap">{qty} {it.unit || 'pc'}</td>
                           {showRate && <td className="py-1 px-2 text-right font-mono">{formatCurrency(rate, profile.currencySymbol)}</td>}
                           {showLineTotal && <td className="py-1 px-2 text-right font-mono font-bold">{formatCurrency(amt, profile.currencySymbol)}</td>}
                         </tr>
