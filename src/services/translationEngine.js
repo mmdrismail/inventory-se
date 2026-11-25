@@ -12,8 +12,10 @@
  */
 
 import { TRANSLATIONS } from '../utils/translations.js';
+import { PUBLIC_TRANSLATIONS } from '../utils/publicTranslations.js';
 
 const STORAGE_CACHE_KEY = 'stockline_translation_cache';
+const MAX_ONLINE_CONCURRENCY = 4;
 
 // Load persistent cache from LocalStorage
 const loadPersistentCache = () => {
@@ -37,6 +39,8 @@ class TranslationEngineService {
     this.memoryCache = loadPersistentCache();
     this.lexicon = new Map();
     this.pendingFetches = new Set();
+    this.fetchQueue = [];
+    this.activeFetches = 0;
     this.listeners = new Set();
 
     this.initCuratedLexicon();
@@ -648,6 +652,11 @@ class TranslationEngineService {
     curated.forEach((item) => {
       this.registerEntry(item);
     });
+    if (Array.isArray(PUBLIC_TRANSLATIONS)) {
+      PUBLIC_TRANSLATIONS.forEach((item) => {
+        this.registerEntry(item);
+      });
+    }
   }
 
   /**
@@ -678,53 +687,102 @@ class TranslationEngineService {
     }
   }
 
+  hasBangla(text) {
+    return /[\u0980-\u09FF]/.test(String(text || ''));
+  }
+
   /**
-   * Asynchronously fetch translation from Google Translate public API
+   * Process concurrency-limited online translation queue
    */
-  async fetchOnlineTranslation(text, targetLang) {
+  drainFetchQueue() {
+    while (this.activeFetches < MAX_ONLINE_CONCURRENCY && this.fetchQueue.length > 0) {
+      const task = this.fetchQueue.shift();
+      this.activeFetches += 1;
+      task().finally(() => {
+        this.activeFetches = Math.max(0, this.activeFetches - 1);
+        this.drainFetchQueue();
+      });
+    }
+  }
+
+  /**
+   * Asynchronously fetch translation from Google Translate public API (throttled & cached)
+   */
+  fetchOnlineTranslation(text, targetLang) {
     const norm = this.normalizeKey(text);
     const cacheKey = `${targetLang}:${norm}`;
+    const apiTarget = targetLang === 'en' ? 'en' : 'bn';
+    const bnCacheKey = `bn:${norm}`;
 
     if (this.memoryCache[cacheKey]) {
-      return this.memoryCache[cacheKey];
+      return Promise.resolve(this.memoryCache[cacheKey]);
+    }
+
+    // Reuse cached Bangla translation cleanly when formatting Banglish ('obro')
+    if (targetLang === 'obro' && this.memoryCache[bnCacheKey]) {
+      const bnVal = this.memoryCache[bnCacheKey];
+      const combined = bnVal !== text ? `${bnVal} (${text})` : text;
+      this.memoryCache[cacheKey] = combined;
+      savePersistentCache(this.memoryCache);
+      this.notifyListeners(text, combined, targetLang);
+      return Promise.resolve(combined);
     }
 
     if (this.pendingFetches.has(cacheKey)) {
-      return text;
+      return Promise.resolve(text);
     }
 
     this.pendingFetches.add(cacheKey);
 
-    try {
-      const sourceLang = targetLang === 'en' ? 'bn' : 'en';
-      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(
-        text
-      )}`;
+    return new Promise((resolve) => {
+      const runFetch = async () => {
+        try {
+          const sourceLang = apiTarget === 'en' ? 'bn' : 'en';
+          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang}&tl=${apiTarget}&dt=t&q=${encodeURIComponent(
+            text
+          )}`;
 
-      const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data[0] && data[0][0] && data[0][0][0]) {
-          const translated = data[0][0][0];
-          this.memoryCache[cacheKey] = translated;
-          savePersistentCache(this.memoryCache);
-          this.notifyListeners(text, translated, targetLang);
-          return translated;
+          const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data?.[0])) {
+              const joined = data[0]
+                .map((seg) => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : ''))
+                .join('')
+                .trim();
+
+              if (joined) {
+                if (apiTarget === 'bn') {
+                  this.memoryCache[bnCacheKey] = joined;
+                }
+                const finalValue =
+                  targetLang === 'obro' && joined !== text ? `${joined} (${text})` : joined;
+
+                this.memoryCache[cacheKey] = finalValue;
+                savePersistentCache(this.memoryCache);
+                this.notifyListeners(text, finalValue, targetLang);
+                resolve(finalValue);
+                return;
+              }
+            }
+          }
+        } catch {
+          // Offline fallback: graceful degradation
+        } finally {
+          this.pendingFetches.delete(cacheKey);
         }
-      }
-    } catch {
-      // Offline fallback: graceful degradation
-    } finally {
-      this.pendingFetches.delete(cacheKey);
-    }
+        resolve(text);
+      };
 
-    return text;
+      this.fetchQueue.push(runFetch);
+      this.drainFetchQueue();
+    });
   }
 
   /**
    * Main Translation Function (Translate string or object)
    */
-  translate(input, targetLang = 'bn', fallback = '') {
+  translate(input, targetLang = 'bn', fallback = '', { allowOnline = true } = {}) {
     if (input === null || input === undefined) return fallback || '';
 
     // If input is an object with { bn, en, obro }
@@ -752,41 +810,87 @@ class TranslationEngineService {
       return this.memoryCache[cacheKey];
     }
 
-    // 3. Dynamic Regex Pattern Matches (Numbers, IDs, Dates)
-    // Order #1234
-    if (/^order\s*#?\s*([\w\-]+)$/i.test(text)) {
-      const match = text.match(/^order\s*#?\s*([\w\-]+)$/i);
+    // 3. Dynamic Regex Pattern Matches (Numbers, Counts, IDs, Units)
+    if (/^order\s*#?\s*([\w-]+)$/i.test(text)) {
+      const match = text.match(/^order\s*#?\s*([\w-]+)$/i);
       return targetLang === 'en' ? `Order #${match[1]}` : `অর্ডার #${match[1]}`;
     }
-    // Invoice #1234
-    if (/^invoice\s*#?\s*([\w\-]+)$/i.test(text)) {
-      const match = text.match(/^invoice\s*#?\s*([\w\-]+)$/i);
+    if (/^invoice\s*#?\s*([\w-]+)$/i.test(text)) {
+      const match = text.match(/^invoice\s*#?\s*([\w-]+)$/i);
       return targetLang === 'en' ? `Invoice #${match[1]}` : `ইনভয়েস #${match[1]}`;
     }
-    // Showing X of Y
     if (/^showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)/i.test(text)) {
       const m = text.match(/^showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)/i);
       return targetLang === 'en'
         ? text
         : `${m[3]} টির মধ্যে ${m[1]} থেকে ${m[2]} প্রদর্শিত হচ্ছে`;
     }
-    // X item(s)
     if (/^(\d+)\s+items?$/i.test(text)) {
       const m = text.match(/^(\d+)\s+items?$/i);
       return targetLang === 'en' ? text : `${m[1]} টি আইটেম`;
     }
-
-    // 4. Online Async Auto-Translate Trigger (Non-blocking)
-    if (typeof window !== 'undefined' && targetLang !== 'en') {
-      this.fetchOnlineTranslation(text, targetLang);
+    if (/^(\d+)\s+skus?$/i.test(text)) {
+      const m = text.match(/^(\d+)\s+skus?$/i);
+      return targetLang === 'en' ? text : `${m[1]}টি SKU`;
+    }
+    if (/^(\d+)\s+pending$/i.test(text)) {
+      const m = text.match(/^(\d+)\s+pending$/i);
+      return targetLang === 'en' ? text : `${m[1]}টি অপেক্ষমাণ`;
+    }
+    if (/^(\d+)\s+roles?$/i.test(text)) {
+      const m = text.match(/^(\d+)\s+roles?$/i);
+      return targetLang === 'en' ? text : `${m[1]}টি রোল`;
+    }
+    if (/^([+-]?\d+)\s+units?$/i.test(text)) {
+      const m = text.match(/^([+-]?\d+)\s+units?$/i);
+      return targetLang === 'en' ? text : `${m[1]} ইউনিট`;
+    }
+    if (/^only\s+(\d+)\s+left$/i.test(text)) {
+      const m = text.match(/^only\s+(\d+)\s+left$/i);
+      return targetLang === 'en' ? text : `মাত্র ${m[1]}টি বাকি`;
+    }
+    if (/^all\s+categories\s*\((\d+)\)$/i.test(text)) {
+      const m = text.match(/^all\s+categories\s*\((\d+)\)$/i);
+      return targetLang === 'en' ? text : `সকল ক্যাটাগরি (${m[1]})`;
+    }
+    if (/^sign\s+out\s*\(([^)]+)\)$/i.test(text)) {
+      const m = text.match(/^sign\s+out\s*\(([^)]+)\)$/i);
+      return targetLang === 'en' ? text : `লগ আউট (${m[1]})`;
     }
 
-    // 5. If English requested and not found in lexicon, return original text
-    if (targetLang === 'en') {
-      return fallback || text;
+    const textHasBangla = this.hasBangla(text);
+    const textHasLatin = /[A-Za-z]{2,}/.test(text);
+
+    // Handle pre-formatted bilingual strings like "গ্রাহকের নাম (Customer Name)"
+    if (textHasBangla && textHasLatin) {
+      if (targetLang === 'en') {
+        const parenMatch = text.match(/^(.*?)\s*\(([^()]*[A-Za-z]{2,}[^()]*)\)\s*([:*]?)\s*$/);
+        if (parenMatch) {
+          const before = parenMatch[1].trim();
+          const inside = parenMatch[2].trim();
+          const suffix = parenMatch[3] || '';
+          if (!/^(BDT|USD|EUR|POS|RFQ|VAT|BIN|SKU|BN|EN|Admin|Manager|Staff|Owner|Agent)$/i.test(inside)) {
+            return `${inside}${suffix}`;
+          }
+          const lexBefore = this.lexicon.get(this.normalizeKey(before));
+          if (lexBefore?.en) {
+            return `${lexBefore.en} (${inside})${suffix}`;
+          }
+        }
+      } else {
+        return text;
+      }
     }
 
-    // 6. Return fallback or original text while background translation fetches
+    // 4. Online Async Auto-Translate Trigger (Non-blocking, Bidirectional)
+    if (allowOnline && typeof window !== 'undefined') {
+      if (targetLang === 'en' && textHasBangla) {
+        this.fetchOnlineTranslation(text, 'en');
+      } else if (targetLang !== 'en' && !textHasBangla && textHasLatin) {
+        this.fetchOnlineTranslation(text, targetLang);
+      }
+    }
+
     return fallback || text;
   }
 }

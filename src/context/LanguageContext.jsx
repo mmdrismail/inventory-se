@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { LANGUAGES, LANGUAGE_OPTIONS } from '../utils/translations';
 import { translationEngine } from '../services/translationEngine';
+import { startDomTranslator, applyDomTranslation } from '../services/domTranslator';
 
 const LanguageContext = createContext(null);
 
@@ -19,8 +20,11 @@ export const LanguageProvider = ({ children }) => {
     return LANGUAGES.BN; // Default to Bangla as requested
   });
 
+  const languageRef = useRef(language);
+
   const setLanguage = (newLang) => {
     if (newLang === LANGUAGES.BN || newLang === LANGUAGES.EN || newLang === LANGUAGES.OBRO) {
+      languageRef.current = newLang;
       setLanguageState(newLang);
       try {
         localStorage.setItem(STORAGE_LANG_KEY, newLang);
@@ -30,10 +34,18 @@ export const LanguageProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    languageRef.current = language;
     try {
       document.documentElement.lang = language === 'en' ? 'en' : 'bn';
+      applyDomTranslation(document.body, language);
     } catch {}
   }, [language]);
+
+  // Global DOM Translator Engine covering all public, storefront, auth & dashboard routes
+  useEffect(() => {
+    const stopDomTranslator = startDomTranslator(() => languageRef.current);
+    return stopDomTranslator;
+  }, []);
 
   // Subscribe to background online translation engine updates
   useEffect(() => {

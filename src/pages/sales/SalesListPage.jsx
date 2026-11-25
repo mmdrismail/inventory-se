@@ -273,7 +273,7 @@ export const SalesListPage = () => {
                         </Link>
                       </td>
 
-                      <td className="py-3 px-3 text-slate-800 dark:text-slate-200 font-medium">
+                      <td className="py-3 px-3 text-slate-800 dark:text-slate-200 font-medium" data-no-translate="true">
                         {s.customerName || 'Walk-in Customer'}
                         {s.customerCompany && (
                           <span className="block text-[11px] text-purple-600 dark:text-purple-400 font-normal">

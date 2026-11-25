@@ -321,13 +321,14 @@ export const CustomerListPage = () => {
                   <div>
                     <Link
                       to={`/customers/${c.id}`}
+                      data-no-translate="true"
                       className="text-base font-bold text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                     >
                       {c.name}
                     </Link>
 
                     {c.companyName && (
-                      <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 mt-0.5">
+                      <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 mt-0.5" data-no-translate="true">
                         <Building2 className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{c.companyName}</span>
                       </div>
@@ -352,7 +353,7 @@ export const CustomerListPage = () => {
                       </div>
                     )}
                     {(c.address || c.location) && (
-                      <div className="flex items-center gap-1.5 text-slate-500">
+                      <div className="flex items-center gap-1.5 text-slate-500" data-no-translate="true">
                         <MapPin className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{c.address || c.location}</span>
                       </div>

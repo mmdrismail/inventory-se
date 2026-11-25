@@ -120,6 +120,7 @@ export const Navbar = () => {
 
         {/* Mobile Hamburger Button */}
         <div className="flex md:hidden items-center gap-2">
+          <LanguageSwitcher showLabel={false} />
           <Link to="/cart" className="relative p-2 text-slate-600 dark:text-slate-300">
             <ShoppingBag className="h-5 w-5" />
             {totalCartCount > 0 && (

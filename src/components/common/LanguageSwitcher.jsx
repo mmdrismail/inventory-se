@@ -18,7 +18,7 @@ export const LanguageSwitcher = ({ variant = 'default', showLabel = true }) => {
   }, []);
 
   return (
-    <div className="relative inline-block text-left" ref={dropdownRef}>
+    <div className="relative inline-block text-left" ref={dropdownRef} data-no-translate="true">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}

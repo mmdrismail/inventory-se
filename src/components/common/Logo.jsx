@@ -20,7 +20,7 @@ export const Logo = ({ to = '/', size = 'md', isWhite = false, showTagline = fal
       <div className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 p-2 text-white shadow-md shadow-emerald-500/20 transition-transform group-hover:scale-105">
         <Boxes className="h-5 w-5" />
       </div>
-      <div className="flex flex-col">
+      <div className="flex flex-col" data-no-translate="true">
         <div className={`font-bold tracking-tight leading-none ${textClasses[size]} ${isWhite ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
           Stock<span className="text-emerald-500">Line</span>
         </div>

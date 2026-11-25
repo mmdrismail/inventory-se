@@ -236,7 +236,7 @@ export const LandingPage = () => {
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200">PO-2026-001 Received</span>
-                      <span className="text-slate-400">(Apex Global Distributors)</span>
+                      <span className="text-slate-400" data-no-translate="true">(Apex Global Distributors)</span>
                     </div>
                     <span className="text-emerald-600 font-mono font-bold">+50 Units</span>
                   </div>
@@ -244,7 +244,7 @@ export const LandingPage = () => {
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200">INV-2026-001 Sale Complete</span>
-                      <span className="text-slate-400">(Delta Engineering Works)</span>
+                      <span className="text-slate-400" data-no-translate="true">(Delta Engineering Works)</span>
                     </div>
                     <span className="text-blue-600 font-mono font-bold">-5 Units</span>
                   </div>

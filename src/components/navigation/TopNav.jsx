@@ -173,7 +173,7 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
                 />
               )}
               <Database className="h-3 w-3" />
-              <span className="hidden lg:inline">
+              <span className="hidden lg:inline" data-no-translate="true">
                 {syncState?.status === 'syncing'
                   ? 'Syncing...'
                   : syncState?.pendingCount > 0
@@ -234,7 +234,7 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
                   alt=""
                   className="h-8 w-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
                 />
-                <div className="hidden md:flex flex-col text-left">
+                <div className="hidden md:flex flex-col text-left" data-no-translate="true">
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
                     {currentUser?.name || 'Demo User'}
                   </span>
@@ -249,10 +249,10 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
                 <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden py-1.5 animate-in fade-in zoom-in-95 duration-100">
                   {/* User info banner */}
                   <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100" data-no-translate="true">
                       {currentUser?.name}
                     </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate" data-no-translate="true">
                       {currentUser?.email}
                     </p>
                     <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-semibold uppercase tracking-wider">

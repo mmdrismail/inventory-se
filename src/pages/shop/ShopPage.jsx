@@ -163,6 +163,7 @@ export const ShopPage = () => {
                   <div className="p-4 space-y-2">
                     <Link
                       to={`/shop/products/${p.id}`}
+                      data-no-translate="true"
                       className="font-bold text-sm text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 line-clamp-1"
                     >
                       {p.name}

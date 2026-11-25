@@ -217,6 +217,7 @@ export const SaleDetailPage = () => {
             {sale.customerId ? (
               <Link
                 to={`/customers/${sale.customerId}`}
+                data-no-translate="true"
                 className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400"
               >
                 {sale.customerName}
@@ -227,13 +228,13 @@ export const SaleDetailPage = () => {
               </span>
             )}
             {(customer?.companyName || sale.customerCompany) && (
-              <p className="text-purple-600 dark:text-purple-400 font-semibold mt-0.5">
+              <p className="text-purple-600 dark:text-purple-400 font-semibold mt-0.5" data-no-translate="true">
                 {customer?.companyName || sale.customerCompany}
               </p>
             )}
             <p className="text-slate-500 mt-0.5">{customer?.phone || sale.customerPhone || l({ bn: 'কাউন্টার সরাসরি বিক্রয়', en: 'Direct counter sale', obro: 'Direct counter sale' })}</p>
             {(customer?.address || sale.customerAddress) && (
-              <p className="text-slate-400 mt-0.5">{customer?.address || sale.customerAddress}</p>
+              <p className="text-slate-400 mt-0.5" data-no-translate="true">{customer?.address || sale.customerAddress}</p>
             )}
           </div>
           <div className="space-y-2">
