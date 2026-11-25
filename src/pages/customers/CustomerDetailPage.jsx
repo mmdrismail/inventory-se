@@ -386,7 +386,7 @@ export const CustomerDetailPage = () => {
                           <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200">
                             {formatCurrency(totalAmt, settings.currency)}
                             {Number(s.discount) > 0 && (
-                              <span className="block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <span className="block text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                                 ছাড়: -{formatCurrency(s.discount, settings.currency)}
                               </span>
                             )}

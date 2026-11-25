@@ -267,7 +267,7 @@ export const SalesListPage = () => {
                       data-scroll-anchor={s.id}
                       className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
                     >
-                      <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100">
+                      <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
                         <Link to={`/sales/${s.id}`} className="hover:text-emerald-600 transition-colors">
                           {invNo}
                         </Link>
@@ -290,19 +290,19 @@ export const SalesListPage = () => {
                         {(s.items || []).length}
                       </td>
 
-                      <td className="py-3 px-3 text-right font-mono text-slate-500">
+                      <td className="py-3 px-3 text-right font-mono text-slate-500 whitespace-nowrap">
                         {formatCurrency(subtotal, settings.currency)}
                       </td>
 
-                      <td className="py-3 px-3 text-right font-mono text-emerald-600">
+                      <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold whitespace-nowrap">
                         {discountNum > 0 ? `-${formatCurrency(discountNum, settings.currency)}` : '—'}
                       </td>
 
-                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
                         {formatCurrency(grandTotal, settings.currency)}
                       </td>
 
-                      <td className="py-3 px-3 text-center">
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span
                           className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                             s.paymentStatus === 'paid'
@@ -315,7 +315,7 @@ export const SalesListPage = () => {
                           {s.paymentStatus}
                         </span>
                         {Number(s.dueAmount) > 0 && (
-                          <span className="block text-[10px] font-mono text-red-600 dark:text-red-400 mt-0.5">
+                          <span className="block text-[10px] font-mono text-red-600 dark:text-red-400 mt-0.5 whitespace-nowrap">
                             Due: {formatCurrency(s.dueAmount, settings.currency)}
                           </span>
                         )}

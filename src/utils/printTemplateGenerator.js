@@ -744,6 +744,7 @@ const getAuthenticStyles = (isThermal = false) => `
     font-family: 'JetBrains Mono', monospace;
     width: 25%;
     background: #eff6ff;
+    white-space: nowrap;
   }
 
   .watermark-layer {
@@ -1432,7 +1433,7 @@ export const generateThermalReceiptHtml = (sale, settings = {}, options = {}) =>
           ? `
         <div style="display: flex; justify-content: space-between; color: #047857;">
           <span>${p.t.discount}</span>
-          <span>-${formatCurrency(discount, p.currencySymbol)}</span>
+          <span style="white-space: nowrap;">-${formatCurrency(discount, p.currencySymbol)}</span>
         </div>`
           : ''
       }

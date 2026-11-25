@@ -354,7 +354,7 @@ export const SaleDetailPage = () => {
             {discountVal > 0 && (
               <div className="flex justify-between w-72 text-emerald-600 font-semibold">
                 <span>{l({ bn: 'বিশেষ ছাড় / ডিসকাউন্ট:', en: 'Discount Applied:', obro: 'Discount Applied:' })}</span>
-                <span className="font-mono">-{formatCurrency(discountVal, settings.currency)}</span>
+                <span className="font-mono whitespace-nowrap">-{formatCurrency(discountVal, settings.currency)}</span>
               </div>
             )}
             {taxVal > 0 && (

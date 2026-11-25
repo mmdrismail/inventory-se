@@ -1246,7 +1246,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                       {discountVal > 0 && (
                         <tr className="border-b border-slate-300 bg-slate-50 text-emerald-700">
                           <td className="py-1 px-2 font-bold text-right border-r border-slate-300">{profile.t.discount}</td>
-                          <td className="py-1 px-2 font-mono font-bold text-right bg-emerald-50/50">-{formatCurrency(discountVal, profile.currencySymbol)}</td>
+                          <td className="py-1 px-2 font-mono font-bold text-right bg-emerald-50/50 whitespace-nowrap">-{formatCurrency(discountVal, profile.currencySymbol)}</td>
                         </tr>
                       )}
                       <tr className="border-b border-slate-300 bg-slate-50">
@@ -1536,7 +1536,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     {discountVal > 0 && (
                       <div className="flex justify-between text-emerald-700">
                         <span>{profile.t.discount}</span>
-                        <span className="font-mono">-{formatCurrency(discountVal, profile.currencySymbol)}</span>
+                        <span className="font-mono whitespace-nowrap">-{formatCurrency(discountVal, profile.currencySymbol)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm font-extrabold text-slate-900 border-t border-slate-300 pt-1">
@@ -1682,7 +1682,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     {discountVal > 0 && (
                       <div className="flex justify-between text-emerald-700">
                         <span>{profile.t.discount}</span>
-                        <span className="font-mono">-{formatCurrency(discountVal, profile.currencySymbol)}</span>
+                        <span className="font-mono whitespace-nowrap">-{formatCurrency(discountVal, profile.currencySymbol)}</span>
                       </div>
                     )}
                     {taxVal > 0 && (
@@ -1774,7 +1774,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                 {discountVal > 0 && (
                   <div className="flex justify-between text-emerald-700">
                     <span>{profile.t.discount}</span>
-                    <span>-{formatCurrency(discountVal, profile.currencySymbol)}</span>
+                    <span className="font-mono whitespace-nowrap">-{formatCurrency(discountVal, profile.currencySymbol)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-extrabold text-sm border-t border-slate-900 pt-1 mt-1">

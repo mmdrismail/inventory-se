@@ -559,8 +559,8 @@ export const QuotationDetailPage = () => {
                   <span>
                     {l({ bn: 'বিশেষ ছাড়:', en: 'Discount:', obro: 'বিশেষ ছাড় (Discount):' })}
                   </span>
-                  <span className="font-mono font-bold">
-                    - {formatCurrency(quotation.discount, settings.currency)}
+                  <span className="font-mono font-bold whitespace-nowrap">
+                    -{formatCurrency(quotation.discount, settings.currency)}
                   </span>
                 </div>
               )}
