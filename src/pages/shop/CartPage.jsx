@@ -65,7 +65,7 @@ export const CartPage = () => {
                   {item.name}
                 </Link>
                 <div className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
-                  {formatCurrency(item.price, settings.currency)} each
+                  {`${formatCurrency(item.price, settings.currency)} each`}
                 </div>
               </div>
 

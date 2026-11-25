@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Logo } from '../common/Logo';
+import { useLanguage } from '../../context/LanguageContext';
 import { Mail, Phone, MapPin, ShieldCheck, Heart } from 'lucide-react';
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const { language } = useLanguage();
 
   return (
     <footer className="bg-slate-900 text-slate-300 border-t border-slate-800">
@@ -92,7 +94,30 @@ export const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {currentYear} StockLine Enterprise. Maintained by <a href="https://github.com/mmdrismail" target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-semibold hover:underline">Mohammad Ismail</a>.</p>
+          <p data-no-translate="true">
+            {language === 'en' ? (
+              <>
+                © {currentYear} StockLine Enterprise. Maintained by{' '}
+                <a href="https://github.com/mmdrismail" target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-semibold hover:underline">
+                  Mohammad Ismail
+                </a>.
+              </>
+            ) : language === 'obro' ? (
+              <>
+                © {currentYear} StockLine Enterprise · Porichalona:{' '}
+                <a href="https://github.com/mmdrismail" target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-semibold hover:underline">
+                  Mohammad Ismail
+                </a>
+              </>
+            ) : (
+              <>
+                © {currentYear} StockLine Enterprise · রক্ষণাবেক্ষণে:{' '}
+                <a href="https://github.com/mmdrismail" target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-semibold hover:underline">
+                  Mohammad Ismail
+                </a>
+              </>
+            )}
+          </p>
           <div className="flex items-center gap-6">
             <a href="https://trello.com/b/B7EZLSFY/my-trello-board" target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors">
               Trello Board

@@ -77,12 +77,10 @@ const isElementSkipped = (el) => {
 const translateCore = (core, lang, allowOnline = true) => {
   const hasBn = translationEngine.hasBangla(core);
 
-  // Target English: if pure English source, restore exact original text immediately
   if (lang === 'en' && !hasBn) {
     return core;
   }
 
-  // Direct lexicon / cache lookup (with trailing colon support like "Subtotal:")
   const direct = translationEngine.translate(core, lang, '', { allowOnline });
   if (direct && direct !== core) {
     return direct;
@@ -103,7 +101,6 @@ const translateCore = (core, lang, allowOnline = true) => {
     }
   }
 
-  // Avoid altering strings that already contain Bangla when viewing Bangla/Banglish
   if (lang !== 'en' && hasBn) {
     return core;
   }
@@ -121,26 +118,55 @@ const translatePreservingWhitespace = (raw, lang, allowOnline = true) => {
   return `${leading}${translated}${trailing}`;
 };
 
-const translateTextNode = (node, lang) => {
-  const parent = node.parentElement;
-  if (!parent || isElementSkipped(parent)) return;
-
+const syncTextNodeSource = (node) => {
   let meta = textMeta.get(node);
-  const currentVal = node.nodeValue;
+  const currentVal = node.nodeValue ?? '';
   if (!meta) {
     meta = { source: currentVal, lastApplied: currentVal };
     textMeta.set(node, meta);
   } else if (currentVal !== meta.lastApplied) {
-    // React or application code dynamically changed this node's text
     meta.source = currentVal;
     meta.lastApplied = currentVal;
   }
+  return meta;
+};
 
-  const allowOnline = parent.tagName !== 'OPTION';
-  const nextVal = translatePreservingWhitespace(meta.source, lang, allowOnline);
-  if (currentVal !== nextVal) {
-    meta.lastApplied = nextVal;
-    node.nodeValue = nextVal;
+/**
+ * Translate a contiguous run of sibling Text nodes as ONE complete grammatical sentence.
+ * Keeps every Text node reference intact in place so React 19 reconciles safely without DOM errors.
+ */
+const translateTextRun = (run, parentEl, lang) => {
+  if (!run || run.length === 0 || !parentEl || isElementSkipped(parentEl)) return;
+
+  const metas = run.map(syncTextNodeSource);
+  const rawCombined = metas.map((m) => m.source).join('');
+  if (!rawCombined) return;
+
+  const allowOnline = parentEl.tagName !== 'OPTION';
+  const nextCombined = translatePreservingWhitespace(rawCombined, lang, allowOnline);
+
+  // When restored back to exact source, restore individual split node values cleanly
+  if (nextCombined === rawCombined) {
+    for (let i = 0; i < run.length; i++) {
+      const node = run[i];
+      const meta = metas[i];
+      if (node.nodeValue !== meta.source) {
+        meta.lastApplied = meta.source;
+        node.nodeValue = meta.source;
+      }
+    }
+    return;
+  }
+
+  if (run[0].nodeValue !== nextCombined) {
+    metas[0].lastApplied = nextCombined;
+    run[0].nodeValue = nextCombined;
+  }
+  for (let i = 1; i < run.length; i++) {
+    if (run[i].nodeValue !== '') {
+      metas[i].lastApplied = '';
+      run[i].nodeValue = '';
+    }
   }
 };
 
@@ -167,7 +193,7 @@ const translateElementAttrs = (el, lang) => {
       meta.lastApplied = current;
     }
 
-    const next = translatePreservingWhitespace(meta.source, lang);
+    const next = translatePreservingWhitespace(meta.source, lang, true);
     if (current !== next) {
       meta.lastApplied = next;
       el.setAttribute(attr, next);
@@ -175,36 +201,42 @@ const translateElementAttrs = (el, lang) => {
   }
 };
 
+const processElementSubtree = (el, lang) => {
+  if (!el || el.nodeType !== 1 || isElementSkipped(el)) return;
+
+  translateElementAttrs(el, lang);
+
+  let textRun = [];
+  const flushRun = () => {
+    if (textRun.length > 0) {
+      translateTextRun(textRun, el, lang);
+      textRun = [];
+    }
+  };
+
+  for (let child = el.firstChild; child; child = child.nextSibling) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      textRun.push(child);
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      flushRun();
+      processElementSubtree(child, lang);
+    }
+  }
+  flushRun();
+};
+
 export const applyDomTranslation = (root, lang) => {
   if (typeof document === 'undefined' || !root) return;
 
   if (root.nodeType === Node.TEXT_NODE) {
-    translateTextNode(root, lang);
+    const parent = root.parentElement;
+    if (parent) {
+      processElementSubtree(parent, lang);
+    }
     return;
   }
 
-  if (root.nodeType !== Node.ELEMENT_NODE && root !== document.body) return;
-  if (root.nodeType === Node.ELEMENT_NODE && isElementSkipped(root)) return;
-
-  if (root.nodeType === Node.ELEMENT_NODE) {
-    translateElementAttrs(root, lang);
-  }
-
-  const attrWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
-  let elNode = attrWalker.nextNode();
-  while (elNode) {
-    if (!isElementSkipped(elNode)) {
-      translateElementAttrs(elNode, lang);
-    }
-    elNode = attrWalker.nextNode();
-  }
-
-  const textWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let textNode = textWalker.nextNode();
-  while (textNode) {
-    translateTextNode(textNode, lang);
-    textNode = textWalker.nextNode();
-  }
+  processElementSubtree(root, lang);
 };
 
 export const startDomTranslator = (getLanguage) => {
@@ -213,7 +245,7 @@ export const startDomTranslator = (getLanguage) => {
   }
 
   let rafId = null;
-  let dirtyRoots = new Set();
+  const dirtyRoots = new Set();
 
   const flush = () => {
     rafId = null;
@@ -248,7 +280,7 @@ export const startDomTranslator = (getLanguage) => {
         const node = m.target;
         const meta = textMeta.get(node);
         if (meta && node.nodeValue === meta.lastApplied) continue;
-        schedule(node);
+        schedule(node.parentElement || node);
       } else if (m.type === 'attributes') {
         const el = m.target;
         const map = attrMeta.get(el);
@@ -257,7 +289,9 @@ export const startDomTranslator = (getLanguage) => {
         schedule(el);
       } else if (m.type === 'childList') {
         m.addedNodes.forEach((added) => {
-          if (added.nodeType === Node.TEXT_NODE || added.nodeType === Node.ELEMENT_NODE) {
+          if (added.nodeType === Node.TEXT_NODE) {
+            schedule(added.parentElement || added);
+          } else if (added.nodeType === Node.ELEMENT_NODE) {
             schedule(added);
           }
         });

@@ -36,7 +36,7 @@ import {
 export const DashboardOverviewPage = () => {
   const [dateRangeDays, setDateRangeDays] = useState(7);
   const { products, categories, sales, purchases, customers, orders, inventoryMovements, settings } = useAppData();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Dynamic calculations from actual local demo records
   const inventoryMetrics = useMemo(() => calculateInventoryMetrics(products), [products]);
@@ -167,8 +167,12 @@ export const DashboardOverviewPage = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle>{t('chart_sales_velocity', 'Sales Revenue Velocity')}</CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {t('chart_sales_velocity_sub', 'Daily completed sales total')} ({dateRangeDays} {t('days_count', 'Days')})
+              <p className="text-xs text-slate-400 mt-0.5" data-no-translate="true">
+                {language === 'en'
+                  ? `Daily completed sales total (${dateRangeDays} days)`
+                  : language === 'obro'
+                  ? `Goto ${dateRangeDays} diner bikroy (${dateRangeDays} days)`
+                  : `গত ${dateRangeDays} দিনের সম্পন্ন বিক্রয়ের হিসাব`}
               </p>
             </div>
             <Link to="/sales">
@@ -203,8 +207,12 @@ export const DashboardOverviewPage = () => {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle>{t('chart_procurement', 'Procurement Expenditures')}</CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {t('chart_procurement_sub', 'Purchases received over the last')} ({dateRangeDays} {t('days_count', 'Days')})
+              <p className="text-xs text-slate-400 mt-0.5" data-no-translate="true">
+                {language === 'en'
+                  ? `Purchases received over the last ${dateRangeDays} days`
+                  : language === 'obro'
+                  ? `Goto ${dateRangeDays} diner received purchase`
+                  : `গত ${dateRangeDays} দিনের গৃহীত ক্রয় অর্ডারসমূহ`}
               </p>
             </div>
             <Link to="/purchases">

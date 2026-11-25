@@ -5,9 +5,11 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/forms/FormControls';
 import { useAuth } from '../../context/AuthContext';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Eye, EyeOff, Shield, Sparkles, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export const LoginPage = () => {
+  const { language } = useLanguage();
   const [email, setEmail] = useState('admin@stockline.io');
   const [password, setPassword] = useState('password123');
   const [showPassword, setShowPassword] = useState(false);
@@ -188,13 +190,21 @@ export const LoginPage = () => {
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500">
-            Don't have an account yet?{' '}
+          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500" data-no-translate="true">
+            {language === 'en'
+              ? "Don't have an account yet? "
+              : language === 'obro'
+              ? 'Ekhono account kholen ni? '
+              : 'এখনো অ্যাকাউন্ট তৈরি করেননি? '}
             <Link
               to="/register"
               className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
             >
-              Register demo account
+              {language === 'en'
+                ? 'Register demo account'
+                : language === 'obro'
+                ? 'Notun demo account khulun'
+                : 'নতুন ডেমো অ্যাকাউন্ট খুলুন'}
             </Link>
           </div>
         </div>

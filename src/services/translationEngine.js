@@ -14,12 +14,52 @@
 import { TRANSLATIONS } from '../utils/translations.js';
 import { PUBLIC_TRANSLATIONS } from '../utils/publicTranslations.js';
 
-const STORAGE_CACHE_KEY = 'stockline_translation_cache';
+const STORAGE_CACHE_KEY = 'stockline_translation_cache_v2';
+const LEGACY_STORAGE_CACHE_KEY = 'stockline_translation_cache';
 const MAX_ONLINE_CONCURRENCY = 4;
 
-// Load persistent cache from LocalStorage
+// Contextless single stop-words/fragments that must never be word-by-word machine translated
+const ISOLATED_STOPWORDS = new Set([
+  'to',
+  'of',
+  'from',
+  'in',
+  'on',
+  'at',
+  'by',
+  'for',
+  'with',
+  'or',
+  'and',
+  'as',
+  'is',
+  'it',
+  'be',
+  'are',
+  'was',
+  'the',
+  'a',
+  'an',
+  'left',
+  'each',
+  'new',
+  'ago',
+  'per',
+  'entries',
+  'results',
+  'items',
+  'item',
+  'units',
+  'bills',
+  'quotes',
+]);
+
+// Load persistent cache from LocalStorage (purge poisoned v1 fragment cache once)
 const loadPersistentCache = () => {
   try {
+    if (localStorage.getItem(LEGACY_STORAGE_CACHE_KEY)) {
+      localStorage.removeItem(LEGACY_STORAGE_CACHE_KEY);
+    }
     const raw = localStorage.getItem(STORAGE_CACHE_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch {
@@ -810,7 +850,7 @@ class TranslationEngineService {
       return this.memoryCache[cacheKey];
     }
 
-    // 3. Dynamic Regex Pattern Matches (Numbers, Counts, IDs, Units)
+    // 3. Dynamic Grammar-Aware Full-Sentence Pattern Matches
     if (/^order\s*#?\s*([\w-]+)$/i.test(text)) {
       const match = text.match(/^order\s*#?\s*([\w-]+)$/i);
       return targetLang === 'en' ? `Order #${match[1]}` : `অর্ডার #${match[1]}`;
@@ -819,15 +859,74 @@ class TranslationEngineService {
       const match = text.match(/^invoice\s*#?\s*([\w-]+)$/i);
       return targetLang === 'en' ? `Invoice #${match[1]}` : `ইনভয়েস #${match[1]}`;
     }
-    if (/^showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)/i.test(text)) {
-      const m = text.match(/^showing\s+(\d+)\s+to\s+(\d+)\s+of\s+(\d+)/i);
-      return targetLang === 'en'
-        ? text
-        : `${m[3]} টির মধ্যে ${m[1]} থেকে ${m[2]} প্রদর্শিত হচ্ছে`;
+    if (/^showing\s+([\d,]+)\s+to\s+([\d,]+)\s+of\s+([\d,]+)(?:\s*(?:entries|results|items))?$/i.test(text)) {
+      const m = text.match(/^showing\s+([\d,]+)\s+to\s+([\d,]+)\s+of\s+([\d,]+)/i);
+      if (targetLang === 'en') return text;
+      if (targetLang === 'obro') return `Mot ${m[3]}-tir moddhe ${m[1]} theke ${m[2]} proshorshito hocche`;
+      return `মোট ${m[3]}টি রেকর্ডের মধ্যে ${m[1]} থেকে ${m[2]} প্রদর্শিত হচ্ছে`;
+    }
+    if (/^(?:only\s+)?([\d/.,-]+)\s+left$/i.test(text)) {
+      const m = text.match(/^(?:only\s+)?([\d/.,-]+)\s+left$/i);
+      if (targetLang === 'en') return `Only ${m[1]} left`;
+      if (targetLang === 'obro') return `Matro ${m[1]}-ti baki`;
+      return `মাত্র ${m[1]}টি বাকি`;
+    }
+    if (/^([\d.,]+)\s+days?\s+left$/i.test(text)) {
+      const m = text.match(/^([\d.,]+)\s+days?\s+left$/i);
+      if (targetLang === 'en') return text;
+      return targetLang === 'obro' ? `Ar ${m[1]} din baki` : `আর মাত্র ${m[1]} দিন বাকি`;
+    }
+    if (/^expired\s+([\d.,]+)\s+days?\s+ago$/i.test(text)) {
+      const m = text.match(/^expired\s+([\d.,]+)\s+days?\s+ago$/i);
+      if (targetLang === 'en') return text;
+      return targetLang === 'obro' ? `${m[1]} din age meyad shesh` : `${m[1]} দিন আগে মেয়াদোত্তীর্ণ হয়েছে`;
+    }
+    if (/^expires\s+soon\s*\(([\d.,]+)\s+days?\)$/i.test(text)) {
+      const m = text.match(/^expires\s+soon\s*\(([\d.,]+)\s+days?\)$/i);
+      if (targetLang === 'en') return text;
+      return targetLang === 'obro' ? `Shighroi meyad shesh (${m[1]} din)` : `শীঘ্রই মেয়াদ শেষ হবে (${m[1]} দিন)`;
+    }
+    if (/^expires\s+today$/i.test(text)) {
+      return targetLang === 'en' ? text : targetLang === 'obro' ? 'Aji meyad shesh' : 'আজই মেয়াদ শেষ';
     }
     if (/^(\d+)\s+items?$/i.test(text)) {
       const m = text.match(/^(\d+)\s+items?$/i);
-      return targetLang === 'en' ? text : `${m[1]} টি আইটেম`;
+      return targetLang === 'en' ? text : targetLang === 'obro' ? `${m[1]}-ti item` : `${m[1]}টি আইটেম`;
+    }
+    if (/^shopping\s+cart\s*\((\d+)\s+items?\)$/i.test(text)) {
+      const m = text.match(/^shopping\s+cart\s*\((\d+)\s+items?\)$/i);
+      if (targetLang === 'en') return text;
+      return targetLang === 'obro' ? `Shopping Cart (${m[1]}-ti item)` : `শপিং কার্ট (${m[1]}টি আইটেম)`;
+    }
+    if (/^([^\s]+(?:\s*[^\s]+)?)\s+each$/i.test(text) && /[\d৳$]/.test(text)) {
+      const m = text.match(/^(.+?)\s+each$/i);
+      if (targetLang === 'en') return text;
+      return targetLang === 'obro' ? `Protiti ${m[1]}` : `প্রতিটি ${m[1]}`;
+    }
+    if (/^(\d+)\s+new$/i.test(text)) {
+      const m = text.match(/^(\d+)\s+new$/i);
+      return targetLang === 'en' ? text : targetLang === 'obro' ? `${m[1]}-ti notun` : `${m[1]}টি নতুন`;
+    }
+    if (/^registered:\s*(.+)$/i.test(text)) {
+      const m = text.match(/^registered:\s*(.+)$/i);
+      return targetLang === 'en' ? text : targetLang === 'obro' ? `Nibondhito: ${m[1]}` : `নিবন্ধিত: ${m[1]}`;
+    }
+    if (/^account\s+registered\s+on\s+(.+)$/i.test(text)) {
+      const m = text.match(/^account\s+registered\s+on\s+(.+)$/i);
+      if (targetLang === 'en') return text;
+      return targetLang === 'obro' ? `Account toirir tarikh: ${m[1]}` : `অ্যাকাউন্ট নিবন্ধনের তারিখ: ${m[1]}`;
+    }
+    if (/^issued\s+on\s+(.+)$/i.test(text)) {
+      const m = text.match(/^issued\s+on\s+(.+)$/i);
+      return targetLang === 'en' ? text : targetLang === 'obro' ? `Issur tarikh: ${m[1]}` : `ইস্যুর তারিখ: ${m[1]}`;
+    }
+    if (/^(\d+)\s+bills?\s*[·•]\s*(\d+)\s+quotes?$/i.test(text)) {
+      const m = text.match(/^(\d+)\s+bills?\s*[·•]\s*(\d+)\s+quotes?$/i);
+      return targetLang === 'en'
+        ? text
+        : targetLang === 'obro'
+        ? `${m[1]}-ti bill · ${m[2]}-ti quote`
+        : `${m[1]}টি বিল · ${m[2]}টি কোটেশন`;
     }
     if (/^(\d+)\s+skus?$/i.test(text)) {
       const m = text.match(/^(\d+)\s+skus?$/i);
@@ -845,10 +944,6 @@ class TranslationEngineService {
       const m = text.match(/^([+-]?\d+)\s+units?$/i);
       return targetLang === 'en' ? text : `${m[1]} ইউনিট`;
     }
-    if (/^only\s+(\d+)\s+left$/i.test(text)) {
-      const m = text.match(/^only\s+(\d+)\s+left$/i);
-      return targetLang === 'en' ? text : `মাত্র ${m[1]}টি বাকি`;
-    }
     if (/^all\s+categories\s*\((\d+)\)$/i.test(text)) {
       const m = text.match(/^all\s+categories\s*\((\d+)\)$/i);
       return targetLang === 'en' ? text : `সকল ক্যাটাগরি (${m[1]})`;
@@ -857,9 +952,32 @@ class TranslationEngineService {
       const m = text.match(/^sign\s+out\s*\(([^)]+)\)$/i);
       return targetLang === 'en' ? text : `লগ আউট (${m[1]})`;
     }
+    if (/^"(.+?)"\s+\(SKU:\s*([^)]+)\)\s+is\s+at\s+0\s+units\./i.test(text)) {
+      const m = text.match(/^"(.+?)"\s+\(SKU:\s*([^)]+)\)/i);
+      return targetLang === 'en'
+        ? text
+        : `"${m[1]}" (SKU: ${m[2]}) পণ্যের মজুদ শূন্য (0)। জরুরি রিস্টক প্রয়োজন।`;
+    }
+    if (/^"(.+?)"\s+has\s+(\d+)\s+units?\s+remaining\s+\(Threshold:\s*(\d+)\)\.?$/i.test(text)) {
+      const m = text.match(/^"(.+?)"\s+has\s+(\d+)\s+units?\s+remaining\s+\(Threshold:\s*(\d+)\)/i);
+      return targetLang === 'en'
+        ? text
+        : `"${m[1]}" পণ্যের মাত্র ${m[2]} ইউনিট মজুদ আছে (সতর্কতা সীমা: ${m[3]})।`;
+    }
+    if (/^order\s+#([\w-]+)\s+placed\s+by\s+(.+?)\s+awaits\s+confirmation\.?$/i.test(text)) {
+      const m = text.match(/^order\s+#([\w-]+)\s+placed\s+by\s+(.+?)\s+awaits/i);
+      return targetLang === 'en'
+        ? text
+        : `${m[2]}-এর অর্ডার #${m[1]} অনুমোদনের অপেক্ষায় আছে।`;
+    }
 
     const textHasBangla = this.hasBangla(text);
     const textHasLatin = /[A-Za-z]{2,}/.test(text);
+
+    // Prevent word-by-word Google Translate of contextless single stop-words
+    if (!textHasBangla && ISOLATED_STOPWORDS.has(norm)) {
+      return fallback || text;
+    }
 
     // Handle pre-formatted bilingual strings like "গ্রাহকের নাম (Customer Name)"
     if (textHasBangla && textHasLatin) {

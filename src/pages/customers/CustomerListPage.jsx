@@ -389,7 +389,11 @@ export const CustomerListPage = () => {
 
                   <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
                     <span>
-                      {stats.count} bill{stats.count === 1 ? '' : 's'} · {stats.quotationsCount} quote{stats.quotationsCount === 1 ? '' : 's'}
+                      {t({
+                        bn: `${stats.count}টি বিল · ${stats.quotationsCount}টি কোটেশন`,
+                        en: `${stats.count} bill${stats.count === 1 ? '' : 's'} · ${stats.quotationsCount} quote${stats.quotationsCount === 1 ? '' : 's'}`,
+                        obro: `${stats.count} bill · ${stats.quotationsCount} quote`,
+                      })}
                     </span>
 
                     <div className="flex items-center gap-1">

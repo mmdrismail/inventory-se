@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
@@ -10,6 +11,7 @@ import { Search, ShoppingBag, Eye, CheckCircle2, AlertTriangle, XCircle, ArrowUp
 
 export const ShopPage = () => {
   const { products, categories, addToCart, settings } = useAppData();
+  const { l } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [sortBy, setSortBy] = useState('featured'); // 'featured', 'price_asc', 'price_desc', 'name'
@@ -148,8 +150,8 @@ export const ShopPage = () => {
                           Out of Stock
                         </span>
                       ) : qty <= 10 ? (
-                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-500 text-white shadow-sm">
-                          Only {qty} left
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-500 text-white shadow-sm" data-no-translate="true">
+                          {l({ bn: `মাত্র ${qty}টি বাকি`, en: `Only ${qty} left`, obro: `Matro ${qty}-ti baki` })}
                         </span>
                       ) : (
                         <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-sm">

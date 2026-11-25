@@ -5,9 +5,11 @@ import { Button } from '../../components/common/Button';
 import { Input, Select } from '../../components/forms/FormControls';
 import { useAuth } from '../../context/AuthContext';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 
 export const RegisterPage = () => {
+  const { language } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -160,13 +162,17 @@ export const RegisterPage = () => {
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500">
-            Already registered?{' '}
+          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500" data-no-translate="true">
+            {language === 'en'
+              ? 'Already registered? '
+              : language === 'obro'
+              ? 'Itimoddhe nibondhito? '
+              : 'ইতিমধ্যে অ্যাকাউন্ট আছে? '}
             <Link
               to="/login"
               className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
             >
-              Sign in here
+              {language === 'en' ? 'Sign in here' : language === 'obro' ? 'Ekhane login korun' : 'এখানে লগইন করুন'}
             </Link>
           </div>
         </div>

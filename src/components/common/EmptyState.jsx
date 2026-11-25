@@ -1,6 +1,7 @@
 import React from 'react';
 import { PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './Button';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const EmptyState = ({
   icon: Icon = PackageOpen,
@@ -35,6 +36,7 @@ export const Pagination = ({
   onPageChange,
   className = '',
 }) => {
+  const { language } = useLanguage();
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(totalItems, currentPage * pageSize);
@@ -43,10 +45,26 @@ export const Pagination = ({
 
   return (
     <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 ${className}`}>
-      <span className="text-xs text-slate-500 dark:text-slate-400">
-        Showing <strong className="font-semibold text-slate-700 dark:text-slate-200">{startItem}</strong> to{' '}
-        <strong className="font-semibold text-slate-700 dark:text-slate-200">{endItem}</strong> of{' '}
-        <strong className="font-semibold text-slate-700 dark:text-slate-200">{totalItems}</strong> entries
+      <span className="text-xs text-slate-500 dark:text-slate-400" data-no-translate="true">
+        {language === 'en' ? (
+          <>
+            Showing <strong className="font-semibold text-slate-700 dark:text-slate-200">{startItem}</strong> to{' '}
+            <strong className="font-semibold text-slate-700 dark:text-slate-200">{endItem}</strong> of{' '}
+            <strong className="font-semibold text-slate-700 dark:text-slate-200">{totalItems}</strong> entries
+          </>
+        ) : language === 'obro' ? (
+          <>
+            Mot <strong className="font-semibold text-slate-700 dark:text-slate-200">{totalItems}</strong>-tir moddhe{' '}
+            <strong className="font-semibold text-slate-700 dark:text-slate-200">{startItem}</strong> theke{' '}
+            <strong className="font-semibold text-slate-700 dark:text-slate-200">{endItem}</strong> proshorshito hocche
+          </>
+        ) : (
+          <>
+            মোট <strong className="font-semibold text-slate-700 dark:text-slate-200">{totalItems}</strong>টি রেকর্ডের মধ্যে{' '}
+            <strong className="font-semibold text-slate-700 dark:text-slate-200">{startItem}</strong> থেকে{' '}
+            <strong className="font-semibold text-slate-700 dark:text-slate-200">{endItem}</strong> প্রদর্শিত হচ্ছে
+          </>
+        )}
       </span>
 
       <div className="flex items-center gap-1">
