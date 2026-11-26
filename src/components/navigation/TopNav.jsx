@@ -8,6 +8,7 @@ import { ShortcutsHelpModal } from '../common/ShortcutsHelpModal';
 import { isSoundEnabled, setSoundEnabled } from '../../utils/soundEffects';
 import { useAuth } from '../../context/AuthContext';
 import { useAppData } from '../../context/AppDataContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   Menu,
   Search,
@@ -36,6 +37,7 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
   const profileRef = useRef(null);
   const { currentUser, role, logout, demoLogin } = useAuth();
   const { settings, toggleTheme, syncState, syncNow, addToast } = useAppData();
+  const { l } = useLanguage();
   const navigate = useNavigate();
 
   // Global Keyboard Shortcuts (Ctrl+K for search, ? for help, Ctrl+Shift+D for dark mode)
@@ -98,9 +100,9 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
   return (
     <>
       <header className="sticky top-0 z-20 h-16 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-        <div className="h-full px-4 sm:px-6 flex items-center justify-between gap-4">
+        <div className="h-full px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-3">
           {/* Left: Hamburger & Breadcrumbs */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden">
             <button
               onClick={onOpenMobileSidebar}
               className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -112,16 +114,18 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
           </div>
 
           {/* Right: Search, Sound, Shortcuts, Notifications, Theme, User Menu */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Global Search trigger */}
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 transition-all text-xs"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 transition-all text-xs whitespace-nowrap shrink-0"
               title="ক্যাটালগ ও ডাটাবেজ সার্চ (Ctrl+K)"
             >
-              <Search className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Quick Search...</span>
-              <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
+              <Search className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden md:inline whitespace-nowrap" data-no-translate="true">
+                {l({ bn: 'খুঁজুন...', en: 'Search...', obro: 'Search...' })}
+              </span>
+              <kbd className="hidden xl:inline-flex items-center gap-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">
                 Ctrl K
               </kbd>
             </button>
@@ -146,7 +150,7 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
                   });
                 }
               }}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all whitespace-nowrap shrink-0 ${
                 syncState?.status === 'syncing'
                   ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700'
                   : syncState?.isOnline === false || syncState?.status === 'queued'
@@ -173,7 +177,7 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
                 />
               )}
               <Database className="h-3 w-3" />
-              <span className="hidden lg:inline" data-no-translate="true">
+              <span className="hidden lg:inline whitespace-nowrap" data-no-translate="true">
                 {syncState?.status === 'syncing'
                   ? 'Syncing...'
                   : syncState?.pendingCount > 0
@@ -234,11 +238,14 @@ export const TopNav = ({ onOpenMobileSidebar }) => {
                   alt=""
                   className="h-8 w-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
                 />
-                <div className="hidden md:flex flex-col text-left" data-no-translate="true">
-                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
+                <div className="hidden md:flex flex-col text-left min-w-0" data-no-translate="true">
+                  <span
+                    className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[120px] xl:max-w-[180px]"
+                    title={currentUser?.name || 'Demo User'}
+                  >
                     {currentUser?.name || 'Demo User'}
                   </span>
-                  <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                     {role}
                   </span>
                 </div>

@@ -272,16 +272,16 @@ export const CustomerDetailPage = () => {
       </Card>
 
       {/* 3 KPI Financial Summary Cards (কাস্টমার হিসাব ও বকেয়া খতিয়ান) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total Lifetime Sales */}
-        <Card className="p-4 bg-gradient-to-br from-blue-500/5 to-slate-500/5 border-l-4 border-l-blue-500">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <Card className="p-4 min-w-0 bg-gradient-to-br from-blue-500/5 to-slate-500/5 border-l-4 border-l-blue-500">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider min-w-0">
               মোট বিক্রয় (Total Sales)
             </span>
-            <Receipt className="h-4 w-4 text-blue-500" />
+            <Receipt className="h-4 w-4 text-blue-500 shrink-0" />
           </div>
-          <p className="text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">
+          <p className="text-lg lg:text-xl xl:text-2xl font-black font-mono tabular-nums break-words text-slate-900 dark:text-white mt-1">
             {formatCurrency(financials.totalSales, settings.currency)}
           </p>
           <span className="text-[11px] text-slate-500">
@@ -290,14 +290,14 @@ export const CustomerDetailPage = () => {
         </Card>
 
         {/* Total Collected / Paid */}
-        <Card className="p-4 bg-gradient-to-br from-emerald-500/5 to-slate-500/5 border-l-4 border-l-emerald-500">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <Card className="p-4 min-w-0 bg-gradient-to-br from-emerald-500/5 to-slate-500/5 border-l-4 border-l-emerald-500">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider min-w-0">
               মোট আদায় (Total Paid)
             </span>
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
           </div>
-          <p className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+          <p className="text-lg lg:text-xl xl:text-2xl font-black font-mono tabular-nums break-words text-emerald-600 dark:text-emerald-400 mt-1">
             {formatCurrency(financials.totalPaid, settings.currency)}
           </p>
           <span className="text-[11px] text-slate-500">
@@ -307,24 +307,24 @@ export const CustomerDetailPage = () => {
 
         {/* Total Due / Receivables ("কাস্টমার থেকে কত পাব") */}
         <Card
-          className={`p-4 border-l-4 ${
+          className={`p-4 min-w-0 border-l-4 ${
             financials.totalDue > 0
               ? 'bg-amber-500/10 border-l-amber-500'
               : 'bg-emerald-500/5 border-l-emerald-500'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider min-w-0">
               কাস্টমার থেকে মোট পাওনা (Due)
             </span>
             <AlertCircle
-              className={`h-4 w-4 ${
+              className={`h-4 w-4 shrink-0 ${
                 financials.totalDue > 0 ? 'text-amber-500' : 'text-emerald-500'
               }`}
             />
           </div>
           <p
-            className={`text-2xl font-black font-mono mt-1 ${
+            className={`text-lg lg:text-xl xl:text-2xl font-black font-mono tabular-nums break-words mt-1 ${
               financials.totalDue > 0
                 ? 'text-amber-600 dark:text-amber-400'
                 : 'text-emerald-600 dark:text-emerald-400'

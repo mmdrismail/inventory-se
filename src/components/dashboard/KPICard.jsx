@@ -20,31 +20,41 @@ export const KPICard = ({
     red: 'bg-red-50 text-red-600 dark:bg-red-950/60 dark:text-red-400 border-red-200/50 dark:border-red-800/50',
   };
 
+  const valStr = String(value ?? '');
+  const valueSizeClass =
+    valStr.length >= 14
+      ? 'text-base sm:text-lg'
+      : valStr.length >= 10
+        ? 'text-lg sm:text-xl'
+        : 'text-xl sm:text-2xl';
+
   return (
     <Card
       onClick={onClick}
-      className={`p-5 relative overflow-hidden transition-all duration-200 hover:shadow-md ${
+      className={`p-4 sm:p-5 relative min-w-0 transition-all duration-200 hover:shadow-md ${
         onClick ? 'cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-600' : ''
       }`}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-            {title}
-          </p>
-          <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1 tracking-tight">
-            {value}
-          </h3>
-        </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider leading-snug min-w-0 flex-1">
+          {title}
+        </p>
 
         {Icon && (
           <div
-            className={`p-2.5 rounded-xl border ${variantStyles[variant] || variantStyles.emerald}`}
+            className={`p-2 rounded-xl border shrink-0 ${variantStyles[variant] || variantStyles.emerald}`}
           >
-            <Icon className="h-5 w-5" />
+            <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
         )}
       </div>
+
+      <h3
+        className={`${valueSizeClass} font-bold text-slate-900 dark:text-slate-100 mt-1.5 tracking-tight tabular-nums leading-tight break-words`}
+        title={valStr}
+      >
+        {value}
+      </h3>
 
       {(subtext || trend) && (
         <div className="mt-3 flex items-center gap-2 text-xs">

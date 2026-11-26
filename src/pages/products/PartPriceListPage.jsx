@@ -226,36 +226,36 @@ export const PartPriceListPage = () => {
       </div>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-4 min-w-0">
           <span className="text-[11px] font-semibold text-slate-500 block">
             {l({ bn: 'মোট প্রাইস এন্ট্রি', en: 'Total Catalog Entries' })}
           </span>
-          <span className="text-2xl font-black font-mono text-slate-900 dark:text-slate-100 mt-1 block">
+          <span className="text-xl sm:text-2xl font-black font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-1 block">
             {stats.total}
           </span>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <span className="text-[11px] font-semibold text-amber-600 block">
             {l({ bn: 'স্টক এন্ট্রি নেই (শুধু প্রাইস লিস্ট)', en: 'Price List Only (Not in Stock DB)' })}
           </span>
-          <span className="text-2xl font-black font-mono text-amber-600 mt-1 block">
+          <span className="text-xl sm:text-2xl font-black font-mono tabular-nums text-amber-600 mt-1 block">
             {stats.priceOnlyCount}
           </span>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <span className="text-[11px] font-semibold text-emerald-600 block">
             {l({ bn: 'স্টক ইনভেন্টরির সাথে যুক্ত', en: 'Linked in Stock Inventory' })}
           </span>
-          <span className="text-2xl font-black font-mono text-emerald-600 mt-1 block">
+          <span className="text-xl sm:text-2xl font-black font-mono tabular-nums text-emerald-600 mt-1 block">
             {stats.linkedCount}
           </span>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 min-w-0">
           <span className="text-[11px] font-semibold text-indigo-600 block">
             {l({ bn: 'নিবন্ধিত মেশিনের ধরন', en: 'Distinct Machine Brands' })}
           </span>
-          <span className="text-2xl font-black font-mono text-indigo-600 mt-1 block">
+          <span className="text-xl sm:text-2xl font-black font-mono tabular-nums text-indigo-600 mt-1 block">
             {stats.machinesCount}
           </span>
         </Card>

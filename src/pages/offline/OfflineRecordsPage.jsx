@@ -1313,8 +1313,8 @@ export const OfflineRecordsPage = () => {
                 </div>
 
                 {/* Metadata Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className="col-span-2 sm:col-span-1">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="col-span-2 md:col-span-1">
                     <label className="block text-[11px] font-semibold text-slate-500 mb-1">
                       {l({ bn: 'উৎস (Source)', en: 'Source' })}
                     </label>
@@ -1328,7 +1328,7 @@ export const OfflineRecordsPage = () => {
                     </select>
                   </div>
 
-                  <div className="col-span-2 sm:col-span-1">
+                  <div className="col-span-2 md:col-span-1">
                     <label className="block text-[11px] font-semibold text-slate-500 mb-1">
                       <Calendar className="h-3 w-3 inline mr-1" />
                       {l({ bn: 'তারিখ (Date)', en: 'Issue Date' })}

@@ -167,34 +167,34 @@ export const ReportsPage = () => {
       {/* 1. INVENTORY VALUATION REPORT */}
       {activeTab === 'inventory' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Total Stock Value</span>
-              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+              <div className="text-lg sm:text-xl font-bold font-mono tabular-nums break-words text-slate-900 dark:text-white mt-1">
                 {formatCurrency(inventoryReport.metrics.totalCostValue, settings.currency)}
               </div>
               <span className="text-[10px] text-slate-400">Cost basis calculation</span>
             </Card>
 
-            <Card className="p-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Retail Potential</span>
-              <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+              <div className="text-lg sm:text-xl font-bold font-mono tabular-nums break-words text-emerald-600 dark:text-emerald-400 mt-1">
                 {formatCurrency(inventoryReport.metrics.totalRetailValue, settings.currency)}
               </div>
               <span className="text-[10px] text-slate-400">Potential retail turnover</span>
             </Card>
 
-            <Card className="p-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Estimated Profit</span>
-              <div className="text-xl font-bold font-mono text-purple-600 dark:text-purple-400 mt-1">
+              <div className="text-lg sm:text-xl font-bold font-mono tabular-nums break-words text-purple-600 dark:text-purple-400 mt-1">
                 {formatCurrency(inventoryReport.metrics.potentialProfit, settings.currency)}
               </div>
               <span className="text-[10px] text-slate-400">Gross profit if cleared</span>
             </Card>
 
-            <Card className="p-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Deficit Items</span>
-              <div className="text-xl font-bold font-mono text-amber-500 mt-1">
+              <div className="text-lg sm:text-xl font-bold font-mono tabular-nums break-words text-amber-500 mt-1">
                 {inventoryReport.metrics.lowStockCount + inventoryReport.metrics.outOfStockCount}
               </div>
               <span className="text-[10px] text-slate-400">
@@ -258,26 +258,26 @@ export const ReportsPage = () => {
       {/* 2. SALES REVENUE REPORT */}
       {activeTab === 'sales' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Total Completed Sales</span>
-              <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+              <div className="text-lg lg:text-xl xl:text-2xl font-bold font-mono tabular-nums break-words text-emerald-600 dark:text-emerald-400 mt-1">
                 {formatCurrency(salesReport.totalSales, settings.currency)}
               </div>
               <span className="text-[10px] text-slate-400">{salesReport.completedCount} invoices completed</span>
             </Card>
 
-            <Card className="p-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Average Order Value</span>
-              <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+              <div className="text-lg lg:text-xl xl:text-2xl font-bold font-mono tabular-nums break-words text-slate-900 dark:text-white mt-1">
                 {formatCurrency(salesReport.avgOrderValue, settings.currency)}
               </div>
               <span className="text-[10px] text-slate-400">Per transaction</span>
             </Card>
 
-            <Card className="p-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Top Sold Product</span>
-              <div className="text-lg font-bold text-slate-800 dark:text-slate-200 truncate mt-1">
+              <div className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 line-clamp-2 break-words mt-1">
                 {salesReport.productBreakdown[0]?.name || 'No sales'}
               </div>
               <span className="text-[10px] text-slate-400">
@@ -359,21 +359,21 @@ export const ReportsPage = () => {
       {/* 3. PROCUREMENT & PURCHASES REPORT */}
       {activeTab === 'purchases' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Card className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Total Purchase Spend</span>
-              <div className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">
+              <div className="text-lg lg:text-xl xl:text-2xl font-bold font-mono tabular-nums break-words text-blue-600 dark:text-blue-400 mt-1">
                 {formatCurrency(purchaseReport.totalPurchases, settings.currency)}
               </div>
               <span className="text-[10px] text-slate-400">{purchaseReport.purchaseCount} POs received</span>
             </Card>
 
-            <Card className="p-4">
+            <Card className="p-4 min-w-0">
               <span className="text-xs uppercase font-bold text-slate-400">Top Supplier Volume</span>
-              <div className="text-lg font-bold text-slate-800 dark:text-slate-200 truncate mt-1">
+              <div className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 line-clamp-2 break-words mt-1">
                 {purchaseReport.supplierBreakdown[0]?.supplier || 'No purchases'}
               </div>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-slate-400 tabular-nums break-words block">
                 {formatCurrency(purchaseReport.supplierBreakdown[0]?.totalAmount || 0, settings.currency)} procurement volume
               </span>
             </Card>

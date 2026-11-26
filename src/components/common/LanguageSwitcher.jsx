@@ -22,13 +22,13 @@ export const LanguageSwitcher = ({ variant = 'default', showLabel = true }) => {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 transition-all text-xs font-semibold shadow-sm select-none"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 transition-all text-xs font-semibold shadow-sm select-none whitespace-nowrap shrink-0"
         title="ভাষা পরিবর্তন করুন / Switch Website Language"
         aria-label="Language Selector"
       >
-        <span className="text-sm leading-none">{currentOption.flag}</span>
+        <span className="text-sm leading-none shrink-0">{currentOption.flag}</span>
         {showLabel && (
-          <span className="hidden sm:inline font-bold">
+          <span className="hidden sm:inline font-bold whitespace-nowrap">
             {currentOption.label}
           </span>
         )}

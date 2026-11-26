@@ -34,13 +34,13 @@ export const Breadcrumbs = () => {
   };
 
   return (
-    <nav className="hidden sm:flex items-center text-xs text-slate-500 dark:text-slate-400 space-x-1.5 overflow-x-auto whitespace-nowrap py-1">
+    <nav className="hidden sm:flex items-center text-xs text-slate-500 dark:text-slate-400 space-x-1.5 min-w-0 flex-1 overflow-hidden whitespace-nowrap py-1">
       <Link
         to="/dashboard"
-        className="hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors"
+        className="hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors shrink-0"
       >
-        <Home className="h-3.5 w-3.5" />
-        <span className="hidden md:inline">StockLine</span>
+        <Home className="h-3.5 w-3.5 shrink-0" />
+        <span className="hidden xl:inline">StockLine</span>
       </Link>
       {pathnames.map((segment, index) => {
         const routeTo = `/${pathnames.slice(0, index + 1).join('/')}`;
@@ -51,7 +51,7 @@ export const Breadcrumbs = () => {
           <React.Fragment key={routeTo}>
             <ChevronRight className="h-3 w-3 text-slate-400 shrink-0" />
             {isLast ? (
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate min-w-0" title={displayName}>
                 {displayName}
               </span>
             ) : (

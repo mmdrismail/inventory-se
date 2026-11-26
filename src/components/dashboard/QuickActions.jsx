@@ -16,19 +16,19 @@ export const QuickActions = () => {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
       {actions.map((act) => {
         const Icon = act.icon;
         return (
           <Link
             key={act.label}
             to={act.to}
-            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 shadow-sm hover:shadow transition-all group text-center"
+            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 shadow-sm hover:shadow transition-all group text-center min-w-0"
           >
-            <div className={`p-2.5 rounded-xl border mb-2 transition-transform group-hover:scale-110 ${act.color}`}>
+            <div className={`p-2.5 rounded-xl border mb-2 transition-transform group-hover:scale-110 shrink-0 ${act.color}`}>
               <Icon className="h-5 w-5" />
             </div>
-            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+            <span className="text-xs font-semibold leading-snug text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
               {act.label}
             </span>
           </Link>

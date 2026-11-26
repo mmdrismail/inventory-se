@@ -188,7 +188,7 @@ export const QuotationListPage = () => {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="p-4 bg-gradient-to-br from-purple-500/5 to-slate-500/5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -241,7 +241,7 @@ export const QuotationListPage = () => {
             </span>
             <span className="text-xs font-mono font-bold text-amber-500">BDT</span>
           </div>
-          <p className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white mt-1 truncate">
+          <p className="text-lg sm:text-xl xl:text-2xl font-black font-mono tabular-nums break-words text-slate-900 dark:text-white mt-1">
             {formatCurrency(stats.totalValue, settings.currency)}
           </p>
           <span className="text-[11px] text-slate-500">
