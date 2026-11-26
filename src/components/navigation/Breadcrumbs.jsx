@@ -1,31 +1,36 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export const Breadcrumbs = () => {
   const location = useLocation();
+  const { t } = useLanguage();
   const pathnames = location.pathname.split('/').filter((x) => x);
 
   const routeNameMap = {
-    dashboard: 'Dashboard',
-    products: 'Products',
-    new: 'Create',
-    edit: 'Edit',
-    categories: 'Categories',
-    suppliers: 'Suppliers',
-    customers: 'Customers',
-    purchases: 'Purchases',
-    sales: 'Sales & POS',
-    inventory: 'Inventory Tracking',
-    orders: 'Customer Orders',
-    reports: 'Reports',
-    users: 'User Roles',
-    settings: 'Settings',
-    profile: 'Profile',
-    shop: 'Storefront',
-    cart: 'Cart',
-    checkout: 'Checkout',
-    'my-orders': 'My Orders',
+    dashboard: t('nav_overview', 'Dashboard'),
+    products: t('nav_products', 'Products'),
+    'price-list': t('nav_price_list', 'Machine & Price List'),
+    new: t('Create', 'Create'),
+    edit: t('Edit', 'Edit'),
+    categories: t('nav_categories', 'Categories'),
+    suppliers: t('nav_suppliers', 'Suppliers'),
+    customers: t('nav_customers', 'Customers'),
+    purchases: t('nav_purchases', 'Purchases'),
+    sales: t('nav_sales', 'Sales & POS'),
+    quotations: t('nav_quotations', 'Quotations'),
+    'offline-entries': t('nav_offline_entries', 'Offline Ledger (OCR)'),
+    inventory: t('nav_inventory', 'Inventory Tracking'),
+    orders: t('nav_orders', 'Customer Orders'),
+    reports: t('nav_reports', 'Reports'),
+    users: t('nav_users', 'User Roles'),
+    settings: t('nav_settings', 'Settings'),
+    profile: t('Profile', 'Profile'),
+    shop: t('Storefront', 'Storefront'),
+    cart: t('Cart', 'Cart'),
+    checkout: t('Checkout', 'Checkout'),
+    'my-orders': t('My Orders', 'My Orders'),
   };
 
   return (

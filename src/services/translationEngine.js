@@ -54,14 +54,177 @@ const ISOLATED_STOPWORDS = new Set([
   'quotes',
 ]);
 
-// Load persistent cache from LocalStorage (purge poisoned v1 fragment cache once)
+const IDENTIFIER_KEY_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/i;
+
+const BN_INDEPENDENT_VOWELS = {
+  অ: 'o', আ: 'a', ই: 'i', ঈ: 'i', উ: 'u', ঊ: 'u', ঋ: 'ri', এ: 'e', ঐ: 'oi', ও: 'o', ঔ: 'ou',
+};
+const BN_MATRAS = {
+  '\u09BE': 'a', '\u09BF': 'i', '\u09C0': 'i', '\u09C1': 'u', '\u09C2': 'u',
+  '\u09C3': 'ri', '\u09C7': 'e', '\u09C8': 'oi', '\u09CB': 'o', '\u09CC': 'ou',
+};
+const BN_CONSONANTS = {
+  ক: 'k', খ: 'kh', গ: 'g', ঘ: 'gh', ঙ: 'ng',
+  চ: 'ch', ছ: 'chh', জ: 'j', ঝ: 'jh', ঞ: 'n',
+  ট: 't', ঠ: 'th', ড: 'd', ঢ: 'dh', ণ: 'n',
+  ত: 't', থ: 'th', দ: 'd', ধ: 'dh', ন: 'n',
+  প: 'p', ফ: 'f', ব: 'b', ভ: 'bh', ম: 'm',
+  য: 'j', র: 'r', ল: 'l', শ: 'sh', ষ: 'sh', স: 's', হ: 'h',
+  ড়: 'r', ঢ়: 'rh', য়: 'y', '\u09DC': 'r', '\u09DD': 'rh', '\u09DF': 'y',
+};
+const BN_SPECIAL_WORDS = {
+  এবং: 'ebong', কিন্তু: 'kintu', জন্য: 'jonno', থেকে: 'theke', সাথে: 'sathe',
+  দিয়ে: 'diye', দিয়ে: 'diye', করে: 'kore', করুন: 'korun', হবে: 'hobe', নেই: 'nei',
+  আছে: 'achhe', সব: 'shob', সকল: 'shokol', নতুন: 'notun', পুরনো: 'purono', পুরানো: 'purano',
+  খাতা: 'khata', অফলাইন: 'offline', অনলাইন: 'online', ডকুমেন্ট: 'document', হাব: 'hub',
+  মেশিন: 'machine', পার্টস: 'parts', প্রাইস: 'price', লিস্ট: 'list', স্টক: 'stock',
+  ইনভেন্টরি: 'inventory', ডাটাবেজ: 'database', ডাটাবেজে: 'database-e', ডাটাবেসে: 'database-e',
+  কোটেশন: 'quotation', চালান: 'challan', মেমো: 'memo', ক্যাশ: 'cash', রিসিপ্ট: 'receipt',
+  ইনভয়েস: 'invoice', কাস্টমার: 'customer', গ্রাহক: 'grahok', গ্রাহকের: 'grahoker',
+  প্রতিষ্ঠান: 'protishthan', প্রতিষ্ঠানের: 'protishthaner', পণ্য: 'ponno', পণ্যের: 'ponnyer',
+  তালিকা: 'talika', খুঁজুন: 'khujun', সার্চ: 'search', স্ক্যান: 'scan', ছবি: 'chhobi',
+  আপলোড: 'upload', সেভ: 'save', প্রিন্ট: 'print', ফর্ম: 'form', ফর্মে: 'form-e',
+  বকেয়া: 'bokeya', বাকি: 'baki', জমা: 'joma', পরিমাণ: 'poriman', একক: 'ekok',
+  দর: 'dor', মূল্য: 'mullo', মোট: 'mot', সর্বমোট: 'shorbomot', টাকা: 'taka',
+  তারিখ: 'tarikh', মোবাইল: 'mobile', নম্বর: 'nombor', নাম: 'nam', ঠিকানা: 'thikana',
+  বিবরণ: 'biboron', মডেল: 'model', ধরন: 'dhoron', সিলিন্ডার: 'cylinder', অশ্বশক্তি: 'HP',
+  অ্যাকশন: 'action', বাতিল: 'batil', মুছুন: 'muchhun', বিস্তারিত: 'bistarito', যুক্ত: 'jukto',
+  হয়েছে: 'hoyeche', হয়নি: 'hoyni', পাওয়া: 'paoa', যায়নি: 'jayni', যোগ: 'jog',
+  একটি: 'ekti', কমপক্ষে: 'kompokkhe', নির্ভুলতা: 'nirbhulota', উৎস: 'utso',
+  বই: 'boi', সিরিয়াল: 'serial', ঐচ্ছিক: 'oichhik', চালু: 'chalu', বন্ধ: 'bondho',
+};
+const BN_DIGITS = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
+
+const isBanglaLetter = (ch) => /[\u0980-\u09FF]/.test(ch || '');
+
+const transliterateBanglaWord = (word) => {
+  if (!word) return '';
+  if (BN_SPECIAL_WORDS[word]) return BN_SPECIAL_WORDS[word];
+
+  let out = '';
+  const chars = Array.from(word);
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    if (BN_DIGITS[ch] !== undefined) {
+      out += BN_DIGITS[ch];
+      continue;
+    }
+    if (ch === '।') {
+      out += '.';
+      continue;
+    }
+    if (BN_INDEPENDENT_VOWELS[ch]) {
+      out += BN_INDEPENDENT_VOWELS[ch];
+      continue;
+    }
+    if (ch === 'ৎ') {
+      out += 't';
+      continue;
+    }
+    if (ch === 'ং') {
+      out += 'ng';
+      continue;
+    }
+    if (ch === 'ঃ') {
+      out += 'h';
+      continue;
+    }
+    if (ch === 'ঁ' || ch === '\u09BC') {
+      continue;
+    }
+
+    const base = BN_CONSONANTS[ch];
+    if (!base) {
+      out += BN_MATRAS[ch] || '';
+      continue;
+    }
+
+    const next = chars[i + 1];
+    // Special conjuncts: ক্ষ (k+s+sh -> kh/kkh) and জ্ঞ (j+g+n -> gg)
+    if (ch === 'ক' && next === '\u09CD' && chars[i + 2] === 'ষ') {
+      out += i === 0 ? 'kh' : 'kkh';
+      i += 2;
+      const post = chars[i + 1];
+      if (BN_MATRAS[post]) {
+        out += BN_MATRAS[post];
+        i += 1;
+      } else if (post && isBanglaLetter(post) && post !== '\u09CD') {
+        out += 'o';
+      }
+      continue;
+    }
+    if (ch === 'জ' && next === '\u09CD' && chars[i + 2] === 'ঞ') {
+      out += 'gg';
+      i += 2;
+      const post = chars[i + 1];
+      if (BN_MATRAS[post]) {
+        out += BN_MATRAS[post];
+        i += 1;
+      } else if (post && isBanglaLetter(post) && post !== '\u09CD') {
+        out += 'o';
+      }
+      continue;
+    }
+
+    // Hasanta conjunct suppresses inherent vowel
+    if (next === '\u09CD') {
+      const joined = chars[i + 2];
+      if (joined === 'য') {
+        out += i === 0 ? `${base}y` : `${base}y`;
+        i += 2;
+        const post = chars[i + 1];
+        if (BN_MATRAS[post]) {
+          out += BN_MATRAS[post];
+          i += 1;
+        }
+        continue;
+      }
+      out += base;
+      i += 1; // Advance to hasanta so next iteration handles joined consonant
+      continue;
+    }
+
+    // Consonant followed by vowel sign (matra)
+    if (BN_MATRAS[next]) {
+      out += base + BN_MATRAS[next];
+      i += 1;
+      continue;
+    }
+
+    // Bare consonant: keep inherent 'o' only before continuing Bengali letters
+    const hasTrailingBn = next && isBanglaLetter(next);
+    out += hasTrailingBn ? `${base}o` : base;
+  }
+  return out;
+};
+
+const transliterateBanglaToAvro = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  const converted = text.replace(/[\u0980-\u09FF]+/g, (segment) => transliterateBanglaWord(segment));
+  return converted.replace(/^[a-z]/, (c) => c.toUpperCase());
+};
+
+// Load persistent cache from LocalStorage (purge poisoned v1 fragment & raw identifier caches)
 const loadPersistentCache = () => {
   try {
     if (localStorage.getItem(LEGACY_STORAGE_CACHE_KEY)) {
       localStorage.removeItem(LEGACY_STORAGE_CACHE_KEY);
     }
     const raw = localStorage.getItem(STORAGE_CACHE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const parsed = raw ? JSON.parse(raw) : {};
+    let mutated = false;
+    for (const cacheKey of Object.keys(parsed)) {
+      const sep = cacheKey.indexOf(':');
+      const term = sep >= 0 ? cacheKey.slice(sep + 1) : cacheKey;
+      if (IDENTIFIER_KEY_RE.test(term)) {
+        delete parsed[cacheKey];
+        mutated = true;
+      }
+    }
+    if (mutated) {
+      localStorage.setItem(STORAGE_CACHE_KEY, JSON.stringify(parsed));
+    }
+    return parsed;
   } catch {
     return {};
   }
@@ -687,6 +850,333 @@ class TranslationEngineService {
         bn: 'ড্যাশবোর্ডে ফিরে যান',
         obro: 'Dashboard-e Jan',
       },
+      // Machine & Parts Price Catalog & Spec Box
+      {
+        en: 'Machine & Price List',
+        bn: 'মেশিন ও প্রাইস লিস্ট',
+        obro: 'Machine o Price List',
+      },
+      {
+        en: 'Offline Ledger (OCR)',
+        bn: 'খাতা ও অফলাইন (OCR)',
+        obro: 'Khata o Offline (OCR)',
+      },
+      {
+        en: 'Machine & Parts Price Intelligence',
+        bn: 'মেশিন ও পার্টস প্রাইস ইন্টেলিজেন্স',
+        obro: 'Machine o Parts Price Intelligence',
+      },
+      {
+        en: 'Machine, Specifications & Parts Price List',
+        bn: 'মেশিন, স্পেসিফিকেশন ও পার্টস প্রাইস লিস্ট',
+        obro: 'Machine, Spec o Parts Price List',
+      },
+      {
+        en: 'Sync Past Quotes & Sales',
+        bn: 'পূর্বের কোটেশন/বিক্রয় সিঙ্ক করুন',
+        obro: 'Purber Quotation/Sales Sync Korun',
+      },
+      {
+        en: '+ Add New Part & Price',
+        bn: '+ নতুন পার্টস ও দাম যোগ করুন',
+        obro: '+ Notun Parts o Dam Jog Korun',
+      },
+      {
+        en: 'Total Price Entries',
+        bn: 'মোট প্রাইস এন্ট্রি',
+        obro: 'Mot Price Entry',
+      },
+      {
+        en: 'Not in Stock (Price List Only)',
+        bn: 'স্টক এন্ট্রি নেই (শুধু প্রাইস লিস্ট)',
+        obro: 'Stock Entry Nei (Shudhu Price List)',
+      },
+      {
+        en: 'Linked to Stock Inventory',
+        bn: 'স্টক ইনভেন্টরির সাথে যুক্ত',
+        obro: 'Stock Inventory-r Sathe Jukto',
+      },
+      {
+        en: 'Registered Machine Types',
+        bn: 'নিবন্ধিত মেশিনের ধরন',
+        obro: 'Nibondhito Machine Dhoron',
+      },
+      {
+        en: 'All Machines / Brands',
+        bn: 'সব মেশিন / ব্র্যান্ড',
+        obro: 'Shob Machine / Brand',
+      },
+      {
+        en: 'All Sources & Statuses',
+        bn: 'সব উৎস ও স্ট্যাটাস',
+        obro: 'Shob Utso o Status',
+      },
+      {
+        en: 'Price List Only (Not in Stock)',
+        bn: 'শুধু প্রাইস লিস্ট (স্টকে এন্ট্রি নেই)',
+        obro: 'Shudhu Price List (Stock Nei)',
+      },
+      {
+        en: 'Linked to Stock Products',
+        bn: 'স্টক প্রোডাক্টে যুক্ত আছে',
+        obro: 'Stock Product-e Jukto Achhe',
+      },
+      {
+        en: 'From Quotation',
+        bn: 'কোটেশন থেকে পাওয়া',
+        obro: 'Quotation Theke Paoa',
+      },
+      {
+        en: 'From Sale / Challan',
+        bn: 'বিক্রয় / চালান থেকে পাওয়া',
+        obro: 'Bikroy / Challan Theke Paoa',
+      },
+      {
+        en: 'Part / Product Name',
+        bn: 'পার্টস / পণ্যের নাম',
+        obro: 'Parts / Ponnyer Nam',
+      },
+      {
+        en: 'Machine & Technical Spec',
+        bn: 'মেশিন ও টেকনিক্যাল স্পেক',
+        obro: 'Machine o Technical Spec',
+      },
+      {
+        en: 'Rate / Price History',
+        bn: 'দর / প্রাইস ইতিহাস',
+        obro: 'Dor / Price Itihas',
+      },
+      {
+        en: 'Last Source & Date',
+        bn: 'শেষ উৎস ও তারিখ',
+        obro: 'Shesh Utso o Tarikh',
+      },
+      {
+        en: 'Actions',
+        bn: 'অ্যাকশন',
+        obro: 'Action',
+      },
+      {
+        en: 'Add to Product Database',
+        bn: 'প্রোডাক্ট ডাটাবেজে যোগ করুন',
+        obro: 'Product Database-e Jog Korun',
+      },
+      {
+        en: 'Create Quotation at This Price',
+        bn: 'এই দামে কোটেশন বানান',
+        obro: 'Ei Dame Quotation Banan',
+      },
+      {
+        en: 'Create Cash Memo at This Price',
+        bn: 'এই দামে ক্যাশ মেমো বানান',
+        obro: 'Ei Dame Cash Memo Banan',
+      },
+      {
+        en: 'Save to Price List',
+        bn: 'প্রাইস লিস্টে সেভ করুন',
+        obro: 'Price List-e Save Korun',
+      },
+      {
+        en: 'Not in Stock',
+        bn: 'স্টকে এন্ট্রি নেই',
+        obro: 'Stock-e Entry Nei',
+      },
+      {
+        en: '+ Add to Products',
+        bn: '+ প্রোডাক্টে নিন',
+        obro: '+ Product-e Nin',
+      },
+      {
+        en: 'Machine & Technical Specification Box (Machine Profile)',
+        bn: 'মেশিন ও টেকনিক্যাল স্পেসিফিকেশন বক্স (Machine Profile)',
+        obro: 'Machine & Technical Specification Box (Machine Profile)',
+      },
+      {
+        en: 'Saves to Price List',
+        bn: 'প্রাইস লিস্টে সেভ হয়',
+        obro: 'Price List-e Save Hoy',
+      },
+      {
+        en: 'Every part and rate from quotations or sales of this machine auto-saves to the Price List',
+        bn: 'প্রতিটি কোটেশন ও বিক্রয় থেকে এই মেশিনের পার্টস ও দর প্রাইস লিস্টে সেভ হবে',
+        obro: 'Protiti Quotation o Sale theke ei Machine-er Parts o Dor Price List-e save hobe',
+      },
+      {
+        en: 'Price List Save: ON',
+        bn: 'প্রাইস লিস্ট সেভ: চালু',
+        obro: 'Price List Save: ON',
+      },
+      {
+        en: 'Price List Save: OFF',
+        bn: 'প্রাইস লিস্ট সেভ: বন্ধ',
+        obro: 'Price List Save: OFF',
+      },
+      {
+        en: '⚡ Select Past Machine...',
+        bn: '⚡ আগের মেশিন বাছুন...',
+        obro: '⚡ Ager Machine Bachhun...',
+      },
+      {
+        en: 'Clear Machine Info',
+        bn: 'মেশিন তথ্য মুছুন',
+        obro: 'Machine Totho Muchhun',
+      },
+      {
+        en: 'Machine & Parts Price Search (Stock + Past Quotes & Sales)',
+        bn: 'মেশিন ও পার্টস প্রাইস সার্চ (স্টক + পূর্বের কোটেশন ও বিক্রয়)',
+        obro: 'Machine o Parts Price Search (Stock + Quotes & Sales)',
+      },
+      {
+        en: 'Not in Stock · Price List',
+        bn: 'স্টক এন্ট্রি নেই · প্রাইস লিস্ট',
+        obro: 'Stock Entry Nei · Price List',
+      },
+      {
+        en: 'Latest Rate',
+        bn: 'সর্বশেষ দর',
+        obro: 'Shorboshesh Dor',
+      },
+      // Offline Khata & OCR Hub
+      {
+        en: 'Smart OCR + Khata Register',
+        bn: 'স্মার্ট OCR + খাতা রেজিস্টার',
+        obro: 'Smart OCR + Khata Register',
+      },
+      {
+        en: 'Photos Not Stored (Zero Image Storage)',
+        bn: 'ছবি স্টোরেজে সেভ হয় না (Zero Image Storage)',
+        obro: 'Chhobi Storage-e Save Hoy Na (Zero Image Storage)',
+      },
+      {
+        en: 'Old Khata & Offline Document Hub',
+        bn: 'পুরনো খাতা ও অফলাইন ডকুমেন্ট হাব',
+        obro: 'Purono Khata o Offline Document Hub',
+      },
+      {
+        en: 'Khata Bill / Challan',
+        bn: 'খাতা বিল/চালান',
+        obro: 'Khata Bill / Challan',
+      },
+      {
+        en: 'Khata Quotation',
+        bn: 'খাতা কোটেশন',
+        obro: 'Khata Quotation',
+      },
+      {
+        en: 'Money Receipt Collection',
+        bn: 'মানি রিসিপ্ট আদায়',
+        obro: 'Money Receipt Aday',
+      },
+      {
+        en: 'Photo Scan & Single Entry',
+        bn: 'ছবি স্ক্যান ও একক এন্ট্রি',
+        obro: 'Chhobi Scan o Ekok Entry',
+      },
+      {
+        en: 'Bulk Khata Register',
+        bn: 'বাল্ক খাতা রেজিস্টার',
+        obro: 'Bulk Khata Register',
+      },
+      {
+        en: 'Khata / Hardcopy Photo Scanner (OCR)',
+        bn: 'খাতা / হার্ডকপির ছবি স্ক্যানার (OCR)',
+        obro: 'Khata / Hardcopy Photo Scanner (OCR)',
+      },
+      {
+        en: 'Capture with Camera',
+        bn: 'ক্যামেরা দিয়ে তুলুন',
+        obro: 'Camera Diye Tulun',
+      },
+      {
+        en: 'Upload Photo',
+        bn: 'ছবি আপলোড',
+        obro: 'Chhobi Upload',
+      },
+      {
+        en: 'Remove Photo',
+        bn: 'ছবি সরান',
+        obro: 'Chhobi Shoran',
+      },
+      {
+        en: 'Re-scan',
+        bn: 'পুনরায় স্ক্যান',
+        obro: 'Punoray Scan',
+      },
+      {
+        en: 'Fill Form',
+        bn: 'ফর্মে বসান',
+        obro: 'Form-e Bosan',
+      },
+      {
+        en: 'Verify Document Type & Details',
+        bn: 'ডকুমেন্টের ধরন ও তথ্য যাচাই করুন',
+        obro: 'Document-er Dhoron o Totho Jachai Korun',
+      },
+      {
+        en: 'Old Khata',
+        bn: 'পুরনো খাতা',
+        obro: 'Purono Khata',
+      },
+      {
+        en: 'Offline',
+        bn: 'অফলাইন',
+        obro: 'Offline',
+      },
+      {
+        en: 'Customer / Party Info',
+        bn: 'গ্রাহক / পার্টির তথ্য',
+        obro: 'Grahok / Party Totho',
+      },
+      {
+        en: 'Products & Items List',
+        bn: 'পণ্য ও বিবরণের তালিকা',
+        obro: 'Ponno o Biboroner Talika',
+      },
+      {
+        en: 'Search Price List',
+        bn: 'প্রাইস লিস্ট খুঁজুন',
+        obro: 'Price List Khujun',
+      },
+      {
+        en: '+ New Line',
+        bn: '+ নতুন লাইন',
+        obro: '+ Notun Line',
+      },
+      {
+        en: 'Save',
+        bn: 'সেভ করুন',
+        obro: 'Save Korun',
+      },
+      {
+        en: 'Save & Print / PDF',
+        bn: 'সেভ ও প্রিন্ট / PDF',
+        obro: 'Save & Print / PDF',
+      },
+      {
+        en: 'Save All Rows to Database',
+        bn: 'সব সারি ডাটাবেসে সেভ করুন',
+        obro: 'Shob Sari Database-e Save Korun',
+      },
+      {
+        en: 'Print / PDF',
+        bn: 'প্রিন্ট / PDF',
+        obro: 'Print / PDF',
+      },
+      {
+        en: 'Details',
+        bn: 'বিস্তারিত',
+        obro: 'Bistarito',
+      },
+      {
+        en: 'Delete',
+        bn: 'মুছে ফেলুন',
+        obro: 'Muchhe Felun',
+      },
+      {
+        en: 'Cancel',
+        bn: 'বাতিল',
+        obro: 'Batil',
+      },
     ];
 
     curated.forEach((item) => {
@@ -725,6 +1215,12 @@ class TranslationEngineService {
     if (entry.bn) {
       this.lexicon.set(this.normalizeKey(entry.bn), entry);
     }
+    if (entry.obro) {
+      const obroKey = this.normalizeKey(entry.obro);
+      if (obroKey && !this.lexicon.has(obroKey)) {
+        this.lexicon.set(obroKey, entry);
+      }
+    }
   }
 
   hasBangla(text) {
@@ -750,6 +1246,9 @@ class TranslationEngineService {
    */
   fetchOnlineTranslation(text, targetLang) {
     const norm = this.normalizeKey(text);
+    if (!norm || IDENTIFIER_KEY_RE.test(norm)) {
+      return Promise.resolve(text);
+    }
     const cacheKey = `${targetLang}:${norm}`;
     const apiTarget = targetLang === 'en' ? 'en' : 'bn';
     const bnCacheKey = `bn:${norm}`;
@@ -842,6 +1341,17 @@ class TranslationEngineService {
       if (targetLang === 'en') return exact.en || text;
       if (targetLang === 'obro') return exact.obro || `${exact.bn} (${exact.en})`;
       return exact.bn || text;
+    }
+
+    // Never pass unresolved snake_case identifier keys (e.g. nav_offline_entries) to Google Translate
+    if (IDENTIFIER_KEY_RE.test(norm)) {
+      if (fallback && this.normalizeKey(fallback) !== norm) {
+        return this.translate(fallback, targetLang, '', { allowOnline });
+      }
+      return text
+        .split('_')
+        .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
+        .join(' ');
     }
 
     // 2. Check Persistent / Memory Cache (from previous auto-translations)
@@ -970,6 +1480,24 @@ class TranslationEngineService {
         ? text
         : `${m[2]}-এর অর্ডার #${m[1]} অনুমোদনের অপেক্ষায় আছে।`;
     }
+    if (/^সংরক্ষিত\s+তালিকা\s*\((\d+)\)$/i.test(text)) {
+      const m = text.match(/^সংরক্ষিত\s+তালিকা\s*\((\d+)\)$/i);
+      if (targetLang === 'en') return `Saved Archive (${m[1]})`;
+      if (targetLang === 'obro') return `Songrokhito Talika (${m[1]})`;
+      return text;
+    }
+    if (/^পূর্বের\s+কোটেশন\s+ও\s+বিক্রয়\s+প্রাইস\s+লিস্ট\s*\((\d+)\)$/i.test(text)) {
+      const m = text.match(/^পূর্বের\s+কোটেশন\s+ও\s+বিক্রয়\s+প্রাইস\s+লিস্ট\s*\((\d+)\)$/i);
+      if (targetLang === 'en') return `Previous Quotation & Sales Price List (${m[1]})`;
+      if (targetLang === 'obro') return `Purber Quotation o Bikroy Price List (${m[1]})`;
+      return text;
+    }
+    if (/^ইনভেন্টরি\s+স্টক\s+ক্যাটালগ\s*\((\d+)\)$/i.test(text)) {
+      const m = text.match(/^ইনভেন্টরি\s+স্টক\s+ক্যাটালগ\s*\((\d+)\)$/i);
+      if (targetLang === 'en') return `Inventory Stock Catalog (${m[1]})`;
+      if (targetLang === 'obro') return `Inventory Stock Catalog (${m[1]})`;
+      return text;
+    }
 
     const textHasBangla = this.hasBangla(text);
     const textHasLatin = /[A-Za-z]{2,}/.test(text);
@@ -979,25 +1507,54 @@ class TranslationEngineService {
       return fallback || text;
     }
 
-    // Handle pre-formatted bilingual strings like "গ্রাহকের নাম (Customer Name)"
+    // Handle pre-formatted bilingual strings like "গ্রাহকের নাম (Customer Name)" or "খাতা ও অফলাইন (OCR)"
     if (textHasBangla && textHasLatin) {
-      if (targetLang === 'en') {
-        const parenMatch = text.match(/^(.*?)\s*\(([^()]*[A-Za-z]{2,}[^()]*)\)\s*([:*]?)\s*$/);
+      const parenMatch = text.match(/^(.*?)\s*\(([^()]*[A-Za-z0-9]{2,}[^()]*)\)\s*([:*]?)\s*$/);
+      if (targetLang === 'en' && parenMatch) {
+        const before = parenMatch[1].trim();
+        const inside = parenMatch[2].trim();
+        const suffix = parenMatch[3] || '';
+        const isKeepPrefixTag =
+          /^[A-Z0-9/+._-]{1,6}$/.test(inside) ||
+          /^(BDT|USD|EUR|POS|RFQ|VAT|BIN|SKU|OCR|AI|PDF|CSV|JSON|API|HP|TR|KG|KW|RPM|BN|EN|Admin|Manager|Staff|Owner|Agent)$/i.test(
+            inside
+          );
+        if (!isKeepPrefixTag) {
+          return `${inside}${suffix}`;
+        }
+        const normBefore = this.normalizeKey(before);
+        const lexBefore = this.lexicon.get(normBefore);
+        const cachedBefore = this.memoryCache[`en:${normBefore}`];
+        if (lexBefore?.en || cachedBefore) {
+          return `${lexBefore?.en || cachedBefore} (${inside})${suffix}`;
+        }
+        if (allowOnline && typeof window !== 'undefined' && this.hasBangla(before)) {
+          this.fetchOnlineTranslation(before, 'en');
+        }
+      } else if (targetLang === 'obro') {
         if (parenMatch) {
           const before = parenMatch[1].trim();
           const inside = parenMatch[2].trim();
           const suffix = parenMatch[3] || '';
-          if (!/^(BDT|USD|EUR|POS|RFQ|VAT|BIN|SKU|BN|EN|Admin|Manager|Staff|Owner|Agent)$/i.test(inside)) {
-            return `${inside}${suffix}`;
-          }
-          const lexBefore = this.lexicon.get(this.normalizeKey(before));
-          if (lexBefore?.en) {
-            return `${lexBefore.en} (${inside})${suffix}`;
+          const normBefore = this.normalizeKey(before);
+          const lexBefore = this.lexicon.get(normBefore);
+          const avroBefore =
+            lexBefore?.obro || this.memoryCache[`obro:${normBefore}`] || transliterateBanglaToAvro(before);
+          if (avroBefore) {
+            return avroBefore.toLowerCase().includes(inside.toLowerCase())
+              ? `${avroBefore}${suffix}`
+              : `${avroBefore} (${inside})${suffix}`;
           }
         }
-      } else {
+        return transliterateBanglaToAvro(text);
+      } else if (targetLang === 'bn') {
         return text;
       }
+    }
+
+    // Immediate phonetic Avro/Banglish fallback for any unmapped Bangla UI text in 'obro' mode
+    if (targetLang === 'obro' && textHasBangla) {
+      return transliterateBanglaToAvro(text);
     }
 
     // 4. Online Async Auto-Translate Trigger (Non-blocking, Bidirectional)

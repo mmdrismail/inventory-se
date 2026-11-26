@@ -54,6 +54,7 @@ const ID_CODE_RE = /^#?(INV|QT|PO|ORD|SKU|REQ|RFQ|MOV|TEST|BIN)-[A-Z0-9_-]+$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOMAIN_OR_PATH_RE = /^(https?:\/\/|\/[a-z0-9/_-]*$|[a-z0-9.-]+\.(app|io|com|org|net)(\/.*)?$)/i;
 const PHONE_RE = /^\+?\d[\d\s\-()]{5,}$/;
+const IDENTIFIER_KEY_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
 
 const textMeta = new WeakMap();
 const attrMeta = new WeakMap();
@@ -62,6 +63,7 @@ const shouldSkipText = (core) => {
   if (!core || core.length < 2) return true;
   if (!/[A-Za-z\u0980-\u09FF]/.test(core)) return true;
   if (SKIP_EXACT.has(core.toLowerCase())) return true;
+  if (IDENTIFIER_KEY_RE.test(core)) return true;
   if (EMAIL_RE.test(core) || DOMAIN_OR_PATH_RE.test(core) || ID_CODE_RE.test(core)) return true;
   if (PHONE_RE.test(core) || DATE_RE.test(core)) return true;
   return false;
@@ -101,7 +103,7 @@ const translateCore = (core, lang, allowOnline = true) => {
     }
   }
 
-  if (lang !== 'en' && hasBn) {
+  if (lang === 'bn' && hasBn) {
     return core;
   }
 

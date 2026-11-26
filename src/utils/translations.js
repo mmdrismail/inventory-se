@@ -660,6 +660,11 @@ export const TRANSLATIONS = {
     en: 'Products',
     obro: 'Products',
   },
+  nav_price_list: {
+    bn: 'মেশিন ও প্রাইস লিস্ট',
+    en: 'Machine & Price List',
+    obro: 'Machine o Price List',
+  },
   nav_categories: {
     bn: 'ক্যাটাগরি সমূহ',
     en: 'Categories',
@@ -689,6 +694,11 @@ export const TRANSLATIONS = {
     bn: 'দরপত্র ও কোটেশন',
     en: 'Quotations',
     obro: 'Quotations',
+  },
+  nav_offline_entries: {
+    bn: 'খাতা ও অফলাইন (OCR)',
+    en: 'Offline Ledger (OCR)',
+    obro: 'Khata o Offline (OCR)',
   },
   nav_inventory: {
     bn: 'ইনভেন্টরি ও স্টক',
@@ -1068,6 +1078,23 @@ export const TRANSLATIONS = {
     bn: 'রিস্টক অ্যানালাইসিস',
     en: 'Restock Analysis',
     obro: 'Restock Analysis',
+  },
+
+  // Missing Action & Empty-State Keys
+  no_products_found: {
+    bn: 'কোনো পণ্য খুঁজে পাওয়া যায়নি',
+    en: 'No products found',
+    obro: 'Kono product paoa jayni',
+  },
+  receive_order_now: {
+    bn: 'এখনই পণ্য গ্রহণ করুন',
+    en: 'Receive Order Now',
+    obro: 'Ekhoni Order Receive Korun',
+  },
+  cancel_order: {
+    bn: 'অর্ডার বাতিল করুন',
+    en: 'Cancel Order',
+    obro: 'Order Batil Korun',
   },
 };
 
