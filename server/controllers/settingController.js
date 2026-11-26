@@ -41,11 +41,17 @@ exports.updateSettings = async (req, res, next) => {
   }
 };
 
-// @desc    Reset entire database to initial seed data
+// @desc    Reset entire database to initial seed data (HARD-LOCKED by default to protect live records)
 // @route   POST /api/settings/reset-database
 // @access  Private (Admin)
 exports.resetDatabase = async (req, res, next) => {
   try {
+    if (process.env.ALLOW_DESTRUCTIVE_DB_RESET !== 'YES_WIPE_ALL_DATA') {
+      return res.status(403).json({
+        success: false,
+        message: 'Live database reset is disabled to protect real business records.',
+      });
+    }
     await seedAllData();
     res.json({
       success: true,

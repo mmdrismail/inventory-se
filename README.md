@@ -11,6 +11,12 @@
 [![Automated Tests](https://img.shields.io/badge/Tests-40%2F40%20Passing-brightgreen?style=flat&logo=jest&logoColor=white)](server/test_suite.js)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+> [!CAUTION]
+> **LIVE BUSINESS DATABASE PROTECTION POLICY (AI AGENTS & DEVELOPERS):**  
+> The active MongoDB database (`stockline_db` / configured `MONGO_URI`) contains **live, irreplaceable commercial records** (inventory, invoices, quotations, customer balances, money receipts, and part price catalogs).  
+> - **AI Coding Assistants MUST NEVER** edit, update, delete, overwrite, seed, or drop any real database records via `mongosh`, backend scripts, API `POST`/`PUT`/`PATCH`/`DELETE` calls, or automated browser form submissions without an explicit per-record user instruction.  
+> - **Strictly Forbidden on Live DB:** `npm run server:seed`, `npm run server:destroy`, `node server/seeder.js`, `POST /api/settings/reset-database`, and running `npm test` (`server/test_suite.js`) against production `MONGO_URI`. See [AGENTS.md](AGENTS.md) and [.agents/skills/live-data-guard/SKILL.md](.agents/skills/live-data-guard/SKILL.md).
+
 ---
 
 ## 📌 Table of Contents

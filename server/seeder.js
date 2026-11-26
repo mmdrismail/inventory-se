@@ -144,8 +144,17 @@ const seedProducts = [
   },
 ];
 
+const assertDestructiveResetAllowed = () => {
+  if (process.env.ALLOW_DESTRUCTIVE_DB_RESET !== 'YES_WIPE_ALL_DATA') {
+    throw new Error(
+      'Blocked destructive database operation: live stockline_db protection is active. Set ALLOW_DESTRUCTIVE_DB_RESET=YES_WIPE_ALL_DATA only on an isolated non-production test DB.'
+    );
+  }
+};
+
 const seedAllData = async () => {
   try {
+    assertDestructiveResetAllowed();
     const isCLI = require.main === module;
     if (isCLI) {
       await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/stockline_db');
@@ -304,6 +313,7 @@ const seedAllData = async () => {
 
 const destroyData = async () => {
   try {
+    assertDestructiveResetAllowed();
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/stockline_db');
     await User.deleteMany();
     await Category.deleteMany();
