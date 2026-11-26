@@ -22,6 +22,7 @@ import {
   ShoppingBag,
   FileSpreadsheet,
   ScanLine,
+  Cpu,
   Kanban,
   ExternalLink,
 } from 'lucide-react';
@@ -36,6 +37,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
   const navigationItems = [
     { label: t('nav_overview', 'Overview'), to: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'staff'] },
     { label: t('nav_products', 'Products'), to: '/products', icon: Package, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_price_list', 'মেশিন ও প্রাইস লিস্ট'), to: '/price-list', icon: Cpu, roles: ['admin', 'manager', 'staff'] },
     { label: t('nav_categories', 'Categories'), to: '/categories', icon: FolderTree, roles: ['admin', 'manager'] },
     { label: t('nav_suppliers', 'Suppliers'), to: '/suppliers', icon: Truck, roles: ['admin', 'manager'] },
     { label: t('nav_customers', 'Customers'), to: '/customers', icon: Users2, roles: ['admin', 'manager', 'staff'] },

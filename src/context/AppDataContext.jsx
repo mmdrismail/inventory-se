@@ -8,6 +8,7 @@ import { purchaseService } from '../services/purchaseService';
 import { salesService } from '../services/salesService';
 import { quotationService } from '../services/quotationService';
 import { moneyReceiptService } from '../services/moneyReceiptService';
+import { priceCatalogService } from '../services/priceCatalogService';
 import { lotService } from '../services/lotService';
 import { inventoryService } from '../services/inventoryService';
 import { orderService } from '../services/orderService';
@@ -39,6 +40,7 @@ export const AppDataProvider = ({ children }) => {
   const [sales, setSales] = useState(() => storageService.getItem(STORAGE_KEYS.SALES, []));
   const [quotations, setQuotations] = useState(() => storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
   const [moneyReceipts, setMoneyReceipts] = useState(() => storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []));
+  const [priceCatalog, setPriceCatalog] = useState(() => storageService.getItem(STORAGE_KEYS.PRICE_CATALOG, []));
   const [lotPurchases, setLotPurchases] = useState(() => storageService.getItem(STORAGE_KEYS.LOT_PURCHASES, []));
   const [inventoryMovements, setInventoryMovements] = useState(() => storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
   const [orders, setOrders] = useState(() => storageService.getItem(STORAGE_KEYS.ORDERS, []));
@@ -79,7 +81,7 @@ export const AppDataProvider = ({ children }) => {
     }
     const pendingTempCreates = globalThis.__stocklinePendingTempCreates;
 
-    const TEMP_LOCAL_ID_RE = /^(cust|sal|quote|mr)-\d{10,}/;
+    const TEMP_LOCAL_ID_RE = /^(cust|sal|quote|mr|pc)-\d{10,}/;
     const IGNORED_DIFF_KEYS = new Set([
       'id',
       '_id',
@@ -248,7 +250,7 @@ export const AppDataProvider = ({ children }) => {
       }
 
       const reqConfig = { bypassCache: true };
-      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, mrRes, ordsRes, setsRes, lotsRes] =
+      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, mrRes, pcRes, ordsRes, setsRes, lotsRes] =
         await Promise.allSettled([
           apiClient.get('/products', {}, reqConfig),
           apiClient.get('/categories', {}, reqConfig),
@@ -258,6 +260,7 @@ export const AppDataProvider = ({ children }) => {
           apiClient.get('/sales', {}, reqConfig),
           apiClient.get('/quotations', {}, reqConfig),
           apiClient.get('/money-receipts', {}, reqConfig),
+          apiClient.get('/price-catalog', {}, reqConfig),
           apiClient.get('/orders', {}, reqConfig),
           apiClient.get('/settings', {}, reqConfig),
           apiClient.get('/lots', {}, reqConfig),
@@ -473,6 +476,36 @@ export const AppDataProvider = ({ children }) => {
         await settleReconcilePushes(pushPromises, merged, setMoneyReceipts, STORAGE_KEYS.MONEY_RECEIPTS);
       }
 
+      if (pcRes.status === 'fulfilled' && pcRes.value?.success && Array.isArray(pcRes.value.data)) {
+        const localPc = storageService.getItem(STORAGE_KEYS.PRICE_CATALOG, []);
+        const rawPc = pcRes.value.data.map((r) => ({
+          ...r,
+          id: r._id || r.id,
+          _id: r._id || r.id,
+        }));
+        const { merged, pushPromises } = reconcileAndPushNewerLocal(
+          localPc,
+          rawPc,
+          (id, item) => apiClient.put(`/price-catalog/${id}`, item).catch(() => null),
+          {
+            entityTag: 'pricecatalog',
+            getFallbackKeys: (r) => {
+              const p = normalizeReconcileKey(r?.normalizedPartName || r?.partName);
+              const mk = normalizeReconcileKey(r?.machineKey);
+              return p ? [`pc:${p}|${mk}`] : [];
+            },
+            shouldAutoCreate: (r) => Boolean(r?.partName),
+            createFn: (item) => {
+              const { id: _tid, _id: _oid, ...payload } = item;
+              return apiClient.post('/price-catalog', payload).catch(() => null);
+            },
+          }
+        );
+        setPriceCatalog(merged);
+        storageService.setItem(STORAGE_KEYS.PRICE_CATALOG, merged);
+        await settleReconcilePushes(pushPromises, merged, setPriceCatalog, STORAGE_KEYS.PRICE_CATALOG);
+      }
+
       if (ordsRes.status === 'fulfilled' && ordsRes.value?.success && Array.isArray(ordsRes.value.data) && ordsRes.value.data.length > 0) {
         const normalized = ordsRes.value.data.map((o) => {
           const tot = Number(o.totalAmount !== undefined ? o.totalAmount : o.total) || 0;
@@ -520,6 +553,7 @@ export const AppDataProvider = ({ children }) => {
     setSales(storageService.getItem(STORAGE_KEYS.SALES, []));
     setQuotations(storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
     setMoneyReceipts(storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []));
+    setPriceCatalog(storageService.getItem(STORAGE_KEYS.PRICE_CATALOG, []));
     setInventoryMovements(storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
     setOrders(storageService.getItem(STORAGE_KEYS.ORDERS, []));
     setUsers(storageService.getItem(STORAGE_KEYS.USERS, []));
@@ -937,6 +971,7 @@ export const AppDataProvider = ({ children }) => {
       customerPhone: quote.customerPhone,
       customerAddress: quote.customerAddress,
       customerLocation: quote.customerLocation,
+      machineDetails: quote.machineDetails || {},
       items: salesItems,
       subtotal: quote.subtotal,
       discount: quote.discount,
@@ -999,6 +1034,59 @@ export const AppDataProvider = ({ children }) => {
     if (res.success) {
       reloadAfterMutation(res);
       addToast({ title: 'মানি রিসিপ্ট মুছে ফেলা হয়েছে', message: res.message });
+    }
+    return res;
+  };
+
+  // ================= MACHINE & PARTS PRICE CATALOG =================
+  const savePriceCatalogEntry = (data) => {
+    const res = priceCatalogService.saveManualEntry(data);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({
+        title: 'প্রাইস লিস্টে সংরক্ষিত',
+        message: `"${res.entry.partName}" প্রাইস লিস্টে যোগ/আপডেট হয়েছে।`,
+        type: 'success',
+      });
+    } else {
+      addToast({ title: 'Error', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
+  const deletePriceCatalogEntry = (id) => {
+    const res = priceCatalogService.remove(id);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({ title: 'প্রাইস লিস্ট থেকে মোছা হয়েছে', message: res.message });
+    }
+    return res;
+  };
+
+  const syncPriceCatalogHistory = () => {
+    const res = priceCatalogService.syncHistoryLocal(quotations, sales);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({
+        title: 'পূর্বের ইতিহাস সিঙ্ক সম্পন্ন',
+        message: `কোটেশন ও বিক্রয় থেকে ${res.entries.length}টি পার্টস প্রাইস এন্ট্রি তৈরি/আপডেট হয়েছে।`,
+        type: 'success',
+      });
+    }
+    return res;
+  };
+
+  const promotePriceEntryToProduct = (entry, overrides = {}) => {
+    const res = priceCatalogService.promoteToProduct(entry, overrides);
+    if (res.success) {
+      reloadAfterMutation(res.product?.syncPromise ? { syncPromise: res.product.syncPromise } : {});
+      addToast({
+        title: 'প্রোডাক্ট ডাটাবেজে যুক্ত হয়েছে',
+        message: `"${res.product.name}" (SKU: ${res.product.sku}) এখন প্রোডাক্ট ক্যাটালগে যুক্ত।`,
+        type: 'success',
+      });
+    } else {
+      addToast({ title: 'Failed', message: res.message, type: 'error' });
     }
     return res;
   };
@@ -1273,6 +1361,7 @@ export const AppDataProvider = ({ children }) => {
     sales,
     quotations,
     moneyReceipts,
+    priceCatalog,
     lotPurchases,
     inventoryMovements,
     orders,
@@ -1313,6 +1402,10 @@ export const AppDataProvider = ({ children }) => {
     createMoneyReceipt,
     updateMoneyReceipt,
     deleteMoneyReceipt,
+    savePriceCatalogEntry,
+    deletePriceCatalogEntry,
+    syncPriceCatalogHistory,
+    promotePriceEntryToProduct,
     createLotPurchase,
     updateLotPurchase,
     deleteLotPurchase,

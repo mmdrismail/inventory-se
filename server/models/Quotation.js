@@ -38,6 +38,21 @@ const quotationItemSchema = new mongoose.Schema({
   },
 });
 
+const machineDetailsSchema = new mongoose.Schema(
+  {
+    machineName: { type: String, default: '', trim: true },
+    model: { type: String, default: '', trim: true },
+    type: { type: String, default: '', trim: true },
+    hp: { type: String, default: '', trim: true },
+    ton: { type: String, default: '', trim: true },
+    cylinder: { type: String, default: '', trim: true },
+    others: { type: String, default: '', trim: true },
+    description: { type: String, default: '', trim: true },
+    autoSaveToPriceCatalog: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 const quotationSchema = new mongoose.Schema(
   {
     quotationNumber: {
@@ -177,6 +192,10 @@ const quotationSchema = new mongoose.Schema(
       type: String,
       default: 'Sales Executive',
     },
+    machineDetails: {
+      type: machineDetailsSchema,
+      default: () => ({}),
+    },
   },
   { timestamps: true, strict: false }
 );
@@ -189,5 +208,6 @@ quotationSchema.index({ validUntil: 1 });
 quotationSchema.index({ requisitionRef: 1 });
 quotationSchema.index({ convertedSaleId: 1 });
 quotationSchema.index({ 'items.productId': 1 });
+quotationSchema.index({ 'machineDetails.machineName': 1, 'machineDetails.model': 1 });
 
 module.exports = mongoose.model('Quotation', quotationSchema);

@@ -4,6 +4,7 @@ const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
 const Customer = require('../models/Customer');
+const { normalizeMachineDetails, syncDocumentToPriceCatalog } = require('./priceCatalogController');
 
 // Safe query helper supporting MongoDB ObjectId, custom String ID, or Quotation Number
 const findQuotationQuery = (id) => {
@@ -29,6 +30,9 @@ exports.getQuotations = async (req, res, next) => {
         { customerName: { $regex: safeSearch, $options: 'i' } },
         { customerCompany: { $regex: safeSearch, $options: 'i' } },
         { requisitionRef: { $regex: safeSearch, $options: 'i' } },
+        { 'machineDetails.machineName': { $regex: safeSearch, $options: 'i' } },
+        { 'machineDetails.model': { $regex: safeSearch, $options: 'i' } },
+        { 'items.name': { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -134,6 +138,7 @@ exports.createQuotation = async (req, res, next) => {
 
     const calculatedSubtotal = normalizedItems.reduce((sum, it) => sum + it.lineTotal, 0);
     const calculatedTotal = Number(totalAmount) || calculatedSubtotal - (Number(discount) || 0) + (Number(tax) || 0);
+    const machineDetails = normalizeMachineDetails(req.body.machineDetails);
 
     const quotation = await Quotation.create({
       quotationNumber,
@@ -150,6 +155,7 @@ exports.createQuotation = async (req, res, next) => {
       customerPhone: customerPhone || '',
       customerEmail: customerEmail || '',
       customerAddress: customerAddress || '',
+      machineDetails,
       items: normalizedItems,
       subtotal: calculatedSubtotal,
       discount: Number(discount) || 0,
@@ -159,6 +165,13 @@ exports.createQuotation = async (req, res, next) => {
       termsAndConditions: termsAndConditions || '১. সকল মালামাল প্রাপ্যতা সাপেক্ষে সরবরাহ করা হইবে।\n২. কার্যাদেশ প্রাপ্তির ৩ কার্যদিবসের মধ্যে ডেলিভারি সম্পন্ন হইবে।\n৩. এই কোটেশনের মেয়াদ জারির তারিখ হইতে ১৫ দিন পর্যন্ত বৈধ।',
       notes: notes || '',
       preparedBy: req.user ? req.user.name : 'Sales Department',
+    });
+
+    await syncDocumentToPriceCatalog(normalizedItems, machineDetails, {
+      docType: 'quotation',
+      docNumber: quotationNumber,
+      date: quotation.date,
+      customerName: quotation.customerName,
     });
 
     res.status(201).json({
@@ -265,9 +278,20 @@ exports.updateQuotation = async (req, res, next) => {
       }
     }
 
+    if (updates.machineDetails !== undefined) {
+      updates.machineDetails = normalizeMachineDetails(updates.machineDetails);
+    }
+
     const updated = await Quotation.findByIdAndUpdate(existing._id, updates, {
       new: true,
       runValidators: true,
+    });
+
+    await syncDocumentToPriceCatalog(updated.items, updated.machineDetails, {
+      docType: 'quotation',
+      docNumber: updated.quotationNumber,
+      date: updated.date,
+      customerName: updated.customerName,
     });
 
     res.json({
@@ -344,6 +368,7 @@ exports.convertQuotationToSale = async (req, res, next) => {
       customerRole: quotation.customerRole,
       customerPhone: quotation.customerPhone,
       customerAddress: quotation.customerAddress,
+      machineDetails: quotation.machineDetails || {},
       items: salesItems,
       subtotal: quotation.subtotal,
       discount: quotation.discount,

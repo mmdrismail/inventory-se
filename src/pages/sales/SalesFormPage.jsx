@@ -11,6 +11,9 @@ import { PrintableReceiptModal } from '../../components/receipt/PrintableReceipt
 import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
 import { formatCurrency } from '../../utils/formatters';
 import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
+import { EMPTY_MACHINE_DETAILS, normalizeMachineDetails } from '../../utils/partPriceSearch';
+import { MachineSpecCard } from '../../components/forms/MachineSpecCard';
+import { SmartPartLookupModal } from '../../components/forms/SmartPartLookupModal';
 import { calculateSaleTotals, calculatePaymentBreakdown } from '../../utils/calculations';
 import {
   ArrowLeft,
@@ -26,11 +29,12 @@ import {
   Barcode,
   Edit2,
   Save,
+  Search,
 } from 'lucide-react';
 import { playBarcodeBeep, playSuccessChime, playErrorTone } from '../../utils/soundEffects';
 
 export const SalesFormPage = () => {
-  const { customers, products, sales, quotations, createSale, updateSale, settings } = useAppData();
+  const { customers, products, sales, quotations, priceCatalog, createSale, updateSale, settings } = useAppData();
   const { language, t } = useLanguage();
 
   const l = (texts) => {
@@ -44,11 +48,21 @@ export const SalesFormPage = () => {
   const { id } = useParams();
   const isEditing = Boolean(id);
 
-  // Requisition / Quotation prefill if routed from quotation
+  // Requisition / Quotation / Price List Part prefill if routed from quotation or price catalog
   const prefill = location.state?.fromQuotation || null;
+  const prefillPart = location.state?.prefillPart || null;
 
   const [barcodeInput, setBarcodeInput] = useState('');
   const [scanSuccessMessage, setScanSuccessMessage] = useState('');
+
+  const [machineDetails, setMachineDetails] = useState(() =>
+    prefill?.machineDetails
+      ? normalizeMachineDetails(prefill.machineDetails)
+      : prefillPart
+      ? normalizeMachineDetails(prefillPart)
+      : { ...EMPTY_MACHINE_DETAILS }
+  );
+  const [lookupModalState, setLookupModalState] = useState({ isOpen: false, targetRowIdx: null });
 
   const [customerId, setCustomerId] = useState(prefill?.customerId || '');
   const [customerName, setCustomerName] = useState(prefill?.customerName || '');
@@ -126,6 +140,9 @@ export const SalesFormPage = () => {
       if (existingSale.showRate !== undefined) setShowRate(existingSale.showRate);
       if (existingSale.showLineTotal !== undefined) setShowLineTotal(existingSale.showLineTotal);
       if (existingSale.showGrandTotal !== undefined) setShowGrandTotal(existingSale.showGrandTotal);
+      if (existingSale.machineDetails) {
+        setMachineDetails(normalizeMachineDetails(existingSale.machineDetails));
+      }
       if (existingSale.items && existingSale.items.length > 0) {
         setItems(
           existingSale.items.map((it) => ({
@@ -157,6 +174,19 @@ export const SalesFormPage = () => {
           unitPrice: it.unitPrice || 0,
         };
       });
+    }
+    if (prefillPart) {
+      const rate = Number(prefillPart.lastPrice || prefillPart.price || 0) || 0;
+      const prod = products.find((p) => p.id === prefillPart.linkedProductId || p.name === prefillPart.partName);
+      return [
+        {
+          productId: prod?.id || 'custom',
+          productName: prefillPart.partName || prod?.name || '',
+          quantity: 1,
+          unit: normalizeUnit(prefillPart.unit || prod?.unit || 'pc'),
+          unitPrice: rate,
+        },
+      ];
     }
     return [
       {
@@ -444,6 +474,7 @@ export const SalesFormPage = () => {
       bookNumber: bookNumber.trim(),
       manualSerialNo: manualSerialNo.trim(),
       deductStock,
+      machineDetails: normalizeMachineDetails(machineDetails),
       items: calculatedItems,
       subtotal,
       total,
@@ -771,6 +802,18 @@ export const SalesFormPage = () => {
             </div>
           </div>
 
+          {/* SECTION 1.5: MACHINE & TECHNICAL SPEC BOX */}
+          <MachineSpecCard
+            value={machineDetails}
+            onChange={setMachineDetails}
+            quotations={quotations}
+            sales={sales}
+            priceCatalog={priceCatalog}
+            language={language}
+            accentColor="emerald"
+            compact
+          />
+
           {/* SECTION 2: INVOICE META & PAYMENT BREAKDOWN */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Input
@@ -942,13 +985,24 @@ export const SalesFormPage = () => {
 
           {/* SECTION 3: MULTI-ITEM PRODUCT BILLING TABLE */}
           <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                 বিক্রিত মালামালের তালিকা (Products to Bill)
               </span>
-              <Button variant="outline" size="sm" icon={Plus} onClick={handleAddItem}>
-                আইটেম যোগ করুন (Add Line)
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={Search}
+                  onClick={() => setLookupModalState({ isOpen: true, targetRowIdx: null })}
+                >
+                  {l({ bn: 'দাম ও মেশিন খুঁজুন', en: 'Search Parts & Prices', obro: 'Search Price List' })}
+                </Button>
+                <Button variant="outline" size="sm" icon={Plus} onClick={handleAddItem}>
+                  আইটেম যোগ করুন (Add Line)
+                </Button>
+              </div>
             </div>
 
             {/* Single Line Column & Total Visibility Controls ("eta ek line e thakbe eigula") */}
@@ -1007,17 +1061,29 @@ export const SalesFormPage = () => {
                     }`}
                   >
                     <div className="flex-1 space-y-1.5">
-                      <Select
-                        value={products.some((p) => p.id === line.productId) ? line.productId : 'custom'}
-                        onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
-                        options={[
-                          { value: 'custom', label: '➕ বিশেষ পার্টস / কাস্টম আইটেম (Custom Part / Quotation Item)' },
-                          ...products.map((p) => ({
-                            value: p.id,
-                            label: `${p.name} (মজুদ: ${p.quantity} ${normalizeUnit(p.unit)} · ৳${p.sellingPrice})`,
-                          })),
-                        ]}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1">
+                          <Select
+                            value={products.some((p) => p.id === line.productId) ? line.productId : 'custom'}
+                            onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
+                            options={[
+                              { value: 'custom', label: '➕ বিশেষ পার্টস / কাস্টম আইটেম (Custom Part / Quotation Item)' },
+                              ...products.map((p) => ({
+                                value: p.id,
+                                label: `${p.name} (মজুদ: ${p.quantity} ${normalizeUnit(p.unit)} · ৳${p.sellingPrice})`,
+                              })),
+                            ]}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setLookupModalState({ isOpen: true, targetRowIdx: index })}
+                          className="p-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 shrink-0"
+                          title="আগের কোটেশন বা বিক্রয় থেকে দাম ও পার্টস খুঁজুন"
+                        >
+                          <Search className="h-4 w-4" />
+                        </button>
+                      </div>
                       {(line.productId === 'custom' || !products.some((p) => p.id === line.productId)) && (
                         <input
                           type="text"
@@ -1278,6 +1344,59 @@ export const SalesFormPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Smart Machine & Parts Price Lookup Modal */}
+      <SmartPartLookupModal
+        isOpen={lookupModalState.isOpen}
+        onClose={() => setLookupModalState({ isOpen: false, targetRowIdx: null })}
+        preferredMachine={machineDetails}
+        onSelectPart={(picked) => {
+          const unitVal = normalizeUnit(picked.unit || 'pc');
+          const rateVal = Number(picked.unitPrice) || 0;
+          if (picked.machineDetails && !machineDetails.machineName && picked.machineDetails.machineName) {
+            setMachineDetails((prev) => ({
+              ...prev,
+              ...normalizeMachineDetails(picked.machineDetails),
+              autoSaveToPriceCatalog: prev.autoSaveToPriceCatalog,
+            }));
+          }
+          setItems((prev) => {
+            const targetIdx = lookupModalState.targetRowIdx;
+            if (targetIdx !== null && targetIdx >= 0 && targetIdx < prev.length) {
+              const updated = [...prev];
+              updated[targetIdx] = {
+                ...updated[targetIdx],
+                productId: picked.productId || 'custom',
+                productName: picked.name,
+                unit: unitVal,
+                unitPrice: rateVal,
+              };
+              return updated;
+            }
+            if (prev.length === 1 && !prev[0].productName?.trim() && prev[0].productId === 'custom') {
+              return [
+                {
+                  ...prev[0],
+                  productId: picked.productId || 'custom',
+                  productName: picked.name,
+                  unit: unitVal,
+                  unitPrice: rateVal,
+                },
+              ];
+            }
+            return [
+              ...prev,
+              {
+                productId: picked.productId || 'custom',
+                productName: picked.name,
+                quantity: 1,
+                unit: unitVal,
+                unitPrice: rateVal,
+              },
+            ];
+          });
+        }}
+      />
 
       {/* Immediate Receipt Modal Preview upon sale completion */}
       <PrintableReceiptModal

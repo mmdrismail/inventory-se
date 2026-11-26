@@ -8,6 +8,7 @@ import { Badge } from '../../components/common/Badge';
 import { BackLink } from '../../components/common/BackLink';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { DOCUMENT_TYPES, cleanItemName } from '../../utils/printTemplateGenerator';
+import { hasAnyMachineDetails } from '../../utils/partPriceSearch';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import {
   FileSpreadsheet,
@@ -24,6 +25,7 @@ import {
   Send,
   FileCheck,
   Receipt,
+  Cpu,
 } from 'lucide-react';
 
 export const QuotationDetailPage = () => {
@@ -337,7 +339,7 @@ export const QuotationDetailPage = () => {
         </div>
 
         {/* Customer & Requisition Info Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 mb-6 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 mb-4 text-xs">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
               {l({
@@ -359,7 +361,7 @@ export const QuotationDetailPage = () => {
               {l({ bn: 'পদবি: ', en: 'Role: ', obro: 'Role: ' })}
               <span className="font-medium text-slate-700 dark:text-slate-300">{getRoleLabel(quotation.customerRole)}</span>
             </p>
-            {quotation.customerPhone && (
+              {quotation.customerPhone && (
               <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                 <Phone className="h-3 w-3 shrink-0" />
                 <span>{quotation.customerPhone}</span>
@@ -397,6 +399,26 @@ export const QuotationDetailPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Machine & Technical Spec Strip */}
+        {hasAnyMachineDetails(quotation.machineDetails) && (
+          <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/50 mb-4 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-indigo-800 dark:text-indigo-300 mb-1.5">
+              <Cpu className="h-4 w-4" />
+              <span>{l({ bn: 'মেশিন ও টেকনিক্যাল বিবরণ (Machine & Technical Profile)', en: 'Machine & Equipment Technical Profile' })}</span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-700 dark:text-slate-200">
+              {quotation.machineDetails.machineName && <span><strong>Machine:</strong> {quotation.machineDetails.machineName}</span>}
+              {quotation.machineDetails.model && <span><strong>Model:</strong> {quotation.machineDetails.model}</span>}
+              {quotation.machineDetails.type && <span><strong>Type:</strong> {quotation.machineDetails.type}</span>}
+              {quotation.machineDetails.hp && <span><strong>HP:</strong> {quotation.machineDetails.hp}</span>}
+              {quotation.machineDetails.ton && <span><strong>Ton:</strong> {quotation.machineDetails.ton}</span>}
+              {quotation.machineDetails.cylinder && <span><strong>Cylinder:</strong> {quotation.machineDetails.cylinder}</span>}
+              {quotation.machineDetails.others && <span><strong>Others:</strong> {quotation.machineDetails.others}</span>}
+              {quotation.machineDetails.description && <span className="w-full text-slate-500">{quotation.machineDetails.description}</span>}
+            </div>
+          </div>
+        )}
 
         {/* Quotation Heading */}
         <div className="text-center my-4">

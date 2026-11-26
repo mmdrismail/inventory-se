@@ -3,6 +3,8 @@ import { inventoryService } from './inventoryService';
 import { customerService } from './customerService';
 import { calculateSaleTotals, calculatePaymentBreakdown } from '../utils/calculations';
 import { apiClient } from './apiClient';
+import { priceCatalogService } from './priceCatalogService';
+import { normalizeMachineDetails } from '../utils/partPriceSearch';
 
 const linkQuotationLocal = (quotationId, saleId) => {
   if (!quotationId || !saleId) return;
@@ -94,6 +96,7 @@ class SalesService {
       `${docTypePrefix}-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const shouldDeductStock = saleData.deductStock !== undefined ? Boolean(saleData.deductStock) : true;
+    const machineDetails = normalizeMachineDetails(saleData.machineDetails);
 
     const newSale = {
       ...saleData,
@@ -105,6 +108,7 @@ class SalesService {
       bookNumber: (saleData.bookNumber || '').trim(),
       manualSerialNo: (saleData.manualSerialNo || '').trim(),
       deductStock: shouldDeductStock,
+      machineDetails,
       customerId,
       customerName: saleData.customerName || 'Walk-in Retail Customer',
       customerCompany: saleData.customerCompany || '',
@@ -143,6 +147,14 @@ class SalesService {
     storageService.setItem(STORAGE_KEYS.SALES, sales);
     if (customerId) customerService.recalculateFromSales(customerId);
     if (newSale.quotationId) linkQuotationLocal(newSale.quotationId, newSale.id);
+    if (newSale.status === 'completed') {
+      priceCatalogService.upsertFromDocument(newSale.items, newSale.machineDetails, {
+        docType: newSale.documentType === 'challan' ? 'challan' : 'sale',
+        docNumber: newSale.invoiceNumber,
+        date: newSale.date,
+        customerName: newSale.customerName,
+      });
+    }
 
     // Live sync to MongoDB Atlas (wait for customer upsert first if temp customer was created)
     const syncPromise = Promise.resolve(custSyncPromise)
@@ -158,6 +170,7 @@ class SalesService {
             bookNumber: newSale.bookNumber,
             manualSerialNo: newSale.manualSerialNo,
             deductStock: newSale.deductStock,
+            machineDetails: newSale.machineDetails,
             showRate: newSale.showRate,
             showLineTotal: newSale.showLineTotal,
             showGrandTotal: newSale.showGrandTotal,
@@ -287,6 +300,9 @@ class SalesService {
       customerEmail: saleData.customerEmail !== undefined ? saleData.customerEmail : existing.customerEmail || '',
       customerAddress: saleData.customerAddress !== undefined ? saleData.customerAddress : existing.customerAddress || '',
       customerLocation: saleData.customerLocation !== undefined ? saleData.customerLocation : existing.customerLocation || '',
+      machineDetails: normalizeMachineDetails(
+        saleData.machineDetails !== undefined ? saleData.machineDetails : existing.machineDetails
+      ),
       items,
       subtotal,
       discount,
@@ -319,6 +335,14 @@ class SalesService {
     if (updatedSale.quotationId) {
       linkQuotationLocal(updatedSale.quotationId, updatedSale._id || updatedSale.id);
     }
+    if (updatedSale.status !== 'cancelled') {
+      priceCatalogService.upsertFromDocument(updatedSale.items, updatedSale.machineDetails, {
+        docType: updatedSale.documentType === 'challan' ? 'challan' : 'sale',
+        docNumber: updatedSale.invoiceNumber,
+        date: updatedSale.date,
+        customerName: updatedSale.customerName,
+      });
+    }
 
     // Live sync to MongoDB Atlas
     const mongoId = existing._id || existing.id;
@@ -342,6 +366,9 @@ class SalesService {
           customerEmail: updatedSale.customerEmail,
           customerAddress: updatedSale.customerAddress,
           customerLocation: updatedSale.customerLocation,
+          machineDetails: normalizeMachineDetails(
+            saleData.machineDetails !== undefined ? saleData.machineDetails : updatedSale.machineDetails
+          ),
           autoSaveCustomer: saleData.autoSaveCustomer !== false,
           items: (updatedSale.items || []).map((it) => ({
             productId: it.productId || it.id,

@@ -68,6 +68,7 @@ import { QuotationDetailPage } from './pages/quotations/QuotationDetailPage';
 
 // Legacy Khata & Offline Entries (OCR Scanner + Batch Register + Money Receipts)
 import { OfflineRecordsPage } from './pages/offline/OfflineRecordsPage';
+import { PartPriceListPage } from './pages/products/PartPriceListPage';
 
 // Inventory Control
 import { InventoryPage } from './pages/inventory/InventoryPage';
@@ -203,8 +204,9 @@ export default function App() {
               <Route path="/quotations/:id" element={<QuotationDetailPage />} />
               <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
 
-              {/* Legacy Khata & Offline Entries */}
+              {/* Legacy Khata & Offline Entries & Machine Price Catalog */}
               <Route path="/offline-entries" element={<OfflineRecordsPage />} />
+              <Route path="/price-list" element={<PartPriceListPage />} />
 
               {/* Inventory */}
               <Route path="/inventory" element={<InventoryPage />} />

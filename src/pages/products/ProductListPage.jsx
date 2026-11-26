@@ -10,6 +10,12 @@ import { EmptyState, Pagination } from '../../components/common/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { exportToCSV, parseCSV } from '../../utils/csv';
 import {
+  buildUnifiedPartsIndex,
+  searchUnifiedParts,
+  matchesMultiTokens,
+  formatMachineSummary,
+} from '../../utils/partPriceSearch';
+import {
   Plus,
   Download,
   Upload,
@@ -24,11 +30,27 @@ import {
   FileSpreadsheet,
   Barcode,
   MapPin,
+  Cpu,
+  History,
+  PackagePlus,
+  Receipt,
 } from 'lucide-react';
 import { BarcodeLabelModal } from '../../components/products/BarcodeLabelModal';
 
 export const ProductListPage = () => {
-  const { products, categories, deleteProduct, importProductsCSV, reloadState, confirmAction, settings } = useAppData();
+  const {
+    products,
+    categories,
+    priceCatalog,
+    quotations,
+    sales,
+    deleteProduct,
+    importProductsCSV,
+    promotePriceEntryToProduct,
+    reloadState,
+    confirmAction,
+    settings,
+  } = useAppData();
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -54,14 +76,21 @@ export const ProductListPage = () => {
     return map;
   }, [categories]);
 
-  // Filtering & Sorting
+  // Filtering & Sorting (multi-keyword across product specs & compatible models)
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      // Search by name or SKU
-      const matchesSearch =
-        !searchTerm ||
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = matchesMultiTokens(searchTerm, [
+        p.name,
+        p.sku,
+        p.barcode,
+        p.brand,
+        p.modelNumber,
+        p.dimensions,
+        p.description,
+        p.oemPartNumber,
+        p.impaCode,
+        p.compatibleModels,
+      ]);
 
       // Category filter
       const matchesCategory = !selectedCategory || p.categoryId === selectedCategory;
@@ -89,6 +118,18 @@ export const ProductListPage = () => {
       return 0;
     });
   }, [products, searchTerm, selectedCategory, selectedStatus, sortField, sortDirection]);
+
+  // Unified Historical Machine/Parts matches from Quotations & Sales (shown when searching)
+  const unifiedIndex = useMemo(
+    () => buildUnifiedPartsIndex({ products, priceCatalog, quotations, sales }),
+    [products, priceCatalog, quotations, sales]
+  );
+
+  const historyPriceMatches = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    const { matchedPriceEntries } = searchUnifiedParts(searchTerm, unifiedIndex, { maxResults: 12 });
+    return matchedPriceEntries;
+  }, [searchTerm, unifiedIndex]);
 
   // Pagination
   const paginatedProducts = useMemo(() => {
@@ -179,6 +220,11 @@ export const ProductListPage = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Link to="/price-list">
+            <Button variant="secondary" size="sm" icon={Cpu}>
+              মেশিন ও প্রাইস লিস্ট
+            </Button>
+          </Link>
           <Button variant="outline" size="sm" icon={RefreshCw} onClick={reloadState}>
             {t('btn_refresh', 'Refresh')}
           </Button>
@@ -435,6 +481,101 @@ export const ProductListPage = () => {
           onPageChange={setCurrentPage}
         />
       </Card>
+
+      {/* Historical Quotes & Sales Price List Matches (when searching by Machine + Part name) */}
+      {searchTerm.trim() && historyPriceMatches.length > 0 && (
+        <Card className="p-4 border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-950/15 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-indigo-600" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                কোটেশন ও বিক্রয় প্রাইস লিস্ট থেকে পাওয়া দাম ({historyPriceMatches.length})
+              </h3>
+              <span className="text-[11px] text-slate-500">
+                (স্টক এন্ট্রি না থাকলেও আগের কোটেশন/মেমো থেকে দাম ও স্পেক দেখানো হচ্ছে)
+              </span>
+            </div>
+            <Link
+              to="/price-list"
+              className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+            >
+              <span>সব প্রাইস লিস্ট দেখুন</span>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {historyPriceMatches.map((row) => {
+              const mSummary = formatMachineSummary(row);
+              return (
+                <div
+                  key={row.uid}
+                  className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                        {row.partName}
+                      </span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800">
+                        {row.unit}
+                      </span>
+                      {!row.inStockDb && (
+                        <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          স্টকে নেই
+                        </span>
+                      )}
+                    </div>
+                    {mSummary && (
+                      <div className="text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold truncate">
+                        {mSummary}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-slate-500">
+                      {row.lastDocNumber ? `${row.lastDocNumber} · ` : ''}
+                      {row.lastCustomerName ? `${row.lastCustomerName} · ` : ''}
+                      {row.lastDocDate ? formatDate(row.lastDocDate) : ''}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                      <span className="text-sm font-black font-mono text-indigo-600 dark:text-indigo-400 block">
+                        {formatCurrency(row.price, settings.currency)}
+                      </span>
+                    </div>
+                    {!row.inStockDb && (
+                      <button
+                        type="button"
+                        onClick={() => promotePriceEntryToProduct(row, { quantity: 0 })}
+                        className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                        title="প্রোডাক্ট ডাটাবেজে যোগ করুন"
+                      >
+                        <PackagePlus className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => navigate('/quotations/new', { state: { prefillPart: row } })}
+                      className="p-1.5 rounded-lg text-purple-600 hover:bg-purple-50"
+                      title="কোটেশন করুন"
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/sales/new', { state: { prefillPart: row } })}
+                      className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50"
+                      title="মেমো / বিক্রয় করুন"
+                    >
+                      <Receipt className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* CSV IMPORT MODAL */}
       <Modal

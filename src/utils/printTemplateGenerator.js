@@ -878,6 +878,28 @@ export const cleanItemSku = (sku) => {
  * 1. CASH MEMO (ক্যাশ মেমো - ১ম কপি)
  * Supports live customizable info & English/Bangla switching
  */
+const renderMachinePrintStrip = (md, lang = 'bn') => {
+  if (!md || typeof md !== 'object') return '';
+  const specs = [
+    md.machineName ? `Machine: <strong>${md.machineName}</strong>` : '',
+    md.model ? `Model: <strong class="font-mono">${md.model}</strong>` : '',
+    md.type ? `Type: <strong>${md.type}</strong>` : '',
+    md.hp ? `HP: <strong>${md.hp}</strong>` : '',
+    md.ton ? `Ton: <strong>${md.ton}</strong>` : '',
+    md.cylinder ? `Cyl: <strong>${md.cylinder}</strong>` : '',
+    md.others ? `Spec: <strong>${md.others}</strong>` : '',
+  ].filter(Boolean);
+  if (specs.length === 0 && !md.description) return '';
+  const label = lang === 'en' ? 'Equipment / Machine:' : 'মেশিন / ইকুইপমেন্ট:';
+  return `
+    <div style="margin: 4px 0 6px; padding: 4px 8px; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 5px; font-size: 10.5px; color: #1e1b4b; line-height: 1.4;">
+      <span style="font-weight: 700; color: #3730a3; margin-right: 6px;">${label}</span>
+      <span>${specs.join(' &nbsp;|&nbsp; ')}</span>
+      ${md.description ? `<div style="font-size: 9.5px; color: #475569; margin-top: 2px;">${md.description}</div>` : ''}
+    </div>
+  `;
+};
+
 export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
   const p = resolveStationeryProfile(settings, options);
   const invoiceNumber = options.overrides?.invoiceNumber || sale.invoiceNumber || sale.invoiceNo || '376';
@@ -963,6 +985,8 @@ export const generateCashMemoHtml = (sale, settings = {}, options = {}) => {
         <span class="customer-dotted-line">${sale.customerAddress || sale.customerPhone || p.t.counterSale}</span>
       </div>
     </div>
+
+    ${renderMachinePrintStrip(sale.machineDetails, p.lang)}
 
     <div class="watermark-layer">
       ${ICONS_SVG.watermarkBg}
@@ -1293,6 +1317,8 @@ export const generateOfficialPadHtml = (sale, settings = {}, options = {}) => {
           <span class="customer-dotted-line">${sale.customerAddress || (sale.customerPhone ? sale.customerPhone : 'N/A')}</span>
         </div>
       </div>
+
+        ${renderMachinePrintStrip(sale.machineDetails, p.lang)}
 
         <table class="memo-table">
           <thead>
@@ -1635,6 +1661,8 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
             </div>
           </div>
         </div>
+
+        ${renderMachinePrintStrip(quotation.machineDetails, p.lang)}
 
         <table class="memo-table">
           <thead>

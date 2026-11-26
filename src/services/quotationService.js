@@ -1,6 +1,8 @@
 import { storageService, STORAGE_KEYS } from './storageService';
 import { apiClient } from './apiClient';
 import { customerService } from './customerService';
+import { priceCatalogService } from './priceCatalogService';
+import { normalizeMachineDetails } from '../utils/partPriceSearch';
 import { INITIAL_QUOTATIONS } from '../data/seedData';
 
 const isGenericClientName = (name) => {
@@ -82,6 +84,7 @@ class QuotationService {
     }
 
     const now = new Date().toISOString();
+    const machineDetails = normalizeMachineDetails(data.machineDetails);
     const newQuotation = {
       ...data,
       id: `quote-${Date.now()}`,
@@ -92,6 +95,7 @@ class QuotationService {
       entrySource: data.entrySource || 'online',
       bookNumber: (data.bookNumber || '').trim(),
       manualSerialNo: (data.manualSerialNo || '').trim(),
+      machineDetails,
       customerId: customerId || null,
       customerName: data.customerName || 'Client Representative',
       customerCompany: data.customerCompany || '',
@@ -118,6 +122,12 @@ class QuotationService {
 
     quotes.unshift(newQuotation);
     storageService.setItem(STORAGE_KEYS.QUOTATIONS, quotes);
+    priceCatalogService.upsertFromDocument(items, machineDetails, {
+      docType: 'quotation',
+      docNumber: quotationNumber,
+      date: newQuotation.date,
+      customerName: newQuotation.customerName,
+    });
 
     // Live sync to MongoDB Atlas
     const syncPromise = Promise.resolve(custSyncPromise)
@@ -133,6 +143,7 @@ class QuotationService {
             entrySource: newQuotation.entrySource,
             bookNumber: newQuotation.bookNumber,
             manualSerialNo: newQuotation.manualSerialNo,
+            machineDetails: newQuotation.machineDetails,
             customerId: resolvedCustId,
             customerName: newQuotation.customerName,
             customerCompany: newQuotation.customerCompany,
@@ -226,6 +237,10 @@ class QuotationService {
       }
     }
 
+    if (cleanUpdates.machineDetails !== undefined) {
+      cleanUpdates.machineDetails = normalizeMachineDetails(cleanUpdates.machineDetails);
+    }
+
     quotes[index] = {
       ...quotes[index],
       ...cleanUpdates,
@@ -233,6 +248,16 @@ class QuotationService {
     };
 
     storageService.setItem(STORAGE_KEYS.QUOTATIONS, quotes);
+    priceCatalogService.upsertFromDocument(
+      quotes[index].items,
+      quotes[index].machineDetails,
+      {
+        docType: 'quotation',
+        docNumber: quotes[index].quotationNumber,
+        date: quotes[index].date,
+        customerName: quotes[index].customerName,
+      }
+    );
 
     const targetId = quotes[index]._id || quotes[index].id || id;
     const syncPromise = Promise.allSettled([

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/common/Card';
@@ -7,6 +7,9 @@ import { Button } from '../../components/common/Button';
 import { BackLink } from '../../components/common/BackLink';
 import { formatCurrency } from '../../utils/formatters';
 import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
+import { EMPTY_MACHINE_DETAILS, normalizeMachineDetails } from '../../utils/partPriceSearch';
+import { MachineSpecCard } from '../../components/forms/MachineSpecCard';
+import { SmartPartLookupModal } from '../../components/forms/SmartPartLookupModal';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
 import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
 import {
@@ -21,6 +24,7 @@ import {
   Calendar,
   Sparkles,
   Check,
+  Search,
 } from 'lucide-react';
 
 const DEFAULT_TERMS = {
@@ -32,16 +36,20 @@ const DEFAULT_TERMS = {
 export const QuotationFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { language } = useLanguage();
   const {
     products,
     customers,
     quotations,
     sales,
+    priceCatalog,
     createQuotation,
     updateQuotation,
     settings,
   } = useAppData();
+
+  const prefillPart = location.state?.prefillPart || null;
 
   // Multi-Language content selector:
   // - 'en'   -> Pure English
@@ -90,18 +98,42 @@ export const QuotationFormPage = () => {
   // Auto-save Customer Option (ALWAYS ON BY DEFAULT as requested)
   const [autoSaveCustomer, setAutoSaveCustomer] = useState(true);
 
+  // Machine & Technical Profile Spec Box State
+  const [machineDetails, setMachineDetails] = useState(() =>
+    prefillPart ? normalizeMachineDetails(prefillPart) : { ...EMPTY_MACHINE_DETAILS }
+  );
+
+  // Smart Price List Lookup Modal state (targetRowIdx: null = append new row, number = fill row)
+  const [lookupModalState, setLookupModalState] = useState({ isOpen: false, targetRowIdx: null });
+
   // Line items state
-  const [items, setItems] = useState([
-    {
-      id: 'item-1',
-      productId: '',
-      name: '',
-      quantity: 1,
-      unit: 'pc',
-      unitPrice: 0,
-      lineTotal: 0,
-    },
-  ]);
+  const [items, setItems] = useState(() => {
+    if (prefillPart) {
+      const rate = Number(prefillPart.lastPrice || prefillPart.price || 0) || 0;
+      return [
+        {
+          id: `item-${Date.now()}`,
+          productId: prefillPart.linkedProductId || '',
+          name: prefillPart.partName || '',
+          quantity: 1,
+          unit: normalizeUnit(prefillPart.unit || 'pc'),
+          unitPrice: rate,
+          lineTotal: rate,
+        },
+      ];
+    }
+    return [
+      {
+        id: 'item-1',
+        productId: '',
+        name: '',
+        quantity: 1,
+        unit: 'pc',
+        unitPrice: 0,
+        lineTotal: 0,
+      },
+    ];
+  });
 
   // Column and Total visibility controls
   const [showRate, setShowRate] = useState(true);
@@ -156,6 +188,9 @@ export const QuotationFormPage = () => {
       setCustomerAddress(existingQuote.customerAddress || existingQuote.customerLocation || '');
       if (existingQuote.autoSaveCustomer !== undefined) {
         setAutoSaveCustomer(existingQuote.autoSaveCustomer);
+      }
+      if (existingQuote.machineDetails) {
+        setMachineDetails(normalizeMachineDetails(existingQuote.machineDetails));
       }
 
       if (existingQuote.items && existingQuote.items.length > 0) {
@@ -354,6 +389,7 @@ export const QuotationFormPage = () => {
       customerAddress: customerAddress.trim(),
       customerLocation: customerAddress.trim(),
       autoSaveCustomer,
+      machineDetails: normalizeMachineDetails(machineDetails),
       items: validItems,
       subtotal,
       discount: Number(discount) || 0,
@@ -808,9 +844,20 @@ export const QuotationFormPage = () => {
         </div>
       </Card>
 
+      {/* Machine & Technical Spec Profile Box */}
+      <MachineSpecCard
+        value={machineDetails}
+        onChange={setMachineDetails}
+        quotations={quotations}
+        sales={sales}
+        priceCatalog={priceCatalog}
+        language={language}
+        accentColor="purple"
+      />
+
       {/* Line Items Table */}
       <Card className="overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3">
           <div>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <span>
@@ -826,22 +873,34 @@ export const QuotationFormPage = () => {
             </CardTitle>
             <p className="text-[11px] text-slate-400">
               {l({
-                bn: 'কাস্টম যন্ত্রাংশের বিবরণ সরাসরি লিখুন বা ক্যাটালগ থেকে নির্বাচন করুন।',
-                en: 'Type custom equipment / spare parts directly, or pick from inventory catalog.',
-                obro: 'Type custom equipment / spare parts directly, or pick from inventory catalog.',
+                bn: 'কাস্টম যন্ত্রাংশের বিবরণ সরাসরি লিখুন অথবা আগের কোটেশন/বিক্রয় থেকে দাম খুঁজে বসান।',
+                en: 'Type custom spare parts directly, pick from inventory catalog, or lookup rates from past quotes/sales.',
+                obro: 'Type custom equipment / spare parts directly, or lookup from price list.',
               })}
             </p>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            icon={Plus}
-            onClick={addItemRow}
-          >
-            {l({ bn: 'নতুন আইটেম যোগ করুন', en: 'Add Item Line', obro: 'Add Item Line' })}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={Search}
+              onClick={() => setLookupModalState({ isOpen: true, targetRowIdx: null })}
+            >
+              {l({ bn: 'দাম ও মেশিন খুঁজুন', en: 'Search Parts & Prices', obro: 'Search Price List' })}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              icon={Plus}
+              onClick={addItemRow}
+            >
+              {l({ bn: 'নতুন আইটেম যোগ করুন', en: 'Add Item Line', obro: 'Add Item Line' })}
+            </Button>
+          </div>
         </CardHeader>
 
         {/* Single Line Column & Total Visibility Controls */}
@@ -960,6 +1019,14 @@ export const QuotationFormPage = () => {
                             </option>
                           ))}
                         </select>
+                        <button
+                          type="button"
+                          onClick={() => setLookupModalState({ isOpen: true, targetRowIdx: idx })}
+                          className="p-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 shrink-0"
+                          title={l({ bn: 'এই সারির জন্য প্রাইস লিস্ট খুঁজুন', en: 'Lookup price from history' })}
+                        >
+                          <Search className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </td>
 
@@ -1188,6 +1255,66 @@ export const QuotationFormPage = () => {
             : l({ bn: 'কোটেশন তৈরি করুন', en: 'Create Quotation', obro: 'Create Quotation' })}
         </Button>
       </div>
+
+      {/* Smart Machine & Parts Price Lookup Modal */}
+      <SmartPartLookupModal
+        isOpen={lookupModalState.isOpen}
+        onClose={() => setLookupModalState({ isOpen: false, targetRowIdx: null })}
+        preferredMachine={machineDetails}
+        onSelectPart={(picked) => {
+          const unitVal = normalizeUnit(picked.unit || 'pc');
+          const rateVal = Number(picked.unitPrice) || 0;
+          if (picked.machineDetails && !machineDetails.machineName && picked.machineDetails.machineName) {
+            setMachineDetails((prev) => ({
+              ...prev,
+              ...normalizeMachineDetails(picked.machineDetails),
+              autoSaveToPriceCatalog: prev.autoSaveToPriceCatalog,
+            }));
+          }
+          setItems((prev) => {
+            const targetIdx = lookupModalState.targetRowIdx;
+            if (targetIdx !== null && targetIdx >= 0 && targetIdx < prev.length) {
+              const updated = [...prev];
+              const q = Number(updated[targetIdx].quantity) || 1;
+              updated[targetIdx] = {
+                ...updated[targetIdx],
+                productId: picked.productId === 'custom' ? '' : picked.productId,
+                name: picked.name,
+                unit: unitVal,
+                unitPrice: rateVal,
+                lineTotal: Math.round(q * rateVal * 100) / 100,
+              };
+              return updated;
+            }
+            const firstEmptyIdx = prev.findIndex((r) => !(r.name || '').trim());
+            if (firstEmptyIdx !== -1 && prev.length === 1) {
+              const q = Number(prev[firstEmptyIdx].quantity) || 1;
+              return [
+                {
+                  ...prev[firstEmptyIdx],
+                  productId: picked.productId === 'custom' ? '' : picked.productId,
+                  name: picked.name,
+                  unit: unitVal,
+                  unitPrice: rateVal,
+                  lineTotal: Math.round(q * rateVal * 100) / 100,
+                },
+              ];
+            }
+            return [
+              ...prev,
+              {
+                id: `item-${Date.now()}-${prev.length + 1}`,
+                productId: picked.productId === 'custom' ? '' : picked.productId,
+                name: picked.name,
+                quantity: 1,
+                unit: unitVal,
+                unitPrice: rateVal,
+                lineTotal: rateVal,
+              },
+            ];
+          });
+        }}
+      />
 
       {/* Printable Receipt Modal */}
       {printQuotationData && (

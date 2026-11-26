@@ -53,10 +53,20 @@ class ProductService {
     }
 
     // Live sync to MongoDB Atlas backend
-    apiClient.post('/products', {
+    const syncPromise = apiClient.post('/products', {
       name: newProduct.name,
       sku: newProduct.sku,
       barcode: newProduct.barcode || '',
+      brand: newProduct.brand || '',
+      modelNumber: newProduct.modelNumber || '',
+      compatibleModels: Array.isArray(newProduct.compatibleModels) ? newProduct.compatibleModels : [],
+      condition: newProduct.condition || 'new',
+      dimensions: newProduct.dimensions || '',
+      impaCode: newProduct.impaCode || '',
+      oemPartNumber: newProduct.oemPartNumber || '',
+      warehouseLocation: newProduct.warehouseLocation || {},
+      variants: Array.isArray(newProduct.variants) ? newProduct.variants : [],
+      alternatives: Array.isArray(newProduct.alternatives) ? newProduct.alternatives : [],
       description: newProduct.description || '',
       categoryId: newProduct.categoryId || null,
       supplierId: newProduct.supplierId || null,
@@ -77,11 +87,13 @@ class ProductService {
           storageService.setItem(STORAGE_KEYS.PRODUCTS, currentProducts);
         }
       }
+      return res;
     }).catch((err) => {
       console.warn('[MongoDB Atlas sync notice]:', err.message);
+      return null;
     });
 
-    return { success: true, product: newProduct };
+    return { success: true, product: newProduct, syncPromise };
   }
 
   update(id, updates) {

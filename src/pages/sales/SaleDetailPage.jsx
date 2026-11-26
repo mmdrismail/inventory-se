@@ -9,7 +9,8 @@ import { PrintableReceiptModal } from '../../components/receipt/PrintableReceipt
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import { calculatePaymentBreakdown } from '../../utils/calculations';
 import { cleanItemName } from '../../utils/printTemplateGenerator';
-import { ArrowLeft, Printer, CheckCircle2, XCircle, Clock, Users2, Edit2, FileSpreadsheet } from 'lucide-react';
+import { hasAnyMachineDetails } from '../../utils/partPriceSearch';
+import { ArrowLeft, Printer, CheckCircle2, XCircle, Clock, Users2, Edit2, FileSpreadsheet, Cpu } from 'lucide-react';
 
 export const SaleDetailPage = () => {
   const { id } = useParams();
@@ -261,6 +262,26 @@ export const SaleDetailPage = () => {
             )}
           </div>
         </div>
+
+        {/* Machine & Technical Spec Summary */}
+        {hasAnyMachineDetails(sale.machineDetails) && (
+          <div className="p-3.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/50 mb-4 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-indigo-800 dark:text-indigo-300 mb-2">
+              <Cpu className="h-4 w-4" />
+              <span>{l({ bn: 'মেশিন ও টেকনিক্যাল বিবরণ (Machine Specs)', en: 'Machine & Equipment Specs' })}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px] text-slate-700 dark:text-slate-200">
+              {sale.machineDetails.machineName && <span><strong>Machine:</strong> {sale.machineDetails.machineName}</span>}
+              {sale.machineDetails.model && <span>• <strong>Model:</strong> {sale.machineDetails.model}</span>}
+              {sale.machineDetails.type && <span>• <strong>Type:</strong> {sale.machineDetails.type}</span>}
+              {sale.machineDetails.hp && <span>• <strong>HP:</strong> {sale.machineDetails.hp}</span>}
+              {sale.machineDetails.ton && <span>• <strong>Ton:</strong> {sale.machineDetails.ton}</span>}
+              {sale.machineDetails.cylinder && <span>• <strong>Cyl:</strong> {sale.machineDetails.cylinder}</span>}
+              {sale.machineDetails.others && <span>• <strong>Others:</strong> {sale.machineDetails.others}</span>}
+              {sale.machineDetails.description && <span className="w-full text-slate-500">{sale.machineDetails.description}</span>}
+            </div>
+          </div>
+        )}
 
         {/* Single Line Column & Total Visibility Controls ("eta ek line e thakbe eigula") */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/60 my-4 text-xs">

@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../../context/AppDataContext';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatDate } from '../../utils/formatters';
+import {
+  buildUnifiedPartsIndex,
+  searchUnifiedParts,
+  matchesMultiTokens,
+  formatMachineSummary,
+} from '../../utils/partPriceSearch';
 import {
   Search,
   Package,
@@ -19,6 +25,8 @@ import {
   GitFork,
   X,
   Boxes,
+  Cpu,
+  History,
 } from 'lucide-react';
 
 export const GlobalSearchModal = ({ isOpen, onClose }) => {
@@ -32,6 +40,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
     lotPurchases,
     sales,
     quotations,
+    priceCatalog,
     orders,
     settings,
   } = useAppData();
@@ -50,8 +59,6 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
 
   const q = query.trim().toLowerCase();
 
@@ -72,70 +79,62 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // Google-Like Smart Fuzzy Search across all machinery attributes & alternatives
+  // Google-Like Smart Fuzzy Multi-Token Search across machinery attributes & alternatives
   const matchedProducts = useMemo(() => {
     if (!q) return [];
     return products.filter((p) => {
-      const nameMatch = p.name?.toLowerCase().includes(q);
-      const skuMatch = p.sku?.toLowerCase().includes(q);
-      const barcodeMatch = p.barcode?.toLowerCase().includes(q);
-      const brandMatch = p.brand?.toLowerCase().includes(q);
-      const modelMatch = p.modelNumber?.toLowerCase().includes(q);
-      const oemMatch = p.oemPartNumber?.toLowerCase().includes(q);
-      const impaMatch = p.impaCode?.toLowerCase().includes(q);
-      const condMatch = p.condition?.toLowerCase().includes(q);
-      const lotMatch = p.lotNumber?.toLowerCase().includes(q);
-
-      // Warehouse rack / bin match
-      const locCodeMatch = p.warehouseLocation?.code?.toLowerCase().includes(q);
-      const locRackMatch = p.warehouseLocation?.rack?.toLowerCase().includes(q);
-      const locZoneMatch = p.warehouseLocation?.zone?.toLowerCase().includes(q);
-
-      // Compatible engine / compressor models match
-      const compatMatch = Array.isArray(p.compatibleModels)
-        ? p.compatibleModels.some((m) => m.toLowerCase().includes(q))
-        : false;
-
-      // Variants match (e.g. searching "+0.25", "STD", "oversize")
-      const variantMatch = Array.isArray(p.variants)
-        ? p.variants.some((v) => v.name?.toLowerCase().includes(q) || v.sku?.toLowerCase().includes(q))
-        : false;
-
-      // Alternative parts cross-reference match
-      const altMatch = Array.isArray(p.alternatives)
-        ? p.alternatives.some((a) => a.toLowerCase().includes(q))
-        : false;
-
-      return (
-        nameMatch ||
-        skuMatch ||
-        barcodeMatch ||
-        brandMatch ||
-        modelMatch ||
-        oemMatch ||
-        impaMatch ||
-        condMatch ||
-        lotMatch ||
-        locCodeMatch ||
-        locRackMatch ||
-        locZoneMatch ||
-        compatMatch ||
-        variantMatch ||
-        altMatch
-      );
+      const variantText = Array.isArray(p.variants)
+        ? p.variants.map((v) => `${v.name || ''} ${v.sku || ''}`).join(' ')
+        : '';
+      return matchesMultiTokens(q, [
+        p.name,
+        p.sku,
+        p.barcode,
+        p.brand,
+        p.modelNumber,
+        p.dimensions,
+        p.description,
+        p.oemPartNumber,
+        p.impaCode,
+        p.condition,
+        p.lotNumber,
+        p.warehouseLocation?.code,
+        p.warehouseLocation?.rack,
+        p.warehouseLocation?.zone,
+        p.compatibleModels,
+        p.alternatives,
+        variantText,
+      ]);
     }).slice(0, 6);
   }, [products, q]);
 
-  // Quotations search
+  const unifiedPartsIndex = useMemo(
+    () => buildUnifiedPartsIndex({ products, priceCatalog, quotations, sales }),
+    [products, priceCatalog, quotations, sales]
+  );
+
+  // Matches from Machine & Parts Price History (Quotations + Sales + PriceCatalog)
+  const matchedPriceHistory = useMemo(() => {
+    if (!q) return [];
+    const { matchedPriceEntries } = searchUnifiedParts(q, unifiedPartsIndex, { maxResults: 6 });
+    return matchedPriceEntries;
+  }, [q, unifiedPartsIndex]);
+
+  // Quotations search (including machineDetails & items)
   const matchedQuotations = useMemo(() => {
     if (!q) return [];
     return (quotations || []).filter((quote) => {
-      const qNum = quote.quotationNumber?.toLowerCase().includes(q);
-      const cName = quote.customerName?.toLowerCase().includes(q);
-      const cComp = quote.customerCompany?.toLowerCase().includes(q);
-      const reqRef = quote.requisitionRef?.toLowerCase().includes(q);
-      const itemMatch = (quote.items || []).some((it) => it.name?.toLowerCase().includes(q));
-      return qNum || cName || cComp || reqRef || itemMatch;
+      const mdText = formatMachineSummary(quote.machineDetails);
+      const itemNames = (quote.items || []).map((it) => it.name || '').join(' ');
+      return matchesMultiTokens(q, [
+        quote.quotationNumber,
+        quote.customerName,
+        quote.customerCompany,
+        quote.requisitionRef,
+        mdText,
+        quote.machineDetails?.description,
+        itemNames,
+      ]);
     }).slice(0, 3);
   }, [quotations, q]);
 
@@ -151,16 +150,28 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
     }).slice(0, 2);
   }, [lotPurchases, q]);
 
+  if (!isOpen) return null;
+
   const matchedCustomers = q
     ? customers.filter((c) => c.name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.companyName?.toLowerCase().includes(q)).slice(0, 3)
     : [];
 
   const matchedSales = q
-    ? sales.filter((s) => s.invoiceNo?.toLowerCase().includes(q) || (s.customerName && s.customerName.toLowerCase().includes(q))).slice(0, 3)
+    ? sales.filter((s) =>
+        matchesMultiTokens(q, [
+          s.invoiceNo,
+          s.invoiceNumber,
+          s.customerName,
+          s.customerCompany,
+          formatMachineSummary(s.machineDetails),
+          (s.items || []).map((it) => it.productName || it.name).join(' '),
+        ])
+      ).slice(0, 3)
     : [];
 
   const hasResults =
     matchedProducts.length > 0 ||
+    matchedPriceHistory.length > 0 ||
     matchedQuotations.length > 0 ||
     matchedLots.length > 0 ||
     matchedCustomers.length > 0 ||
@@ -360,6 +371,69 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                         </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* MACHINE & PARTS PRICE HISTORY (FROM QUOTATIONS & SALES) */}
+          {matchedPriceHistory.length > 0 && (
+            <div>
+              <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <History className="h-3.5 w-3.5" />
+                  <span>মেশিন ও পার্টস প্রাইস লিস্ট (কোটেশন ও বিক্রয় ইতিহাস: {matchedPriceHistory.length})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSelect('/price-list')}
+                  className="text-[10px] text-indigo-600 hover:underline font-semibold"
+                >
+                  প্রাইস লিস্ট খুলুন
+                </button>
+              </div>
+              <div className="space-y-1.5 mt-1">
+                {matchedPriceHistory.map((row) => {
+                  const mSummary = formatMachineSummary(row);
+                  return (
+                    <button
+                      key={row.uid}
+                      type="button"
+                      onClick={() => handleSelect('/price-list')}
+                      className="w-full text-left p-2.5 rounded-xl border border-indigo-200/80 dark:border-indigo-900/50 bg-indigo-50/40 dark:bg-indigo-950/20 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center justify-between text-xs transition-colors"
+                    >
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
+                          <span>{row.partName}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                            {row.unit}
+                          </span>
+                          {!row.inStockDb && (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                              স্টকে নেই · প্রাইস লিস্ট
+                            </span>
+                          )}
+                        </div>
+                        {mSummary && (
+                          <div className="text-[10.5px] text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-1 mt-0.5 truncate">
+                            <Cpu className="h-3 w-3 shrink-0" />
+                            <span>{mSummary}</span>
+                          </div>
+                        )}
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {row.lastDocNumber ? `${row.lastDocNumber} · ` : ''}
+                          {row.lastCustomerName ? `${row.lastCustomerName} · ` : ''}
+                          {row.lastDocDate ? formatDate(row.lastDocDate) : ''}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-black text-sm text-indigo-600 dark:text-indigo-400">
+                          {formatCurrency(row.price, settings.currency)}
+                        </div>
+                        <div className="text-[10px] text-slate-400">সর্বশেষ দর</div>
+                      </div>
+                    </button>
                   );
                 })}
               </div>

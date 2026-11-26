@@ -10,6 +10,9 @@ import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { scanDocumentPhoto, parseOcrTextToDocument } from '../../utils/documentOcrParser';
+import { EMPTY_MACHINE_DETAILS, normalizeMachineDetails } from '../../utils/partPriceSearch';
+import { MachineSpecCard } from '../../components/forms/MachineSpecCard';
+import { SmartPartLookupModal } from '../../components/forms/SmartPartLookupModal';
 import {
   Camera,
   Upload,
@@ -118,6 +121,7 @@ export const OfflineRecordsPage = () => {
     sales,
     quotations,
     moneyReceipts,
+    priceCatalog,
     settings,
     createSale,
     createQuotation,
@@ -199,6 +203,8 @@ export const OfflineRecordsPage = () => {
   const [showRate, setShowRate] = useState(true);
   const [showLineTotal, setShowLineTotal] = useState(true);
   const [showGrandTotal, setShowGrandTotal] = useState(true);
+  const [machineDetails, setMachineDetails] = useState(() => ({ ...EMPTY_MACHINE_DETAILS }));
+  const [lookupModalState, setLookupModalState] = useState({ isOpen: false, targetRowIdx: null });
 
   // Money Receipt specific state
   const [linkedSaleId, setLinkedSaleId] = useState('');
@@ -537,6 +543,7 @@ export const OfflineRecordsPage = () => {
         customerAddress: customerAddress.trim(),
         customerLocation: customerAddress.trim(),
         autoSaveCustomer,
+        machineDetails: normalizeMachineDetails(machineDetails),
         items: qItems,
         subtotal: singleSubtotal,
         discount: singleDiscountVal,
@@ -603,6 +610,7 @@ export const OfflineRecordsPage = () => {
         customerAddress: customerAddress.trim(),
         customerLocation: customerAddress.trim(),
         autoSaveCustomer,
+        machineDetails: normalizeMachineDetails(machineDetails),
         items: sItems,
         subtotal: singleSubtotal,
         discount: singleDiscountVal,
@@ -1463,6 +1471,20 @@ export const OfflineRecordsPage = () => {
                   </div>
                 </div>
 
+                {/* MACHINE / EQUIPMENT SPEC BOX (COLLAPSIBLE) */}
+                {documentType !== 'money_receipt' && (
+                  <MachineSpecCard
+                    value={machineDetails}
+                    onChange={setMachineDetails}
+                    quotations={quotations}
+                    sales={sales}
+                    priceCatalog={priceCatalog}
+                    language={language}
+                    compact
+                    defaultExpanded={false}
+                  />
+                )}
+
                 {/* CONDITIONAL BODY: MONEY RECEIPT vs LINE ITEMS */}
                 {documentType === 'money_receipt' ? (
                   <div className="space-y-3 p-4 rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/40 dark:bg-amber-950/20">
@@ -1627,19 +1649,30 @@ export const OfflineRecordsPage = () => {
 
                     {/* Line Items Table */}
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
                           {l({ bn: 'পণ্য ও বিবরণের তালিকা', en: 'Line Items' })} ({items.length})
                         </span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          icon={Plus}
-                          onClick={() => setItems((prev) => [...prev, createEmptyItem(null)])}
-                        >
-                          {l({ bn: '+ নতুন লাইন', en: '+ Add Line' })}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            icon={Search}
+                            onClick={() => setLookupModalState({ isOpen: true, targetRowIdx: null })}
+                          >
+                            {l({ bn: 'প্রাইস লিস্ট খুঁজুন', en: 'Price Lookup' })}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            icon={Plus}
+                            onClick={() => setItems((prev) => [...prev, createEmptyItem(null)])}
+                          >
+                            {l({ bn: '+ নতুন লাইন', en: '+ Add Line' })}
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
@@ -2296,6 +2329,48 @@ export const OfflineRecordsPage = () => {
           </Card>
         </div>
       )}
+
+      {/* Smart Machine & Parts Price Lookup Modal */}
+      <SmartPartLookupModal
+        isOpen={lookupModalState.isOpen}
+        onClose={() => setLookupModalState({ isOpen: false, targetRowIdx: null })}
+        preferredMachine={machineDetails}
+        onSelectPart={(picked) => {
+          const unitVal = normalizeUnit(picked.unit || 'pc');
+          const rateVal = Number(picked.unitPrice) || 0;
+          if (picked.machineDetails && !machineDetails.machineName && picked.machineDetails.machineName) {
+            setMachineDetails((prev) => ({
+              ...prev,
+              ...normalizeMachineDetails(picked.machineDetails),
+              autoSaveToPriceCatalog: prev.autoSaveToPriceCatalog,
+            }));
+          }
+          setItems((prev) => {
+            if (prev.length === 1 && !prev[0].productName?.trim()) {
+              return [
+                {
+                  ...prev[0],
+                  productId: picked.productId || 'custom',
+                  productName: picked.name,
+                  unit: unitVal,
+                  unitPrice: rateVal,
+                },
+              ];
+            }
+            return [
+              ...prev,
+              {
+                id: `itm-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+                productId: picked.productId || 'custom',
+                productName: picked.name,
+                quantity: 1,
+                unit: unitVal,
+                unitPrice: rateVal,
+              },
+            ];
+          });
+        }}
+      />
 
       {/* Printable Receipt / Cash Memo / Challan / Quotation / Money Receipt Modal */}
       {printTarget && (

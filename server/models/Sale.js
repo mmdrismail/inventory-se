@@ -36,6 +36,21 @@ const saleItemSchema = new mongoose.Schema({
   },
 });
 
+const machineDetailsSchema = new mongoose.Schema(
+  {
+    machineName: { type: String, default: '', trim: true },
+    model: { type: String, default: '', trim: true },
+    type: { type: String, default: '', trim: true },
+    hp: { type: String, default: '', trim: true },
+    ton: { type: String, default: '', trim: true },
+    cylinder: { type: String, default: '', trim: true },
+    others: { type: String, default: '', trim: true },
+    description: { type: String, default: '', trim: true },
+    autoSaveToPriceCatalog: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 const saleSchema = new mongoose.Schema(
   {
     invoiceNumber: {
@@ -176,6 +191,10 @@ const saleSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    machineDetails: {
+      type: machineDetailsSchema,
+      default: () => ({}),
+    },
   },
   { timestamps: true, strict: false }
 );
@@ -189,5 +208,6 @@ saleSchema.index({ quotationId: 1 });
 saleSchema.index({ entrySource: 1, date: -1 });
 saleSchema.index({ documentType: 1, date: -1 });
 saleSchema.index({ 'items.productId': 1 });
+saleSchema.index({ 'machineDetails.machineName': 1, 'machineDetails.model': 1 });
 
 module.exports = mongoose.model('Sale', saleSchema);

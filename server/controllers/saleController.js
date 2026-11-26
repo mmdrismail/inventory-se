@@ -5,6 +5,7 @@ const StockMovement = require('../models/StockMovement');
 const Customer = require('../models/Customer');
 const Quotation = require('../models/Quotation');
 const { recalculateCustomerFinancials } = require('./customerController');
+const { normalizeMachineDetails, syncDocumentToPriceCatalog } = require('./priceCatalogController');
 
 // Safe query helper supporting MongoDB ObjectId, custom String ID, or Invoice Number
 const findSaleQuery = (id) => {
@@ -43,6 +44,9 @@ exports.getSales = async (req, res, next) => {
         { bookNumber: { $regex: safeSearch, $options: 'i' } },
         { customerName: { $regex: safeSearch, $options: 'i' } },
         { customerPhone: { $regex: safeSearch, $options: 'i' } },
+        { 'machineDetails.machineName': { $regex: safeSearch, $options: 'i' } },
+        { 'machineDetails.model': { $regex: safeSearch, $options: 'i' } },
+        { 'items.productName': { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -267,6 +271,8 @@ exports.createSale = async (req, res, next) => {
       await activeCustomer.save();
     }
 
+    const machineDetails = normalizeMachineDetails(req.body.machineDetails);
+
     // Step 5: Create sale record
     const sale = await Sale.create({
       invoiceNumber,
@@ -278,6 +284,7 @@ exports.createSale = async (req, res, next) => {
       customerEmail: req.body.customerEmail || activeCustomer?.email || '',
       customerAddress: req.body.customerAddress || activeCustomer?.address || '',
       customerLocation: req.body.customerLocation || activeCustomer?.location || '',
+      machineDetails,
       items: normalizedItems,
       subtotal: computedSubtotal,
       tax: taxVal,
@@ -317,6 +324,15 @@ exports.createSale = async (req, res, next) => {
       } catch (err) {
         console.warn('Quotation update warning:', err.message);
       }
+    }
+
+    if (isCompleted) {
+      await syncDocumentToPriceCatalog(normalizedItems, machineDetails, {
+        docType: documentType === 'challan' ? 'challan' : 'sale',
+        docNumber: invoiceNumber,
+        date: sale.date,
+        customerName: sale.customerName,
+      });
     }
 
     res.status(201).json({
@@ -509,6 +525,10 @@ exports.updateSale = async (req, res, next) => {
       }
     }
 
+    if (updates.machineDetails !== undefined) {
+      updates.machineDetails = normalizeMachineDetails(updates.machineDetails);
+    }
+
     const updated = await Sale.findOneAndUpdate(saleQuery, updates, {
       new: true,
       runValidators: true,
@@ -534,6 +554,15 @@ exports.updateSale = async (req, res, next) => {
     }
     if (updated.customerId) {
       await recalculateCustomerFinancials(updated.customerId);
+    }
+
+    if (updated.status !== 'cancelled') {
+      await syncDocumentToPriceCatalog(updated.items, updated.machineDetails, {
+        docType: updated.documentType === 'challan' ? 'challan' : 'sale',
+        docNumber: updated.invoiceNumber,
+        date: updated.date,
+        customerName: updated.customerName,
+      });
     }
 
     res.json({

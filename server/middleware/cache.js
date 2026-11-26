@@ -139,7 +139,7 @@ const cacheInvalidator = (entityPrefixes = []) => {
           // Always invalidate reports and summary when mutations occur
           memoryCache.clearByPattern('/api/reports');
 
-          // If inventory, sales, purchases, or orders mutate, invalidate products and inventory caches
+          // If inventory, sales, purchases, orders, or price-catalog mutate, invalidate products and inventory caches
           const pathStr = String(pathSegments);
           if (
             pathStr.includes('/purchases') ||
@@ -147,23 +147,27 @@ const cacheInvalidator = (entityPrefixes = []) => {
             pathStr.includes('/orders') ||
             pathStr.includes('/inventory') ||
             pathStr.includes('/products') ||
-            pathStr.includes('/lots')
+            pathStr.includes('/lots') ||
+            pathStr.includes('/price-catalog')
           ) {
             memoryCache.clearByPattern('/api/products');
             memoryCache.clearByPattern('/api/inventory');
           }
 
-          // Cross-invalidate customers, sales, quotations, and money receipts on linked updates
+          // Cross-invalidate customers, sales, quotations, money receipts, and price catalog on linked updates
           if (
             pathStr.includes('/customers') ||
             pathStr.includes('/sales') ||
             pathStr.includes('/quotations') ||
-            pathStr.includes('/money-receipts')
+            pathStr.includes('/money-receipts') ||
+            pathStr.includes('/price-catalog') ||
+            pathStr.includes('/products')
           ) {
             memoryCache.clearByPattern('/api/customers');
             memoryCache.clearByPattern('/api/sales');
             memoryCache.clearByPattern('/api/quotations');
             memoryCache.clearByPattern('/api/money-receipts');
+            memoryCache.clearByPattern('/api/price-catalog');
           }
         }
         return originalJson(body);
