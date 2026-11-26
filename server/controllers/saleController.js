@@ -20,12 +20,14 @@ const findSaleQuery = (id) => {
 // @access  Private
 exports.getSales = async (req, res, next) => {
   try {
-    const { customerId, status, paymentStatus, search, page, limit, startDate, endDate } = req.query;
+    const { customerId, status, paymentStatus, entrySource, documentType, search, page, limit, startDate, endDate } = req.query;
     const query = {};
 
     if (customerId) query.customerId = customerId;
     if (status && status !== 'all') query.status = status;
     if (paymentStatus && paymentStatus !== 'all') query.paymentStatus = paymentStatus;
+    if (entrySource && entrySource !== 'all') query.entrySource = entrySource;
+    if (documentType && documentType !== 'all') query.documentType = documentType;
 
     if (startDate || endDate) {
       query.createdAt = {};
@@ -37,6 +39,8 @@ exports.getSales = async (req, res, next) => {
       const safeSearch = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
         { invoiceNumber: { $regex: safeSearch, $options: 'i' } },
+        { manualSerialNo: { $regex: safeSearch, $options: 'i' } },
+        { bookNumber: { $regex: safeSearch, $options: 'i' } },
         { customerName: { $regex: safeSearch, $options: 'i' } },
         { customerPhone: { $regex: safeSearch, $options: 'i' } },
       ];
@@ -107,6 +111,12 @@ exports.createSale = async (req, res, next) => {
       paymentStatus,
       status,
       notes,
+      documentType,
+      date,
+      entrySource,
+      bookNumber,
+      manualSerialNo,
+      deductStock,
     } = req.body;
 
     if (!items || items.length === 0) {
@@ -144,13 +154,14 @@ exports.createSale = async (req, res, next) => {
     };
 
     const isCompleted = status === 'completed' || !status;
+    const shouldDeductStock = deductStock !== undefined ? Boolean(deductStock) : true;
 
-    // Step 1: Pre-validation of inventory for all tracked items
+    // Step 1: Pre-validation of inventory for all tracked items (skipped for historical archive records when deductStock=false)
     for (const item of normalizedItems) {
       const prod = await resolveProduct(item);
       if (prod) {
         item.productId = prod._id; // Ensure consistent ObjectId
-        if (isCompleted && prod.quantity < Number(item.quantity)) {
+        if (isCompleted && shouldDeductStock && prod.quantity < Number(item.quantity)) {
           return res.status(400).json({
             success: false,
             message: `Insufficient stock for "${prod.name}". Available: ${prod.quantity}, Requested: ${item.quantity}.`,
@@ -162,12 +173,13 @@ exports.createSale = async (req, res, next) => {
       }
     }
 
-    // Step 2: Generate unique invoice number
+    // Step 2: Generate unique invoice/challan number
     const count = await Sale.countDocuments();
-    const invoiceNumber = req.body.invoiceNumber || req.body.invoiceNo || `INV-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    const defaultPrefix = documentType === 'challan' ? 'CHL' : 'INV';
+    const invoiceNumber = req.body.invoiceNumber || req.body.invoiceNo || `${defaultPrefix}-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
 
-    // Step 3: Deduct stock and record movement for inventory-tracked items
-    if (isCompleted) {
+    // Step 3: Deduct stock and record movement for inventory-tracked items when deductStock is enabled
+    if (isCompleted && shouldDeductStock) {
       for (const item of normalizedItems) {
         if (item.productId) {
           const prod = await Product.findById(item.productId);
@@ -277,6 +289,15 @@ exports.createSale = async (req, res, next) => {
       paymentMethod: paymentMethod || 'cash',
       paymentStatus: nextPayStatus,
       status: isCompleted ? 'completed' : 'draft',
+      documentType: documentType || 'cash_memo',
+      date: date ? new Date(date) : new Date(),
+      entrySource: entrySource || 'online',
+      bookNumber: bookNumber || '',
+      manualSerialNo: manualSerialNo || '',
+      deductStock: shouldDeductStock,
+      showRate: req.body.showRate !== undefined ? Boolean(req.body.showRate) : true,
+      showLineTotal: req.body.showLineTotal !== undefined ? Boolean(req.body.showLineTotal) : true,
+      showGrandTotal: req.body.showGrandTotal !== undefined ? Boolean(req.body.showGrandTotal) : true,
       requisitionRef: req.body.requisitionRef || '',
       quotationId: req.body.quotationId || null,
       cashierName: req.user ? req.user.name : 'Cashier Staff',
@@ -364,9 +385,15 @@ exports.updateSale = async (req, res, next) => {
     // Reconcile tracked Product stock when completed status/quantities change
     const nextStatus = updates.status || sale.status || 'completed';
     const nextItemsForStock = updates.items || sale.items || [];
-    const buildTrackedQtyMap = (statusVal, itemList) => {
+    const prevDeductStock = sale.deductStock !== false;
+    const nextDeductStock = updates.deductStock !== undefined ? Boolean(updates.deductStock) : prevDeductStock;
+    if (updates.date) {
+      updates.date = new Date(updates.date);
+    }
+
+    const buildTrackedQtyMap = (statusVal, itemList, shouldDeduct) => {
       const map = new Map();
-      if (statusVal !== 'completed') return map;
+      if (statusVal !== 'completed' || shouldDeduct === false) return map;
       for (const it of itemList || []) {
         if (!it.productId || !mongoose.Types.ObjectId.isValid(it.productId)) continue;
         const k = String(it.productId);
@@ -374,8 +401,8 @@ exports.updateSale = async (req, res, next) => {
       }
       return map;
     };
-    const oldStockMap = buildTrackedQtyMap(sale.status, sale.items);
-    const newStockMap = buildTrackedQtyMap(nextStatus, nextItemsForStock);
+    const oldStockMap = buildTrackedQtyMap(sale.status, sale.items, prevDeductStock);
+    const newStockMap = buildTrackedQtyMap(nextStatus, nextItemsForStock, nextDeductStock);
     const allProdIds = new Set([...oldStockMap.keys(), ...newStockMap.keys()]);
 
     for (const pid of allProdIds) {
@@ -540,8 +567,8 @@ exports.cancelSale = async (req, res, next) => {
       });
     }
 
-    // If sale was completed, restore stock
-    if (sale.status === 'completed') {
+    // If sale was completed and deducted stock, restore stock
+    if (sale.status === 'completed' && sale.deductStock !== false) {
       for (const item of sale.items) {
         if (!item.productId || !mongoose.Types.ObjectId.isValid(item.productId)) continue;
         const prod = await Product.findById(item.productId);

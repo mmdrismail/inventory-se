@@ -29,6 +29,7 @@ export const QuotationListPage = () => {
   const { quotations, deleteQuotation, confirmAction, settings } = useAppData();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [activePrintQuotation, setActivePrintQuotation] = useState(null);
 
   const l = (texts) => {
@@ -58,12 +59,19 @@ export const QuotationListPage = () => {
         item.customerName?.toLowerCase().includes(q) ||
         item.customerCompany?.toLowerCase().includes(q) ||
         item.requisitionRef?.toLowerCase().includes(q) ||
+        item.bookNumber?.toLowerCase().includes(q) ||
+        item.manualSerialNo?.toLowerCase().includes(q) ||
         item.customerPhone?.includes(q);
 
       const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const src = item.entrySource || 'online';
+      const matchesSource =
+        sourceFilter === 'all' ||
+        (sourceFilter === 'khata_offline' && (src === 'khata' || src === 'offline')) ||
+        src === sourceFilter;
+      return matchesSearch && matchesStatus && matchesSource;
     });
-  }, [quotations, searchTerm, statusFilter]);
+  }, [quotations, searchTerm, statusFilter, sourceFilter]);
 
   const handleDelete = (quote) => {
     confirmAction({
@@ -281,6 +289,17 @@ export const QuotationListPage = () => {
               </button>
             ))}
           </div>
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-300"
+          >
+            <option value="all">{l({ bn: 'সব উৎস (অনলাইন + খাতা)', en: 'All Sources' })}</option>
+            <option value="khata_offline">{l({ bn: 'খাতা ও অফলাইন', en: 'Khata & Offline' })}</option>
+            <option value="khata">{l({ bn: 'শুধু পুরনো খাতা', en: 'Khata Only' })}</option>
+            <option value="offline">{l({ bn: 'শুধু অফলাইন', en: 'Offline Only' })}</option>
+            <option value="online">{l({ bn: 'শুধু অনলাইন', en: 'Online Only' })}</option>
+          </select>
         </div>
       </Card>
 
@@ -332,6 +351,27 @@ export const QuotationListPage = () => {
                         <FileText className="h-3.5 w-3.5 shrink-0" />
                         <span>{quote.quotationNumber}</span>
                       </Link>
+                      {(quote.entrySource === 'khata' || quote.entrySource === 'offline' || quote.bookNumber || quote.manualSerialNo) && (
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {quote.entrySource === 'khata' && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                              খাতা
+                            </span>
+                          )}
+                          {quote.entrySource === 'offline' && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                              অফলাইন
+                            </span>
+                          )}
+                          {(quote.bookNumber || quote.manualSerialNo) && (
+                            <span className="text-[10px] font-mono text-slate-500">
+                              {quote.bookNumber ? `B:${quote.bookNumber}` : ''}
+                              {quote.bookNumber && quote.manualSerialNo ? '/' : ''}
+                              {quote.manualSerialNo ? `#${quote.manualSerialNo}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <span className="text-[10px] text-slate-400 block mt-0.5">
                         {l({ bn: 'তৈরি করেছেন: ', en: 'By: ', obro: 'By: ' })} {quote.preparedBy || 'Sales Exec'}
                       </span>

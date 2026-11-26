@@ -24,6 +24,7 @@ const userRoutes = require('./routes/userRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const quotationRoutes = require('./routes/quotationRoutes');
 const lotRoutes = require('./routes/lotRoutes');
+const moneyReceiptRoutes = require('./routes/moneyReceiptRoutes');
 
 const compression = require('compression');
 const { cacheMiddleware, cacheInvalidator } = require('./middleware/cache');
@@ -131,6 +132,8 @@ app.get('/', (req, res) => {
       customers: '/api/customers',
       purchases: '/api/purchases',
       sales: '/api/sales',
+      quotations: '/api/quotations',
+      moneyReceipts: '/api/money-receipts',
       inventory: '/api/inventory',
       orders: '/api/orders',
       reports: '/api/reports',
@@ -163,6 +166,7 @@ app.use('/api/users', cacheMiddleware(15), userRoutes);
 app.use('/api/settings', cacheMiddleware(60), settingRoutes);
 app.use('/api/quotations', cacheMiddleware(15), quotationRoutes);
 app.use('/api/lots', cacheMiddleware(15), lotRoutes);
+app.use('/api/money-receipts', cacheMiddleware(15), moneyReceiptRoutes);
 
 // Error Handling Middleware
 app.use(notFound);

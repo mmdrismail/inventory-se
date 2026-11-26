@@ -21,8 +21,9 @@ import {
   Package,
   Building2,
   Download,
+  Wallet,
 } from 'lucide-react';
-import { formatCurrency, formatDateTime } from '../../utils/formatters';
+import { formatCurrency, formatDateTime, numberToWords } from '../../utils/formatters';
 import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { useAppData } from '../../context/AppDataContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -36,6 +37,7 @@ import {
   generateOfficialPadHtml,
   generateThermalReceiptHtml,
   generateQuotationHtml,
+  generateMoneyReceiptHtml,
   resolveStationeryProfile,
   isStandardDefaultTerms,
   cleanItemName,
@@ -43,11 +45,21 @@ import {
 } from '../../utils/printTemplateGenerator';
 
 export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType }) => {
-  const { settings, updateSettings, updateSale, updateQuotation, addToast } = useAppData();
+  const { settings, updateSettings, updateSale, updateQuotation, updateMoneyReceipt, addToast } = useAppData();
   const { language: currentGlobalLang } = useLanguage();
 
   // Document format tab
   const [docType, setDocType] = useState(initialDocType || DOCUMENT_TYPES.CASH_MEMO);
+
+  useEffect(() => {
+    if (isOpen && initialDocType) {
+      setDocType(initialDocType);
+    } else if (isOpen && sale?.receiptNumber) {
+      setDocType(DOCUMENT_TYPES.MONEY_RECEIPT);
+    } else if (isOpen && sale?.documentType === 'challan' && !initialDocType) {
+      setDocType(DOCUMENT_TYPES.CHALLAN);
+    }
+  }, [isOpen, initialDocType, sale?.receiptNumber, sale?.documentType]);
 
   // Column and Total visibility toggles (Single-line controls)
   const [showRate, setShowRate] = useState(sale?.showRate !== undefined ? sale.showRate : true);
@@ -198,9 +210,12 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
     setEditableItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const isQuotation = docType === DOCUMENT_TYPES.QUOTATION || !!sale?.quotationNumber;
-  const invoiceNumber = customInfo.customSerial || sale?.quotationNumber || sale?.invoiceNumber || sale?.invoiceNo || (isQuotation ? 'QT-2026-0541' : '376');
-  const cleanSerial = isQuotation
+  const isMoneyReceipt = docType === DOCUMENT_TYPES.MONEY_RECEIPT || !!sale?.receiptNumber;
+  const isQuotation = !isMoneyReceipt && (docType === DOCUMENT_TYPES.QUOTATION || !!sale?.quotationNumber);
+  const invoiceNumber = customInfo.customSerial || sale?.receiptNumber || sale?.quotationNumber || sale?.invoiceNumber || sale?.invoiceNo || (isMoneyReceipt ? 'MR-2026-0001' : isQuotation ? 'QT-2026-0541' : '376');
+  const cleanSerial = isMoneyReceipt
+    ? invoiceNumber
+    : isQuotation
     ? (invoiceNumber.replace(/\D/g, '').slice(-4) || '0541')
     : (invoiceNumber.replace(/\D/g, '').slice(-3) || '376');
 
@@ -283,6 +298,8 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
         return generateOfficialPadHtml(effectiveSale, settings, options);
       case DOCUMENT_TYPES.QUOTATION:
         return generateQuotationHtml(effectiveSale, settings, options);
+      case DOCUMENT_TYPES.MONEY_RECEIPT:
+        return generateMoneyReceiptHtml(effectiveSale, settings, options);
       case DOCUMENT_TYPES.THERMAL:
         return generateThermalReceiptHtml(effectiveSale, settings, options);
       case DOCUMENT_TYPES.CASH_MEMO:
@@ -291,12 +308,12 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
     }
   }, [effectiveSale, settings, docType, options]);
 
-  if (!sale) return null;
-
   // Standardized print & save filename: Customer Number + Memo/Doc Number + Date + Customer Name
   const printFileName = useMemo(() => {
     return generatePrintFileName(effectiveSale, docType, options);
   }, [effectiveSale, docType, options]);
+
+  if (!sale) return null;
 
   const handlePrint = () => {
     printDocumentViaIframe(currentHtml, printFileName);
@@ -387,7 +404,23 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
   const handleSaveToRecord = () => {
     try {
       const targetId = sale?._id || sale?.id;
-      if (isQuotation && targetId) {
+      if (isMoneyReceipt && targetId && updateMoneyReceipt) {
+        const res = updateMoneyReceipt(targetId, {
+          customerName: customerData.name,
+          customerCompany: customerData.company,
+          customerRole: customerData.role,
+          customerPhone: customerData.phone,
+          customerEmail: customerData.email,
+          customerAddress: customerData.address,
+        });
+        if (res && res.success !== false) {
+          addToast({
+            title: 'মানি রিসিপ্ট আপডেট সম্পন্ন',
+            message: `রসিদ #${sale.receiptNumber || invoiceNumber}-এর তথ্য সংরক্ষিত হয়েছে।`,
+            type: 'success',
+          });
+        }
+      } else if (isQuotation && targetId) {
         const mappedItems = editableItems.map((it) => ({
           productId: it.productId || null,
           name: it.productName || it.name || 'Equipment Part',
@@ -499,7 +532,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
         {/* Top Control Bar: Format Selector + Language Switcher + Edit Button */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
           {/* Document Format Tabs */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700/60 flex-1">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700/60 flex-1">
             <button
               type="button"
               onClick={() => setDocType(DOCUMENT_TYPES.CASH_MEMO)}
@@ -546,6 +579,18 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
               <span>কোটেশন প্যাড</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDocType(DOCUMENT_TYPES.MONEY_RECEIPT)}
+              className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${docType === DOCUMENT_TYPES.MONEY_RECEIPT
+                ? 'bg-teal-600 text-white shadow-sm ring-2 ring-teal-500/30'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+            >
+              <Wallet className="h-3.5 w-3.5" />
+              <span>মানি রিসিপ্ট</span>
             </button>
 
             <button
@@ -1723,6 +1768,105 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
               </div>
 
               <div className="h-1 bg-gradient-to-r from-red-600 via-blue-600 to-indigo-700 rounded-full mt-4"></div>
+            </div>
+          )}
+
+          {/* FORMAT 5: MONEY RECEIPT (মানি রিসিপ্ট / টাকা জমার রসিদ) */}
+          {docType === DOCUMENT_TYPES.MONEY_RECEIPT && (
+            <div className="bg-white text-slate-900 p-5 sm:p-7 rounded-xl shadow-md border-2 border-emerald-600 max-w-2xl mx-auto space-y-3 relative overflow-hidden">
+              {profile.t.bismi && (
+                <div className="text-center text-xs font-semibold text-slate-600">
+                  {profile.t.bismi}
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 items-center mb-1">
+                <div />
+                <div className="text-center">
+                  <span className="inline-block bg-emerald-700 text-white font-bold text-xs px-4 py-1 rounded shadow-sm uppercase tracking-wider">
+                    {profile.t.moneyReceiptBadge}
+                  </span>
+                </div>
+                <div className="text-right text-[11px] leading-tight">
+                  <p className="font-bold text-slate-800">{profile.t.proprietor} {profile.proprietorName}</p>
+                  <p className="font-mono text-emerald-700 font-semibold">📞 {profile.phone}</p>
+                </div>
+              </div>
+
+              <div className="text-center space-y-0.5">
+                <h1 className="text-2xl font-extrabold text-[#047857] tracking-tight">{profile.primaryTitle}</h1>
+                {profile.secondaryTitle && <h2 className="text-base font-extrabold text-[#b91c1c]">{profile.secondaryTitle}</h2>}
+                <p className="text-[11px] font-bold text-slate-800">📍 {profile.address}</p>
+              </div>
+
+              <div className="flex justify-between items-center text-xs font-semibold border-b border-slate-300 pb-1.5 pt-1">
+                <div>
+                  <span>{profile.t.memoNo} <strong className="font-mono text-red-600 text-sm font-black">{cleanSerial}</strong></span>
+                  {sale.bookNumber && <span className="ml-2 text-[10.5px] text-slate-500">(Book: {sale.bookNumber}{sale.manualSerialNo ? ` · Sl: ${sale.manualSerialNo}` : ''})</span>}
+                </div>
+                <div className="font-mono text-blue-900 font-bold text-[11px]">{profile.bin}</div>
+                <div className="flex items-center gap-1 text-[11px]">
+                  <span>{profile.t.date}</span>
+                  <span className="border border-slate-800 px-1.5 py-0.5 font-mono font-bold bg-white">{day}</span>
+                  <span className="border border-slate-800 px-1.5 py-0.5 font-mono font-bold bg-white">{month}</span>
+                  <span className="border border-slate-800 px-2 py-0.5 font-mono font-bold bg-white">{year}</span>
+                </div>
+              </div>
+
+              {(() => {
+                const mrAmt = Number(sale?.amount !== undefined ? sale.amount : (paidVal || liveGrandTotal || 0));
+                const methodLabel = String(sale?.paymentMethod || 'cash').replace('_', ' ').toUpperCase();
+                return (
+                  <div className="border-2 border-emerald-600 rounded-lg p-4 space-y-2.5 text-xs bg-white">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-slate-800 shrink-0">{profile.t.receivedWithThanks}</span>
+                      <span className="flex-1 border-b border-dotted border-slate-400 font-semibold text-slate-900">
+                        {effectiveSale.customerName || profile.t.walkInBuyer}{effectiveSale.customerCompany ? ` (${effectiveSale.customerCompany})` : ''}
+                      </span>
+                    </div>
+                    {(effectiveSale.customerAddress || effectiveSale.customerPhone) && (
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-bold text-slate-800 shrink-0">{profile.t.address}</span>
+                        <span className="flex-1 border-b border-dotted border-slate-400 text-slate-700">
+                          {[effectiveSale.customerAddress, effectiveSale.customerPhone].filter(Boolean).join(' · ')}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-slate-800 shrink-0">{profile.t.paymentModeLabel}</span>
+                      <span className="flex-1 border-b border-dotted border-slate-400 font-semibold">
+                        {methodLabel}{sale?.chequeOrRefNo ? ` · Ref/Cheque: ${sale.chequeOrRefNo}` : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-slate-800 shrink-0">{profile.t.againstBillLabel}</span>
+                      <span className="flex-1 border-b border-dotted border-slate-400 font-semibold">
+                        {sale?.purpose || 'Bill / Due Payment'}{sale?.linkedInvoiceNo ? ` (#${sale.linkedInvoiceNo})` : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-bold text-slate-800 shrink-0">{profile.t.inWordsLabel}</span>
+                      <span className="flex-1 border-b border-dotted border-slate-400 italic font-semibold">
+                        {numberToWords(mrAmt)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-dashed border-slate-300">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-600 block">{profile.t.sumOfTaka}</span>
+                        <span className="inline-block mt-1 px-4 py-1.5 rounded-lg border-2 border-emerald-600 bg-emerald-50 text-emerald-800 font-mono font-extrabold text-lg whitespace-nowrap">
+                          {formatCurrency(mrAmt, profile.currencySymbol)}
+                        </span>
+                      </div>
+                      {sale?.notes && <span className="text-[11px] text-slate-500 max-w-xs text-right">Note: {sale.notes}</span>}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex justify-between items-end pt-10 px-4 text-xs font-bold text-slate-800">
+                <div className="border-t border-dashed border-slate-500 pt-1 text-center w-40">{profile.t.depositorSign}</div>
+                <div className="border-t border-dashed border-slate-500 pt-1 text-center w-52">{profile.t.sellerSign} {profile.primaryTitle}</div>
+              </div>
             </div>
           )}
 

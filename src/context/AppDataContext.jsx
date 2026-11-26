@@ -7,6 +7,7 @@ import { customerService } from '../services/customerService';
 import { purchaseService } from '../services/purchaseService';
 import { salesService } from '../services/salesService';
 import { quotationService } from '../services/quotationService';
+import { moneyReceiptService } from '../services/moneyReceiptService';
 import { lotService } from '../services/lotService';
 import { inventoryService } from '../services/inventoryService';
 import { orderService } from '../services/orderService';
@@ -37,6 +38,7 @@ export const AppDataProvider = ({ children }) => {
   const [purchases, setPurchases] = useState(() => storageService.getItem(STORAGE_KEYS.PURCHASES, []));
   const [sales, setSales] = useState(() => storageService.getItem(STORAGE_KEYS.SALES, []));
   const [quotations, setQuotations] = useState(() => storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
+  const [moneyReceipts, setMoneyReceipts] = useState(() => storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []));
   const [lotPurchases, setLotPurchases] = useState(() => storageService.getItem(STORAGE_KEYS.LOT_PURCHASES, []));
   const [inventoryMovements, setInventoryMovements] = useState(() => storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
   const [orders, setOrders] = useState(() => storageService.getItem(STORAGE_KEYS.ORDERS, []));
@@ -77,7 +79,7 @@ export const AppDataProvider = ({ children }) => {
     }
     const pendingTempCreates = globalThis.__stocklinePendingTempCreates;
 
-    const TEMP_LOCAL_ID_RE = /^(cust|sal|quote)-\d{10,}$/;
+    const TEMP_LOCAL_ID_RE = /^(cust|sal|quote|mr)-\d{10,}/;
     const IGNORED_DIFF_KEYS = new Set([
       'id',
       '_id',
@@ -246,7 +248,7 @@ export const AppDataProvider = ({ children }) => {
       }
 
       const reqConfig = { bypassCache: true };
-      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, ordsRes, setsRes, lotsRes] =
+      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, mrRes, ordsRes, setsRes, lotsRes] =
         await Promise.allSettled([
           apiClient.get('/products', {}, reqConfig),
           apiClient.get('/categories', {}, reqConfig),
@@ -255,6 +257,7 @@ export const AppDataProvider = ({ children }) => {
           apiClient.get('/purchases', {}, reqConfig),
           apiClient.get('/sales', {}, reqConfig),
           apiClient.get('/quotations', {}, reqConfig),
+          apiClient.get('/money-receipts', {}, reqConfig),
           apiClient.get('/orders', {}, reqConfig),
           apiClient.get('/settings', {}, reqConfig),
           apiClient.get('/lots', {}, reqConfig),
@@ -439,6 +442,37 @@ export const AppDataProvider = ({ children }) => {
         await settleReconcilePushes(pushPromises, merged, setQuotations, STORAGE_KEYS.QUOTATIONS);
       }
 
+      if (mrRes.status === 'fulfilled' && mrRes.value?.success && Array.isArray(mrRes.value.data)) {
+        const localReceipts = storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []);
+        const rawNormalized = mrRes.value.data.map((r) => ({
+          ...r,
+          id: r._id || r.id,
+          _id: r._id || r.id,
+          amount: Number(r.amount) || 0,
+          date: r.date || r.createdAt,
+        }));
+        const { merged, pushPromises } = reconcileAndPushNewerLocal(
+          localReceipts,
+          rawNormalized,
+          (id, item) => apiClient.put(`/money-receipts/${id}`, item).catch(() => null),
+          {
+            entityTag: 'moneyreceipt',
+            getFallbackKeys: (r) => {
+              const rn = normalizeReconcileKey(r?.receiptNumber);
+              return rn ? [`mr:${rn}`] : [];
+            },
+            shouldAutoCreate: (r) => Boolean(r?.customerName && Number(r?.amount) > 0),
+            createFn: (item) => {
+              const { id: _tid, _id: _oid, ...payload } = item;
+              return apiClient.post('/money-receipts', payload).catch(() => null);
+            },
+          }
+        );
+        setMoneyReceipts(merged);
+        storageService.setItem(STORAGE_KEYS.MONEY_RECEIPTS, merged);
+        await settleReconcilePushes(pushPromises, merged, setMoneyReceipts, STORAGE_KEYS.MONEY_RECEIPTS);
+      }
+
       if (ordsRes.status === 'fulfilled' && ordsRes.value?.success && Array.isArray(ordsRes.value.data) && ordsRes.value.data.length > 0) {
         const normalized = ordsRes.value.data.map((o) => {
           const tot = Number(o.totalAmount !== undefined ? o.totalAmount : o.total) || 0;
@@ -485,6 +519,7 @@ export const AppDataProvider = ({ children }) => {
     setLotPurchases(storageService.getItem(STORAGE_KEYS.LOT_PURCHASES, []));
     setSales(storageService.getItem(STORAGE_KEYS.SALES, []));
     setQuotations(storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
+    setMoneyReceipts(storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []));
     setInventoryMovements(storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
     setOrders(storageService.getItem(STORAGE_KEYS.ORDERS, []));
     setUsers(storageService.getItem(STORAGE_KEYS.USERS, []));
@@ -888,6 +923,7 @@ export const AppDataProvider = ({ children }) => {
         productName: it.name,
         sku: prod?.sku || 'QUOTE-ITEM',
         quantity: it.quantity,
+        unit: it.unit || prod?.unit || 'pc',
         unitPrice: it.unitPrice,
         total: it.lineTotal,
       };
@@ -927,6 +963,42 @@ export const AppDataProvider = ({ children }) => {
         message: `কোটেশন #${quote.quotationNumber} সফলভাবে সেলস ইনভয়েস #${res.sale.invoiceNo}-এ রূপান্তরিত হয়েছে।`,
         type: 'success',
       });
+    }
+    return res;
+  };
+
+  // ================= MONEY RECEIPTS (টাকা জমার রসিদ) =================
+  const createMoneyReceipt = (data, receivedBy = 'Accounts') => {
+    const res = moneyReceiptService.create(data, receivedBy);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({
+        title: 'মানি রিসিপ্ট সংরক্ষিত',
+        message: `রসিদ #${res.receipt.receiptNumber} (৳${res.receipt.amount.toLocaleString()}) যুক্ত হয়েছে।`,
+        type: 'success',
+      });
+    } else {
+      addToast({ title: 'Receipt Failed', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
+  const updateMoneyReceipt = (id, updates) => {
+    const res = moneyReceiptService.update(id, updates);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({ title: 'মানি রিসিপ্ট আপডেট হয়েছে', message: 'Money receipt updated.', type: 'success' });
+    } else {
+      addToast({ title: 'Update Failed', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
+  const deleteMoneyReceipt = (id) => {
+    const res = moneyReceiptService.remove(id);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({ title: 'মানি রিসিপ্ট মুছে ফেলা হয়েছে', message: res.message });
     }
     return res;
   };
@@ -1200,6 +1272,7 @@ export const AppDataProvider = ({ children }) => {
     purchases,
     sales,
     quotations,
+    moneyReceipts,
     lotPurchases,
     inventoryMovements,
     orders,
@@ -1237,6 +1310,9 @@ export const AppDataProvider = ({ children }) => {
     updateQuotation,
     deleteQuotation,
     convertQuotationToSale,
+    createMoneyReceipt,
+    updateMoneyReceipt,
+    deleteMoneyReceipt,
     createLotPurchase,
     updateLotPurchase,
     deleteLotPurchase,

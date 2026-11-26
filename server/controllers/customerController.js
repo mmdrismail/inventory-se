@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Customer = require('../models/Customer');
 const Sale = require('../models/Sale');
 const Quotation = require('../models/Quotation');
+const MoneyReceipt = require('../models/MoneyReceipt');
 
 // Safe query helper supporting MongoDB ObjectId or custom String ID
 const findCustomerQuery = (id) => {
@@ -25,14 +26,19 @@ const recalculateCustomerFinancials = async (customerId) => {
     const queryIds = [custDoc._id, String(custDoc._id), String(customerId)];
     if (custDoc.clientSideId) queryIds.push(String(custDoc.clientSideId));
 
-    const sales = await Sale.find({
-      customerId: { $in: queryIds },
-      status: { $ne: 'cancelled' },
-    }).lean();
+    const [sales, receipts] = await Promise.all([
+      Sale.find({
+        customerId: { $in: queryIds },
+        status: { $ne: 'cancelled' },
+      }).lean(),
+      MoneyReceipt.find({
+        customerId: { $in: queryIds },
+        status: { $ne: 'cancelled' },
+      }).lean(),
+    ]);
 
     let totalSales = 0;
     let totalPaid = 0;
-    let totalDue = 0;
     for (const s of sales) {
       const tot = Math.max(0, Number(s.totalAmount !== undefined ? s.totalAmount : s.total) || 0);
       const pStatus = s.paymentStatus || 'paid';
@@ -42,11 +48,18 @@ const recalculateCustomerFinancials = async (customerId) => {
           : pStatus === 'due'
           ? 0
           : Math.min(tot, Math.max(0, Number(s.paidAmount) || 0));
-      const due = Math.max(0, tot - paid);
       totalSales += tot;
       totalPaid += paid;
-      totalDue += due;
     }
+
+    // Standalone/unlinked money receipts (not already applied directly to a Sale invoice)
+    for (const mr of receipts) {
+      if (!mr.linkedSaleId) {
+        totalPaid += Math.max(0, Number(mr.amount) || 0);
+      }
+    }
+
+    const totalDue = Math.max(0, totalSales - totalPaid);
 
     return await Customer.findByIdAndUpdate(
       custDoc._id,
@@ -216,6 +229,7 @@ exports.updateCustomer = async (req, res, next) => {
         await Promise.allSettled([
           Sale.updateMany({ customerId: { $in: custIds } }, { $set: snapshotUpdates }),
           Quotation.updateMany({ customerId: { $in: custIds } }, { $set: snapshotUpdates }),
+          MoneyReceipt.updateMany({ customerId: { $in: custIds } }, { $set: snapshotUpdates }),
         ]);
       }
     }

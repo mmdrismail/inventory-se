@@ -29,6 +29,7 @@ export const SalesListPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [selectedSource, setSelectedSource] = useState('');
   const [sortField, setSortField] = useState('date');
   const [sortDirection, setSortDirection] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -46,12 +47,26 @@ export const SalesListPage = () => {
         const q = searchTerm.toLowerCase();
         const inv = (s.invoiceNo || s.invoiceNumber || '').toLowerCase();
         const cust = (s.customerName || '').toLowerCase();
-        const matchesSearch = !searchTerm || inv.includes(q) || cust.includes(q);
+        const book = (s.bookNumber || '').toLowerCase();
+        const manualSerial = (s.manualSerialNo || '').toLowerCase();
+        const matchesSearch =
+          !searchTerm ||
+          inv.includes(q) ||
+          cust.includes(q) ||
+          book.includes(q) ||
+          manualSerial.includes(q);
 
         const matchesCustomer = !selectedCustomer || s.customerId === selectedCustomer;
         const matchesStatus = !selectedStatus || s.status === selectedStatus;
+        const src = s.entrySource || 'online';
+        const matchesSource =
+          !selectedSource ||
+          (selectedSource === 'khata_offline' && (src === 'khata' || src === 'offline')) ||
+          (selectedSource === 'khata' && src === 'khata') ||
+          (selectedSource === 'offline' && src === 'offline') ||
+          (selectedSource === 'challan' && s.documentType === 'challan');
 
-        return matchesSearch && matchesCustomer && matchesStatus;
+        return matchesSearch && matchesCustomer && matchesStatus && matchesSource;
       })
       .sort((a, b) => {
         let valA = a[sortField];
@@ -69,7 +84,7 @@ export const SalesListPage = () => {
         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
         return 0;
       });
-  }, [sales, searchTerm, selectedCustomer, selectedStatus, sortField, sortDirection]);
+  }, [sales, searchTerm, selectedCustomer, selectedStatus, selectedSource, sortField, sortDirection]);
 
   // Pagination
   const paginatedSales = useMemo(() => {
@@ -205,6 +220,20 @@ export const SalesListPage = () => {
               <option value="draft">Draft (Stock Not Deducted)</option>
               <option value="cancelled">Cancelled (Stock Restored)</option>
             </select>
+            <select
+              value={selectedSource}
+              onChange={(e) => {
+                setSelectedSource(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full mt-2 px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              <option value="">All Sources (Online + খাতা)</option>
+              <option value="khata_offline">খাতা ও অফলাইন (Khata & Offline)</option>
+              <option value="khata">পুরনো খাতা (Khata Only)</option>
+              <option value="offline">অফলাইন (Offline Only)</option>
+              <option value="challan">চালান (Challan Only)</option>
+            </select>
           </div>
         </div>
       </Card>
@@ -268,9 +297,33 @@ export const SalesListPage = () => {
                       className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors"
                     >
                       <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                        <Link to={`/sales/${s.id}`} className="hover:text-emerald-600 transition-colors">
+                        <Link to={`/sales/${s.id}`} className="hover:text-emerald-600 transition-colors block">
                           {invNo}
                         </Link>
+                        {(s.entrySource === 'khata' || s.entrySource === 'offline' || s.documentType === 'challan' || s.bookNumber || s.manualSerialNo) && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1 font-sans">
+                            {s.documentType === 'challan' && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
+                                চালান
+                              </span>
+                            )}
+                            {s.entrySource === 'khata' && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
+                                খাতা
+                              </span>
+                            )}
+                            {s.entrySource === 'offline' && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                                অফলাইন
+                              </span>
+                            )}
+                            {(s.bookNumber || s.manualSerialNo) && (
+                              <span className="text-[10px] font-mono text-slate-500">
+                                {s.bookNumber ? `B:${s.bookNumber}` : ''}{s.bookNumber && s.manualSerialNo ? '/' : ''}{s.manualSerialNo ? `#${s.manualSerialNo}` : ''}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3 px-3 text-slate-800 dark:text-slate-200 font-medium" data-no-translate="true">
@@ -398,6 +451,7 @@ export const SalesListPage = () => {
         isOpen={Boolean(selectedSaleForReceipt)}
         onClose={() => setSelectedSaleForReceipt(null)}
         sale={selectedSaleForReceipt}
+        initialDocType={selectedSaleForReceipt?.documentType === 'challan' ? 'challan' : 'cash_memo'}
       />
     </div>
   );

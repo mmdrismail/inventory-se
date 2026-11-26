@@ -193,6 +193,9 @@ class InventoryService {
    * Process completing a sale: decreases stock
    */
   processSaleCompletion(sale, performedBy = 'Sales Executive') {
+    if (sale?.deductStock === false) {
+      return { success: true, skippedStock: true };
+    }
     const products = storageService.getItem(STORAGE_KEYS.PRODUCTS, []);
     const movements = this.getMovements();
 
@@ -244,6 +247,9 @@ class InventoryService {
    * Safely reverse completed sale if cancelled
    */
   processSaleCancellation(sale, performedBy = 'Admin') {
+    if (sale?.deductStock === false) {
+      return { success: true, skippedStock: true };
+    }
     const products = storageService.getItem(STORAGE_KEYS.PRODUCTS, []);
     const movements = this.getMovements();
 
@@ -288,7 +294,7 @@ class InventoryService {
 
     const buildQtyMap = (saleObj) => {
       const map = new Map();
-      if (!saleObj || saleObj.status !== 'completed') return map;
+      if (!saleObj || saleObj.status !== 'completed' || saleObj.deductStock === false) return map;
       for (const item of saleObj.items || []) {
         const prod = resolveTrackedProduct(item.productId);
         if (!prod) continue;

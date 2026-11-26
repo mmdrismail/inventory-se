@@ -153,15 +153,17 @@ const cacheInvalidator = (entityPrefixes = []) => {
             memoryCache.clearByPattern('/api/inventory');
           }
 
-          // Cross-invalidate customers, sales, and quotations on linked updates
+          // Cross-invalidate customers, sales, quotations, and money receipts on linked updates
           if (
             pathStr.includes('/customers') ||
             pathStr.includes('/sales') ||
-            pathStr.includes('/quotations')
+            pathStr.includes('/quotations') ||
+            pathStr.includes('/money-receipts')
           ) {
             memoryCache.clearByPattern('/api/customers');
             memoryCache.clearByPattern('/api/sales');
             memoryCache.clearByPattern('/api/quotations');
+            memoryCache.clearByPattern('/api/money-receipts');
           }
         }
         return originalJson(body);

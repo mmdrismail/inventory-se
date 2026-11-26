@@ -9,13 +9,14 @@
  * Instant Multi-language Switch: Bangla (বাংলা), English, and Bilingual (উভয়).
  */
 
-import { formatCurrency, formatDateTime, formatDate } from './formatters';
+import { formatCurrency, formatDateTime, formatDate, numberToWords } from './formatters';
 
 export const DOCUMENT_TYPES = {
   CASH_MEMO: 'cash_memo',
   CHALLAN: 'challan',
   OFFICIAL_PAD: 'official_pad',
   QUOTATION: 'quotation',
+  MONEY_RECEIPT: 'money_receipt',
   THERMAL: 'thermal',
   INVOICE: 'official_pad',
 };
@@ -42,12 +43,15 @@ export const generatePrintFileName = (doc = {}, docType = DOCUMENT_TYPES.CASH_ME
     '';
   const cleanPhone = String(rawPhone).replace(/[^\d+]/g, '').trim() || 'NoPhone';
 
-  // 2. Memo / Quotation / Document Number
+  // 2. Memo / Quotation / Money Receipt / Document Number
   const isQuote = docType === DOCUMENT_TYPES.QUOTATION || Boolean(doc.quotationNumber || doc.quotationNo);
+  const isReceipt = docType === DOCUMENT_TYPES.MONEY_RECEIPT || Boolean(doc.receiptNumber);
   const rawNumber = options.overrides?.invoiceNumber ||
-    (isQuote
+    (isReceipt
+      ? (doc.receiptNumber || doc.manualSerialNo || 'MR-000')
+      : isQuote
       ? (doc.quotationNumber || doc.quotationNo || doc.invoiceNumber || 'QT-000')
-      : (doc.invoiceNumber || doc.invoiceNo || doc.receiptNumber || 'INV-000'));
+      : (doc.invoiceNumber || doc.invoiceNo || doc.manualSerialNo || 'INV-000'));
   const cleanNumber = String(rawNumber).replace(/[/\\?%*:|"<>]/g, '-').trim() || 'DOC';
 
   // 3. Document Date (YYYY-MM-DD)
@@ -199,6 +203,13 @@ export const I18N = {
     challanBadge: 'ডেলিভারী চালান',
     padBadge: 'অফিসিয়াল প্যাড',
     quotationBadge: 'দরপত্র / কোটেশন',
+    moneyReceiptBadge: 'মানি রিসিপ্ট (টাকা জমার রসিদ)',
+    receivedWithThanks: 'ধন্যবাদসহ প্রাপ্ত হইল (জনাব / মেসার্স):',
+    sumOfTaka: 'প্রাপ্ত টাকার পরিমাণ:',
+    inWordsLabel: 'কথায়:',
+    paymentModeLabel: 'পরিশোধের মাধ্যম:',
+    againstBillLabel: 'বাবদ / বিল সূত্র:',
+    depositorSign: 'জমাদানকারীর স্বাক্ষর',
     thermalBadge: 'ক্যাশ মেমো (POS SLIP)',
     copy1: '১ম কপি',
     copy2: '২য় কপি',
@@ -249,6 +260,13 @@ export const I18N = {
     challanBadge: 'DELIVERY CHALLAN',
     padBadge: 'COMMERCIAL INVOICE',
     quotationBadge: 'QUOTATION',
+    moneyReceiptBadge: 'MONEY RECEIPT',
+    receivedWithThanks: 'Received with thanks from (Mr. / M/S):',
+    sumOfTaka: 'Sum of Amount Received:',
+    inWordsLabel: 'In Words:',
+    paymentModeLabel: 'Payment Mode:',
+    againstBillLabel: 'Purpose / Against Bill:',
+    depositorSign: 'Payer / Depositor Signature',
     thermalBadge: 'POS SALES RECEIPT',
     copy1: '1st Copy',
     copy2: '2nd Copy',
@@ -299,6 +317,13 @@ export const I18N = {
     challanBadge: 'DELIVERY CHALLAN',
     padBadge: 'OFFICIAL PAD',
     quotationBadge: 'QUOTATION',
+    moneyReceiptBadge: 'MONEY RECEIPT',
+    receivedWithThanks: 'Received with thanks from:',
+    sumOfTaka: 'Prapto Takar Poriman:',
+    inWordsLabel: 'Kothay (In Words):',
+    paymentModeLabel: 'Payment Mode:',
+    againstBillLabel: 'Babod / Bill No:',
+    depositorSign: 'Jomadankarir Shakkhor',
     thermalBadge: 'CASH MEMO (POS SLIP)',
     copy1: '1st Copy',
     copy2: '2nd Copy',
@@ -349,6 +374,13 @@ export const I18N = {
     challanBadge: 'ডেলিভারী চালান / CHALLAN',
     padBadge: 'অফিসিয়াল প্যাড / COMMERCIAL INVOICE',
     quotationBadge: 'দরপত্র / QUOTATION',
+    moneyReceiptBadge: 'মানি রিসিপ্ট / MONEY RECEIPT',
+    receivedWithThanks: 'প্রাপ্ত হইল / Received with thanks from:',
+    sumOfTaka: 'প্রাপ্ত টাকা / Sum of Amount:',
+    inWordsLabel: 'কথায় / In Words:',
+    paymentModeLabel: 'মাধ্যম / Payment Mode:',
+    againstBillLabel: 'বাবদ / Against Bill:',
+    depositorSign: 'জমাদানকারী / Payer',
     thermalBadge: 'ক্যাশ মেমো / POS RECEIPT',
     copy1: '১ম কপি (1st Copy)',
     copy2: '২য় কপি (2nd Copy)',
@@ -1698,3 +1730,149 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
 
 // Backward-compatible alias
 export const generateInvoiceHtml = generateOfficialPadHtml;
+
+/**
+ * 5. OFFICIAL MONEY RECEIPT (মানি রিসিপ্ট / টাকা জমার রসিদ)
+ */
+export const generateMoneyReceiptHtml = (receipt = {}, settings = {}, options = {}) => {
+  const p = resolveStationeryProfile(settings, options);
+  const receiptNumber =
+    options.overrides?.invoiceNumber ||
+    receipt.receiptNumber ||
+    receipt.manualSerialNo ||
+    receipt.invoiceNumber ||
+    'MR-2026-0001';
+  const { day, month, year } = getDateParts(receipt.date || receipt.createdAt);
+  const amount = Number(receipt.amount !== undefined ? receipt.amount : receipt.paidAmount || receipt.totalAmount || 0);
+  const methodLabel = String(receipt.paymentMethod || 'cash').replace('_', ' ').toUpperCase();
+  const amountWords = numberToWords(amount);
+  const docFileName = generatePrintFileName(receipt, DOCUMENT_TYPES.MONEY_RECEIPT, options);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${docFileName}</title>
+  <style>
+    ${getAuthenticStyles(false)}
+    .mr-card {
+      border: 2px solid #047857;
+      border-radius: 6px;
+      padding: 14px 16px;
+      background: #ffffff;
+    }
+    .mr-line {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 9px;
+      font-size: 12px;
+    }
+    .mr-label {
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+    .mr-value {
+      flex: 1;
+      border-bottom: 1px dotted #64748b;
+      font-weight: 600;
+      color: #0f172a;
+      padding-bottom: 2px;
+    }
+    .mr-amount-pill {
+      display: inline-block;
+      border: 2px solid #047857;
+      background: #ecfdf5;
+      color: #065f46;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="pad-page">
+    ${p.t.bismi ? `<div class="top-bismi">${p.t.bismi}</div>` : ''}
+
+    <div class="top-header-grid">
+      <div class="top-left-cell"></div>
+      <div class="top-center-cell">
+        <div class="memo-badge" style="background: #047857;">${p.t.moneyReceiptBadge}</div>
+      </div>
+      <div class="top-right-cell prop-line">
+        <div>${p.t.proprietor} ${p.proprietorName}</div>
+        <div class="font-mono" style="font-size: 10px; color: #047857;">📞 ${p.phone}</div>
+        ${p.email ? `<div style="font-size: 9px; color: #64748b;">✉ ${p.email}</div>` : ''}
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 2px;">
+      <h1 class="title-bn">${p.primaryTitle}</h1>
+      ${p.secondaryTitle ? `<h2 class="title-en">${p.secondaryTitle}</h2>` : ''}
+      <div class="address-line" style="margin-top: 3px;">📍 ${p.address}</div>
+    </div>
+
+    <div class="meta-bar">
+      <div>
+        <span>${p.t.memoNo} <strong class="font-mono" style="color: #dc2626; font-size: 15px;">${receiptNumber}</strong></span>
+        ${receipt.bookNumber ? `<span style="margin-left: 8px; font-size: 10.5px; color: #475569;">(Book: ${receipt.bookNumber}${receipt.manualSerialNo ? ` · Sl: ${receipt.manualSerialNo}` : ''})</span>` : ''}
+      </div>
+      <div class="font-mono font-bold" style="font-size: 11px; color: #1e3a8a;">${p.bin}</div>
+      <div>
+        <span>${p.t.date}</span>
+        <span class="date-box">${day}</span>
+        <span class="date-box">${month}</span>
+        <span class="date-box" style="min-width: 38px;">${year}</span>
+      </div>
+    </div>
+
+    <div class="mr-card" style="position: relative;">
+      <div class="mr-line">
+        <span class="mr-label">${p.t.receivedWithThanks}</span>
+        <span class="mr-value">${receipt.customerName || p.t.walkInBuyer}${receipt.customerCompany ? ` (${receipt.customerCompany})` : ''}</span>
+      </div>
+
+      ${receipt.customerPhone || receipt.customerAddress ? `
+      <div class="mr-line">
+        <span class="mr-label">${p.t.address}</span>
+        <span class="mr-value">${[receipt.customerAddress, receipt.customerPhone].filter(Boolean).join(' · ')}</span>
+      </div>` : ''}
+
+      <div class="mr-line">
+        <span class="mr-label">${p.t.paymentModeLabel}</span>
+        <span class="mr-value">${methodLabel}${receipt.chequeOrRefNo ? ` · Ref/Cheque: ${receipt.chequeOrRefNo}` : ''}</span>
+      </div>
+
+      <div class="mr-line">
+        <span class="mr-label">${p.t.againstBillLabel}</span>
+        <span class="mr-value">${receipt.purpose || 'Bill / Due Payment'}${receipt.linkedInvoiceNo ? ` (#${receipt.linkedInvoiceNo})` : ''}</span>
+      </div>
+
+      <div class="mr-line">
+        <span class="mr-label">${p.t.inWordsLabel}</span>
+        <span class="mr-value" style="font-style: italic;">${amountWords}</span>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px dashed #cbd5e1;">
+        <div>
+          <div style="font-size: 11px; color: #475569; font-weight: 700;">${p.t.sumOfTaka}</div>
+          <div class="mr-amount-pill" style="margin-top: 4px;">${formatCurrency(amount, p.currencySymbol)}</div>
+        </div>
+        ${receipt.notes ? `<div style="max-width: 55%; font-size: 10.5px; color: #475569; text-align: right;">Note: ${receipt.notes}</div>` : ''}
+      </div>
+    </div>
+
+    <div class="signatures-row" style="margin-top: 46px;">
+      <div class="sig-block">${p.t.depositorSign}</div>
+      <div class="sig-block">${p.t.sellerSign} ${p.primaryTitle}</div>
+    </div>
+  </div>
+</body>
+</html>
+`;
+};

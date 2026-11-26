@@ -74,6 +74,9 @@ export const QuotationFormPage = () => {
     new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [requisitionRef, setRequisitionRef] = useState('');
+  const [entrySource, setEntrySource] = useState('online');
+  const [bookNumber, setBookNumber] = useState('');
+  const [manualSerialNo, setManualSerialNo] = useState('');
 
   // Customer Profile State
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -141,6 +144,9 @@ export const QuotationFormPage = () => {
           : ''
       );
       setRequisitionRef(existingQuote.requisitionRef || '');
+      setEntrySource(existingQuote.entrySource || 'online');
+      setBookNumber(existingQuote.bookNumber || '');
+      setManualSerialNo(existingQuote.manualSerialNo || '');
       setSelectedCustomerId(existingQuote.customerId || '');
       setCustomerName(existingQuote.customerName || '');
       setCustomerCompany(existingQuote.customerCompany || '');
@@ -336,6 +342,9 @@ export const QuotationFormPage = () => {
       date: new Date(quotationDate).toISOString(),
       validUntil: validUntil ? new Date(validUntil).toISOString() : null,
       requisitionRef: requisitionRef.trim(),
+      entrySource,
+      bookNumber: bookNumber.trim(),
+      manualSerialNo: manualSerialNo.trim(),
       customerId: selectedCustomerId || null,
       customerName: finalCustomerName,
       customerCompany: customerCompany.trim(),
@@ -499,6 +508,48 @@ export const QuotationFormPage = () => {
               onChange={(e) => setRequisitionRef(e.target.value)}
               className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
               placeholder="e.g. RFQ-WHATSAPP-09"
+            />
+          </div>
+        </div>
+
+        {/* Khata / Offline Metadata Row (Proposal 2) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+              {l({ bn: 'কাগজ / এন্ট্রির উৎস', en: 'Entry Source', obro: 'Entry Source' })}
+            </label>
+            <select
+              value={entrySource}
+              onChange={(e) => setEntrySource(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+            >
+              <option value="online">{l({ bn: 'লাইভ ওয়েবঅ্যাপ (Online)', en: 'Live Web App', obro: 'Online' })}</option>
+              <option value="khata">{l({ bn: 'পুরানো খাতা / হার্ডকপি (Khata Archive)', en: 'Old Khata / Hardcopy', obro: 'Purano Khata' })}</option>
+              <option value="offline">{l({ bn: 'অফলাইন / হাতে লেখা (Offline)', en: 'Offline / Handwritten', obro: 'Offline' })}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+              {l({ bn: 'বই / খাতা নং (ঐচ্ছিক)', en: 'Book No. (Optional)', obro: 'Book No.' })}
+            </label>
+            <input
+              type="text"
+              value={bookNumber}
+              onChange={(e) => setBookNumber(e.target.value)}
+              placeholder="e.g. Book-02"
+              className="w-full px-3 py-1.5 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+              {l({ bn: 'হাতে লেখা ক্রমিক নং (ঐচ্ছিক)', en: 'Manual Serial No.', obro: 'Manual Serial No.' })}
+            </label>
+            <input
+              type="text"
+              value={manualSerialNo}
+              onChange={(e) => setManualSerialNo(e.target.value)}
+              placeholder="e.g. Sl-109"
+              className="w-full px-3 py-1.5 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
             />
           </div>
         </div>

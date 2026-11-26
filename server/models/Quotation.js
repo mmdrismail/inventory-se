@@ -58,6 +58,21 @@ const quotationSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    entrySource: {
+      type: String,
+      enum: ['online', 'khata', 'offline'],
+      default: 'online',
+    },
+    bookNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    manualSerialNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     customerId: {
       type: mongoose.Schema.Types.Mixed,
       ref: 'Customer',

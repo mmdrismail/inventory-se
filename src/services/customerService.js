@@ -285,10 +285,10 @@ class CustomerService {
     const customer = customers[index];
     const idSet = new Set([customer.id, customer._id, customer.clientSideId, customerId].filter(Boolean).map(String));
     const sales = storageService.getItem(STORAGE_KEYS.SALES, []);
+    const moneyReceipts = storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []);
 
     let totalSales = 0;
     let totalPaid = 0;
-    let totalDue = 0;
 
     for (const s of sales) {
       if (s.status === 'cancelled') continue;
@@ -301,11 +301,17 @@ class CustomerService {
           : status === 'due'
           ? 0
           : Math.min(tot, Math.max(0, Number(s.paidAmount) || 0));
-      const due = Math.max(0, tot - paid);
       totalSales += tot;
       totalPaid += paid;
-      totalDue += due;
     }
+
+    for (const mr of moneyReceipts) {
+      if (mr.status === 'cancelled' || mr.linkedSaleId) continue;
+      if (!mr.customerId || !idSet.has(String(mr.customerId))) continue;
+      totalPaid += Math.max(0, Number(mr.amount) || 0);
+    }
+
+    const totalDue = Math.max(0, totalSales - totalPaid);
 
     customers[index] = {
       ...customer,

@@ -21,6 +21,7 @@ import {
   LogOut,
   ShoppingBag,
   FileSpreadsheet,
+  ScanLine,
   Kanban,
   ExternalLink,
 } from 'lucide-react';
@@ -41,6 +42,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
     { label: t('nav_purchases', 'Purchases'), to: '/purchases', icon: ShoppingCart, roles: ['admin', 'manager'] },
     { label: t('nav_sales', 'Sales & POS'), to: '/sales', icon: Receipt, roles: ['admin', 'manager', 'staff'] },
     { label: t('nav_quotations', 'Quotations / দরপত্র'), to: '/quotations', icon: FileSpreadsheet, roles: ['admin', 'manager', 'staff'] },
+    { label: t('nav_offline_entries', 'খাতা ও অফলাইন (OCR)'), to: '/offline-entries', icon: ScanLine, roles: ['admin', 'manager', 'staff'] },
     { label: t('nav_inventory', 'Inventory'), to: '/inventory', icon: Boxes, roles: ['admin', 'manager', 'staff'] },
     { label: t('nav_orders', 'Customer Orders'), to: '/orders', icon: ClipboardList, roles: ['admin', 'manager', 'staff'] },
     { label: t('nav_reports', 'Reports & Analytics'), to: '/reports', icon: BarChart3, roles: ['admin', 'manager'] },

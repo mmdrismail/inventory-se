@@ -80,3 +80,35 @@ export const generateSKU = (categoryName = 'GEN') => {
   const random = Math.floor(1000 + Math.random() * 9000);
   return `${prefix}-${random}`;
 };
+
+/**
+ * Convert numeric amount into English words (e.g. for Money Receipts & Invoices)
+ */
+export const numberToWords = (amount, currencyName = 'Taka') => {
+  const num = Math.floor(Math.max(0, Number(amount) || 0));
+  if (num === 0) return `Zero ${currencyName} Only`;
+
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const twoDigits = (n) => (n < 20 ? ones[n] : `${tens[Math.floor(n / 10)]}${n % 10 ? ` ${ones[n % 10]}` : ''}`);
+  const threeDigits = (n) => {
+    const h = Math.floor(n / 100);
+    const rem = n % 100;
+    return [h ? `${ones[h]} Hundred` : '', rem ? twoDigits(rem) : ''].filter(Boolean).join(' ');
+  };
+
+  const parts = [];
+  const crore = Math.floor(num / 10000000);
+  const lakh = Math.floor((num % 10000000) / 100000);
+  const thousand = Math.floor((num % 100000) / 1000);
+  const rest = num % 1000;
+
+  if (crore) parts.push(`${twoDigits(crore)} Crore`);
+  if (lakh) parts.push(`${twoDigits(lakh)} Lakh`);
+  if (thousand) parts.push(`${twoDigits(thousand)} Thousand`);
+  if (rest) parts.push(threeDigits(rest));
+
+  return `${parts.join(' ')} ${currencyName} Only`;
+};

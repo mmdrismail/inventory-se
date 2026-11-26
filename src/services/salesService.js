@@ -87,16 +87,24 @@ class SalesService {
     }
 
     const now = new Date().toISOString();
+    const docTypePrefix = saleData.documentType === 'challan' ? 'CHL' : 'INV';
     const invNo =
       saleData.invoiceNo?.trim() ||
       saleData.invoiceNumber?.trim() ||
-      `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      `${docTypePrefix}-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const shouldDeductStock = saleData.deductStock !== undefined ? Boolean(saleData.deductStock) : true;
 
     const newSale = {
       ...saleData,
       id: `sal-${Date.now()}`,
       invoiceNo: invNo,
       invoiceNumber: invNo,
+      documentType: saleData.documentType || 'cash_memo',
+      entrySource: saleData.entrySource || 'online',
+      bookNumber: (saleData.bookNumber || '').trim(),
+      manualSerialNo: (saleData.manualSerialNo || '').trim(),
+      deductStock: shouldDeductStock,
       customerId,
       customerName: saleData.customerName || 'Walk-in Retail Customer',
       customerCompany: saleData.customerCompany || '',
@@ -144,6 +152,15 @@ class SalesService {
           '/sales',
           {
             invoiceNumber: newSale.invoiceNumber,
+            date: newSale.date,
+            documentType: newSale.documentType,
+            entrySource: newSale.entrySource,
+            bookNumber: newSale.bookNumber,
+            manualSerialNo: newSale.manualSerialNo,
+            deductStock: newSale.deductStock,
+            showRate: newSale.showRate,
+            showLineTotal: newSale.showLineTotal,
+            showGrandTotal: newSale.showGrandTotal,
             customerId: resolvedCustId,
             customerName: newSale.customerName,
             customerCompany: newSale.customerCompany,
@@ -312,6 +329,11 @@ class SalesService {
         apiClient.put(`/sales/${mongoId}`, {
           invoiceNumber: updatedSale.invoiceNumber,
           date: updatedSale.date,
+          documentType: updatedSale.documentType || 'cash_memo',
+          entrySource: updatedSale.entrySource || 'online',
+          bookNumber: updatedSale.bookNumber || '',
+          manualSerialNo: updatedSale.manualSerialNo || '',
+          deductStock: updatedSale.deductStock !== undefined ? Boolean(updatedSale.deductStock) : true,
           customerId: updatedSale.customerId,
           customerName: updatedSale.customerName,
           customerCompany: updatedSale.customerCompany,

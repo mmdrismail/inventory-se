@@ -66,6 +66,9 @@ import { QuotationListPage } from './pages/quotations/QuotationListPage';
 import { QuotationFormPage } from './pages/quotations/QuotationFormPage';
 import { QuotationDetailPage } from './pages/quotations/QuotationDetailPage';
 
+// Legacy Khata & Offline Entries (OCR Scanner + Batch Register + Money Receipts)
+import { OfflineRecordsPage } from './pages/offline/OfflineRecordsPage';
+
 // Inventory Control
 import { InventoryPage } from './pages/inventory/InventoryPage';
 
@@ -199,6 +202,9 @@ export default function App() {
               <Route path="/quotations/new" element={<QuotationFormPage />} />
               <Route path="/quotations/:id" element={<QuotationDetailPage />} />
               <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
+
+              {/* Legacy Khata & Offline Entries */}
+              <Route path="/offline-entries" element={<OfflineRecordsPage />} />
 
               {/* Inventory */}
               <Route path="/inventory" element={<InventoryPage />} />

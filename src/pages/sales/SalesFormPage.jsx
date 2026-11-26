@@ -8,6 +8,7 @@ import { BackLink } from '../../components/common/BackLink';
 import { Input, Select } from '../../components/forms/FormControls';
 import { Badge } from '../../components/common/Badge';
 import { PrintableReceiptModal } from '../../components/receipt/PrintableReceiptModal';
+import { DOCUMENT_TYPES } from '../../utils/printTemplateGenerator';
 import { formatCurrency } from '../../utils/formatters';
 import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { calculateSaleTotals, calculatePaymentBreakdown } from '../../utils/calculations';
@@ -71,6 +72,11 @@ export const SalesFormPage = () => {
   const [notes, setNotes] = useState(prefill ? `Generated from Quotation #${prefill.quotationNumber}` : '');
   const [requisitionRef, setRequisitionRef] = useState(prefill?.requisitionRef || '');
   const [quotationId, setQuotationId] = useState(prefill?.id || prefill?._id || '');
+  const [entrySource, setEntrySource] = useState(prefill?.entrySource || 'online'); // 'online' | 'khata' | 'offline'
+  const [documentType, setDocumentType] = useState('cash_memo'); // 'cash_memo' | 'challan'
+  const [bookNumber, setBookNumber] = useState(prefill?.bookNumber || '');
+  const [manualSerialNo, setManualSerialNo] = useState(prefill?.manualSerialNo || '');
+  const [deductStock, setDeductStock] = useState(prefill?.entrySource === 'khata' ? false : true);
 
   // Single-line column & total visibility controls ("eta ek line e thakbe eigula")
   const [showRate, setShowRate] = useState(prefill?.showRate !== undefined ? prefill.showRate : true);
@@ -112,6 +118,11 @@ export const SalesFormPage = () => {
       setNotes(existingSale.notes || '');
       setRequisitionRef(existingSale.requisitionRef || '');
       setQuotationId(existingSale.quotationId || '');
+      setEntrySource(existingSale.entrySource || 'online');
+      setDocumentType(existingSale.documentType || 'cash_memo');
+      setBookNumber(existingSale.bookNumber || '');
+      setManualSerialNo(existingSale.manualSerialNo || '');
+      setDeductStock(existingSale.deductStock !== undefined ? Boolean(existingSale.deductStock) : true);
       if (existingSale.showRate !== undefined) setShowRate(existingSale.showRate);
       if (existingSale.showLineTotal !== undefined) setShowLineTotal(existingSale.showLineTotal);
       if (existingSale.showGrandTotal !== undefined) setShowGrandTotal(existingSale.showGrandTotal);
@@ -379,11 +390,14 @@ export const SalesFormPage = () => {
         errs.items = `Line ${i + 1}: Quantity must be at least 1.`;
         break;
       }
-      if (statusToSave === 'completed' && prod) {
+      if (statusToSave === 'completed' && deductStock && prod) {
         const key = String(prod.id);
         const totalReq = (requestedByProd.get(key) || 0) + qty;
         requestedByProd.set(key, totalReq);
-        const prevDeducted = previouslyDeductedByProd.get(key) || previouslyDeductedByProd.get(String(prod._id)) || 0;
+        const prevDeducted =
+          existingSale?.deductStock === false
+            ? 0
+            : previouslyDeductedByProd.get(key) || previouslyDeductedByProd.get(String(prod._id)) || 0;
         const effectiveAvailable = (Number(prod.quantity) || 0) + prevDeducted;
         if (totalReq > effectiveAvailable) {
           errs.items = `Line ${i + 1}: Cannot sell ${totalReq} units of "${prod.name}". Only ${effectiveAvailable} available in stock!`;
@@ -425,6 +439,11 @@ export const SalesFormPage = () => {
       notes,
       requisitionRef,
       quotationId: quotationId || null,
+      entrySource,
+      documentType,
+      bookNumber: bookNumber.trim(),
+      manualSerialNo: manualSerialNo.trim(),
+      deductStock,
       items: calculatedItems,
       subtotal,
       total,
@@ -515,6 +534,100 @@ export const SalesFormPage = () => {
               <span>{errors.form}</span>
             </div>
           )}
+
+          {/* ENTRY SOURCE & KHATA / OFFLINE CONTROLS (Proposal 2) */}
+          <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-xs font-extrabold text-amber-900 dark:text-amber-200 block">
+                  {l({ bn: 'এন্ট্রির ধরন ও খাতা / অফলাইন মোড', en: 'Entry Mode (Online / Khata / Offline Paper)', obro: 'Entry Mode (Online / Khata / Offline)' })}
+                </span>
+                <span className="text-[11px] text-slate-600 dark:text-slate-400">
+                  {l({
+                    bn: 'পুরানো খাতা বা অফলাইন কাগজের ক্যাশমেমো/চালান এন্ট্রি দিতে উৎস নির্বাচন করুন',
+                    en: 'Switch to Khata Archive or Offline Paper mode for hardcopy/backdated entries.',
+                    obro: 'Khata Archive ba Offline mode select korun purano paper entryr jonno.',
+                  })}
+                </span>
+              </div>
+
+              <div className="inline-flex rounded-xl p-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/60">
+                {[
+                  { id: 'online', label: l({ bn: 'লাইভ POS', en: 'Live POS', obro: 'Live POS' }) },
+                  { id: 'khata', label: l({ bn: 'পুরানো খাতা', en: 'Old Khata', obro: 'Purano Khata' }) },
+                  { id: 'offline', label: l({ bn: 'অফলাইন কাগজ', en: 'Offline Paper', obro: 'Offline' }) },
+                ].map((src) => (
+                  <button
+                    key={src.id}
+                    type="button"
+                    onClick={() => {
+                      setEntrySource(src.id);
+                      setDeductStock(src.id !== 'khata');
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                      entrySource === src.id
+                        ? 'bg-amber-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                  >
+                    {src.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {(entrySource !== 'online' || documentType === 'challan') && (
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-amber-200/70 dark:border-amber-800/40 text-xs">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">ডকুমেন্ট ধরন</label>
+                  <select
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold"
+                  >
+                    <option value="cash_memo">Cash Memo (ক্যাশ মেমো)</option>
+                    <option value="challan">Delivery Challan (ডেলিভারী চালান)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">বই / খাতা নং (Book No)</label>
+                  <input
+                    type="text"
+                    value={bookNumber}
+                    onChange={(e) => setBookNumber(e.target.value)}
+                    placeholder="e.g. Book-04"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">হাতে লেখা নং (Manual Serial)</label>
+                  <input
+                    type="text"
+                    value={manualSerialNo}
+                    onChange={(e) => setManualSerialNo(e.target.value)}
+                    placeholder="e.g. #267"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                  />
+                </div>
+
+                <div className="flex items-end pb-1">
+                  <label className="inline-flex items-center gap-2 cursor-pointer font-bold text-slate-800 dark:text-slate-200 select-none">
+                    <input
+                      type="checkbox"
+                      checked={deductStock}
+                      onChange={(e) => setDeductStock(e.target.checked)}
+                      className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 h-4 w-4"
+                    />
+                    <span className="text-[11px] leading-tight">
+                      {deductStock ? 'স্টক থেকে কমবে (Deduct Stock)' : 'আর্কাইভ: স্টক কমবে না'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* SECTION 1: INTERNATIONAL CUSTOMER PROFILE & ENTERPRISE INFO */}
           <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-4">
@@ -1174,6 +1287,7 @@ export const SalesFormPage = () => {
           navigate('/sales');
         }}
         sale={completedSale}
+        initialDocType={completedSale?.documentType === 'challan' ? DOCUMENT_TYPES.CHALLAN : DOCUMENT_TYPES.CASH_MEMO}
       />
     </div>
   );

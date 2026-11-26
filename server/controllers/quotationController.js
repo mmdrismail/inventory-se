@@ -140,6 +140,9 @@ exports.createQuotation = async (req, res, next) => {
       date: req.body.date ? new Date(req.body.date) : new Date(),
       validUntil: validUntil ? new Date(validUntil) : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
       requisitionRef: requisitionRef || '',
+      entrySource: req.body.entrySource || 'online',
+      bookNumber: req.body.bookNumber || '',
+      manualSerialNo: req.body.manualSerialNo || '',
       customerId: customerId || null,
       customerName: customerName || 'Client Representative',
       customerCompany: customerCompany || '',
@@ -187,6 +190,13 @@ exports.updateQuotation = async (req, res, next) => {
     delete updates.__v;
     delete updates.createdAt;
     delete updates.id;
+
+    if (updates.date) {
+      updates.date = new Date(updates.date);
+    }
+    if (updates.validUntil) {
+      updates.validUntil = new Date(updates.validUntil);
+    }
 
     if (updates.items && Array.isArray(updates.items)) {
       updates.items = updates.items.map((it) => {

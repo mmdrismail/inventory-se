@@ -106,7 +106,7 @@ const saleSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'card', 'mobile_banking', 'bank_transfer', 'cheque'],
+      enum: ['cash', 'card', 'mobile_banking', 'bkash', 'nagad', 'bank', 'bank_transfer', 'cheque'],
       default: 'cash',
     },
     paymentStatus: {
@@ -118,6 +118,34 @@ const saleSchema = new mongoose.Schema(
       type: String,
       enum: ['draft', 'completed', 'cancelled'],
       default: 'completed',
+    },
+    documentType: {
+      type: String,
+      enum: ['cash_memo', 'challan', 'invoice'],
+      default: 'cash_memo',
+    },
+    date: {
+      type: Date,
+      default: Date.now,
+    },
+    entrySource: {
+      type: String,
+      enum: ['online', 'khata', 'offline'],
+      default: 'online',
+    },
+    bookNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    manualSerialNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    deductStock: {
+      type: Boolean,
+      default: true,
     },
     requisitionRef: {
       type: String,
@@ -158,6 +186,8 @@ saleSchema.index({ status: 1, createdAt: -1 });
 saleSchema.index({ createdAt: -1 });
 saleSchema.index({ paymentStatus: 1, createdAt: -1 });
 saleSchema.index({ quotationId: 1 });
+saleSchema.index({ entrySource: 1, date: -1 });
+saleSchema.index({ documentType: 1, date: -1 });
 saleSchema.index({ 'items.productId': 1 });
 
 module.exports = mongoose.model('Sale', saleSchema);

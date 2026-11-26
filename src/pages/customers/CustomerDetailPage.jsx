@@ -29,12 +29,24 @@ import {
   AlertCircle,
   CheckCircle2,
   Edit2,
+  Banknote,
+  BookOpen,
+  Trash2,
 } from 'lucide-react';
 
 export const CustomerDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { customers, sales, orders, quotations, settings } = useAppData();
+  const {
+    customers,
+    sales,
+    orders,
+    quotations,
+    moneyReceipts,
+    deleteMoneyReceipt,
+    confirmAction,
+    settings,
+  } = useAppData();
   const { language, t } = useLanguage();
 
   const l = (texts) => {
@@ -43,8 +55,9 @@ export const CustomerDetailPage = () => {
     return texts.bn;
   };
 
-  const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'quotations' | 'orders'
+  const [activeTab, setActiveTab] = useState('invoices'); // 'invoices' | 'quotations' | 'receipts' | 'orders'
   const [activePrintQuotation, setActivePrintQuotation] = useState(null);
+  const [activePrintReceipt, setActivePrintReceipt] = useState(null);
 
   const customer = customers.find((c) => c.id === id || c._id === id);
 
@@ -64,11 +77,19 @@ export const CustomerDetailPage = () => {
     );
   }, [orders, id, customer]);
 
-  // Financial calculations (matches active sales ledger on backend)
+  const customerReceipts = useMemo(() => {
+    return (moneyReceipts || []).filter(
+      (r) =>
+        r.customerId === id ||
+        r.customerId === customer?._id ||
+        (customer && r.customerName?.toLowerCase() === customer.name?.toLowerCase())
+    );
+  }, [moneyReceipts, id, customer]);
+
+  // Financial calculations (matches active sales ledger + unlinked money receipts on backend)
   const financials = useMemo(() => {
     let salesTotal = 0;
     let paidTotal = 0;
-    let dueTotal = 0;
 
     customerSales.forEach((s) => {
       if (s.status === 'cancelled') return;
@@ -82,18 +103,25 @@ export const CustomerDetailPage = () => {
           : pStatus === 'due'
           ? 0
           : Math.min(invTotal, Math.max(0, Number(s.paidAmount) || 0));
-      const dueAmt = Math.max(0, invTotal - paidAmt);
 
       paidTotal += paidAmt;
-      dueTotal += dueAmt;
     });
 
+    // Only unlinked active receipts add to paidTotal (linked receipts already updated their Sale.paidAmount)
+    customerReceipts.forEach((r) => {
+      if (r.status === 'cancelled' || r.linkedSaleId) return;
+      paidTotal += Math.max(0, Number(r.amount) || 0);
+    });
+
+    const dueTotal = Math.max(0, salesTotal - paidTotal);
+    const hasLedgerActivity = customerSales.length > 0 || customerReceipts.length > 0;
+
     return {
-      totalSales: customerSales.length > 0 ? salesTotal : (customer?.totalSales || 0),
-      totalPaid: customerSales.length > 0 ? paidTotal : (customer?.totalPaid || 0),
-      totalDue: customerSales.length > 0 ? dueTotal : (customer?.totalDue || 0),
+      totalSales: hasLedgerActivity ? salesTotal : (customer?.totalSales || 0),
+      totalPaid: hasLedgerActivity ? paidTotal : (customer?.totalPaid || 0),
+      totalDue: hasLedgerActivity ? dueTotal : (customer?.totalDue || 0),
     };
-  }, [customerSales, customer]);
+  }, [customerSales, customerReceipts, customer]);
 
   if (!customer) {
     return (
@@ -192,6 +220,33 @@ export const CustomerDetailPage = () => {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                navigate('/offline-entries', {
+                  state: { preselectCustomer: customer, defaultDocType: 'money_receipt' },
+                })
+              }
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 transition-colors flex items-center gap-1.5"
+            >
+              <Banknote className="h-3.5 w-3.5" />
+              <span>+ মানি রিসিপ্ট / জমা</span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                navigate('/offline-entries', {
+                  state: { preselectCustomer: customer, defaultDocType: 'cash_memo' },
+                })
+              }
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 transition-colors flex items-center gap-1.5"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span>+ খাতা / চালান এন্ট্রি</span>
+            </button>
           </div>
         </div>
 
@@ -302,6 +357,18 @@ export const CustomerDetailPage = () => {
         >
           <FileSpreadsheet className="h-4 w-4" />
           <span>Quotations / দরপত্র ({customerQuotations.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('receipts')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'receipts'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Banknote className="h-4 w-4" />
+          <span>Money Receipts ({customerReceipts.length})</span>
         </button>
 
         <button
@@ -636,13 +703,123 @@ export const CustomerDetailPage = () => {
         </Card>
       )}
 
-      {/* Printable Receipt Modal */}
-      {activePrintQuotation && (
+      {/* TAB 4: MONEY RECEIPTS (টাকা জমা ও মানি রিসিপ্ট) */}
+      {activeTab === 'receipts' && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-amber-600" />
+              <span>Money Receipts & Khata Collections ({customerReceipts.length})</span>
+            </CardTitle>
+            <button
+              type="button"
+              onClick={() =>
+                navigate('/offline-entries', {
+                  state: { preselectCustomer: customer, defaultDocType: 'money_receipt' },
+                })
+              }
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+            >
+              + Add Money Receipt
+            </button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 text-slate-500">
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Receipt # / Ref</th>
+                    <th className="py-3 px-4">Method & Purpose</th>
+                    <th className="py-3 px-4 text-right">Amount</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {customerReceipts.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-10 text-center text-slate-400">
+                        No Money Receipts recorded for this customer yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    customerReceipts.map((mr) => (
+                      <tr key={mr.id || mr._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
+                          {formatDate(mr.date || mr.createdAt)}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="font-mono font-bold text-slate-900 dark:text-slate-100 block">
+                            {mr.receiptNumber}
+                          </span>
+                          {(mr.bookNumber || mr.manualSerialNo || mr.linkedInvoiceNo) && (
+                            <span className="text-[10px] text-slate-500 font-mono block">
+                              {mr.linkedInvoiceNo ? `Bill: ${mr.linkedInvoiceNo} ` : ''}
+                              {mr.bookNumber ? `B:${mr.bookNumber} ` : ''}
+                              {mr.manualSerialNo ? `#${mr.manualSerialNo}` : ''}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mr-1.5">
+                            {mr.paymentMethod || 'cash'}
+                          </span>
+                          <span className="text-slate-700 dark:text-slate-200">{mr.purpose}</span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                          {formatCurrency(mr.amount || 0, settings.currency)}
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setActivePrintReceipt(mr)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600"
+                              title="Print Money Receipt"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                confirmAction({
+                                  title: `Delete Receipt ${mr.receiptNumber}?`,
+                                  message: 'Deleting this receipt will also update customer payment balance.',
+                                  confirmText: 'Delete',
+                                  cancelText: 'Cancel',
+                                }).then((ok) => {
+                                  if (ok) deleteMoneyReceipt(mr.id || mr._id);
+                                })
+                              }
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-500"
+                              title="Delete Receipt"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Printable Receipt / Quotation / Money Receipt Modal */}
+      {(activePrintQuotation || activePrintReceipt) && (
         <PrintableReceiptModal
-          isOpen={!!activePrintQuotation}
-          onClose={() => setActivePrintQuotation(null)}
-          sale={activePrintQuotation}
-          initialDocType={DOCUMENT_TYPES.QUOTATION}
+          isOpen={!!(activePrintQuotation || activePrintReceipt)}
+          onClose={() => {
+            setActivePrintQuotation(null);
+            setActivePrintReceipt(null);
+          }}
+          sale={activePrintReceipt || activePrintQuotation}
+          initialDocType={
+            activePrintReceipt ? DOCUMENT_TYPES.MONEY_RECEIPT : DOCUMENT_TYPES.QUOTATION
+          }
         />
       )}
     </div>
