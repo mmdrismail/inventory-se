@@ -1009,7 +1009,7 @@ export const AppDataProvider = ({ children }) => {
       reloadAfterMutation(res);
       addToast({
         title: 'মানি রিসিপ্ট সংরক্ষিত',
-        message: `রসিদ #${res.receipt.receiptNumber} (৳${res.receipt.amount.toLocaleString()}) যুক্ত হয়েছে।`,
+        message: `রসিদ #${res.receipt.receiptNumber} (৳${(Math.round(((Number(res.receipt.amount) || 0) + Number.EPSILON) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}) যুক্ত হয়েছে।`,
         type: 'success',
       });
     } else {

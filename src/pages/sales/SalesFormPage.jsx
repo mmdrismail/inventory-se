@@ -880,7 +880,7 @@ export const SalesFormPage = () => {
               max={subtotal}
               value={discount}
               onChange={(e) => setDiscount(e.target.value)}
-              placeholder="0.00"
+              placeholder="0"
               helperText={discountVal > 0 ? `নিট মূল্যে -${formatCurrency(discountVal, settings.currency)} ছাড় প্রযোজ্য` : 'সাবটোটাল থেকে সরাসরি ছাড়'}
             />
 
@@ -893,7 +893,7 @@ export const SalesFormPage = () => {
                 max={total}
                 value={paidAmountInput}
                 onChange={(e) => setPaidAmountInput(e.target.value)}
-                placeholder="0.00"
+                placeholder="0"
                 helperText={`অবশিষ্ট বকেয়া থাকবে: ${formatCurrency(calculatedDue, settings.currency)}`}
                 required
               />
@@ -1061,15 +1061,15 @@ export const SalesFormPage = () => {
                 return (
                   <div
                     key={index}
-                    className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-3 rounded-xl border transition-all ${
+                    className={`flex flex-wrap xl:flex-nowrap items-stretch xl:items-center gap-2.5 p-3 rounded-xl border transition-all ${
                       isOverStock
                         ? 'border-red-300 dark:border-red-800 bg-red-50/40 dark:bg-red-950/20'
                         : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40'
                     }`}
                   >
-                    <div className="flex-1 space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex-1">
+                    <div className="w-full xl:flex-1 xl:min-w-[260px] space-y-1.5 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex-1 min-w-0">
                           <Select
                             value={products.some((p) => p.id === line.productId) ? line.productId : 'custom'}
                             onChange={(e) => handleItemChange(index, 'productId', e.target.value)}
@@ -1077,7 +1077,7 @@ export const SalesFormPage = () => {
                               { value: 'custom', label: '➕ বিশেষ পার্টস / কাস্টম আইটেম (Custom Part / Quotation Item)' },
                               ...products.map((p) => ({
                                 value: p.id,
-                                label: `${p.name} (মজুদ: ${p.quantity} ${normalizeUnit(p.unit)} · ৳${p.sellingPrice})`,
+                                label: `${p.name} (মজুদ: ${p.quantity} ${normalizeUnit(p.unit)} · ${formatCurrency(p.sellingPrice, settings.currency)})`,
                               })),
                             ]}
                           />
@@ -1103,7 +1103,7 @@ export const SalesFormPage = () => {
                       )}
                     </div>
 
-                    <div className="w-full sm:w-28">
+                    <div className="flex-1 min-w-[96px] sm:flex-none sm:w-28">
                       <select
                         value={normalizeUnit(line.unit)}
                         onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
@@ -1118,10 +1118,11 @@ export const SalesFormPage = () => {
                       </select>
                     </div>
 
-                    <div className="w-full sm:w-24">
+                    <div className="w-20 sm:w-24 shrink-0">
                       <Input
                         type="number"
-                        min="1"
+                        step="any"
+                        min="0.01"
                         value={line.quantity}
                         onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                         placeholder="পরিমাণ"
@@ -1129,7 +1130,7 @@ export const SalesFormPage = () => {
                     </div>
 
                     {showRate && (
-                      <div className="w-full sm:w-36">
+                      <div className="flex-1 min-w-[110px] sm:flex-none sm:w-32">
                         <Input
                           type="number"
                           step="any"
@@ -1142,7 +1143,7 @@ export const SalesFormPage = () => {
                     )}
 
                     {showLineTotal && (
-                      <div className="w-full sm:w-32 text-right font-mono font-bold text-sm text-slate-800 dark:text-slate-200 shrink-0">
+                      <div className="ml-auto xl:ml-0 w-auto sm:min-w-[100px] sm:w-28 text-right font-mono font-bold text-sm text-slate-800 dark:text-slate-200 tabular-nums shrink-0 self-center">
                         {formatCurrency(lineTotal, settings.currency)}
                       </div>
                     )}
@@ -1150,7 +1151,7 @@ export const SalesFormPage = () => {
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(index)}
-                      className="p-2 text-slate-400 hover:text-red-500 transition-colors self-end sm:self-center"
+                      className="p-2 text-slate-400 hover:text-red-500 transition-colors self-center shrink-0"
                       title="আইটেম মুছুন"
                     >
                       <Trash2 className="h-4 w-4" />

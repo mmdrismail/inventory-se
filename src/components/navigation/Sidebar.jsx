@@ -163,7 +163,10 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
           />
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+              <div
+                className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate"
+                title={currentUser?.name || 'Demo User'}
+              >
                 {currentUser?.name || 'Demo User'}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">

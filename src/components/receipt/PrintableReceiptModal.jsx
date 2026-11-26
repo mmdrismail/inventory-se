@@ -897,11 +897,11 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
             {activeEditorTab === 'items' && (
               <div className="space-y-3 pt-1">
                 <div className="overflow-x-auto rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <table className="w-full min-w-[700px] text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-b border-slate-300 dark:border-slate-700 font-bold">
                         <th className="py-2 px-2 text-center w-10">#</th>
-                        <th className="py-2 px-3">পণ্যের নাম ও বিবরণ (Product Description)</th>
+                        <th className="py-2 px-3 min-w-[220px]">পণ্যের নাম ও বিবরণ (Product Description)</th>
                         <th className="py-2 px-2 text-center w-24">পরিমাণ (Qty)</th>
                         <th className="py-2 px-2 text-center w-28">একক (Unit)</th>
                         <th className="py-2 px-3 text-right w-32">দর / রেট (৳ Rate)</th>
@@ -1287,7 +1287,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
               {/* Totals Table */}
               {showGrandTotal && (
                 <div className="flex justify-end relative z-10">
-                  <table className="w-60 text-xs border border-slate-400">
+                  <table className="w-full max-w-[280px] sm:w-72 text-xs border border-slate-400 tabular-nums">
                     <tbody>
                       {(discountVal > 0 || taxVal > 0) && (
                         <tr className="border-b border-slate-300 bg-slate-50">

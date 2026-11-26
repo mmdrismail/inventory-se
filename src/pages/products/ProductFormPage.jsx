@@ -126,7 +126,14 @@ export const ProductFormPage = () => {
           locBin: loc.bin?.replace(/Bin-?/i, '') || 'B',
         });
         if (Array.isArray(existing.variants)) {
-          setVariants(existing.variants);
+          setVariants(
+            existing.variants.map((v) => ({
+              ...v,
+              costPrice: Number(v.costPrice) > 0 ? String(v.costPrice) : '',
+              sellingPrice: Number(v.sellingPrice) > 0 ? String(v.sellingPrice) : '',
+              quantity: Number(v.quantity) > 0 ? String(v.quantity) : '',
+            }))
+          );
         }
       } else {
         navigate('/products');

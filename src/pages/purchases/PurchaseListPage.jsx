@@ -1224,7 +1224,8 @@ export const PurchaseListPage = () => {
                       </label>
                       <input
                         type="number"
-                        value={it.allocatedCost}
+                        step="any"
+                        value={Number(it.allocatedCost) > 0 ? it.allocatedCost : ''}
                         onChange={(e) => handleUpdateLotItem(idx, 'allocatedCost', e.target.value)}
                         placeholder="4500"
                         className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-semibold text-slate-800 dark:text-slate-200 text-xs"
@@ -1263,7 +1264,8 @@ export const PurchaseListPage = () => {
                       </label>
                       <input
                         type="number"
-                        value={it.targetSellingPrice}
+                        step="any"
+                        value={Number(it.targetSellingPrice) > 0 ? it.targetSellingPrice : ''}
                         onChange={(e) => handleUpdateLotItem(idx, 'targetSellingPrice', e.target.value)}
                         placeholder="10000"
                         className="w-full px-2 py-1 rounded border border-emerald-400 dark:border-emerald-600 bg-white dark:bg-slate-900 font-mono font-bold text-emerald-600 dark:text-emerald-300 text-xs"

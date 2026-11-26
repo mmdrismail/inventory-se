@@ -12,6 +12,14 @@
   .dark * {
     border-color: theme('colors.slate.800');
   }
+  input[type='number']::placeholder {
+    color: rgba(148, 163, 184, 0.72);
+    font-weight: 400;
+    opacity: 1;
+  }
+  .dark input[type='number']::placeholder {
+    color: rgba(100, 116, 139, 0.78);
+  }
 }
 
 /* Custom modern scrollbar */

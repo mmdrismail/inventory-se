@@ -1539,7 +1539,7 @@ export const OfflineRecordsPage = () => {
                           step="any"
                           value={receiptAmount}
                           onChange={(e) => setReceiptAmount(e.target.value)}
-                          placeholder="0.00"
+                          placeholder="0"
                           className="w-full px-3 py-2 text-sm font-bold font-mono rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-300"
                         />
                       </div>
@@ -1797,7 +1797,7 @@ export const OfflineRecordsPage = () => {
                               step="any"
                               value={paidAmount}
                               onChange={(e) => setPaidAmount(e.target.value)}
-                              placeholder={String(singleNetTotal)}
+                              placeholder={String(Math.round((singleNetTotal + Number.EPSILON) * 100) / 100)}
                               className="w-full px-2.5 py-1.5 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                             />
                           </div>

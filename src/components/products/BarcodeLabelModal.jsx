@@ -168,7 +168,7 @@ export const BarcodeLabelModal = ({ isOpen, onClose, product, selectedVariant = 
               <div class="barcode-text">* ${barcodeNumber} *</div>
               <div class="label-grid">
                 <span class="loc-tag">📍 LOC: ${itemToPrint.location}</span>
-                <span class="price-tag">৳${itemToPrint.sellingPrice?.toLocaleString() || '0'}</span>
+                <span class="price-tag">৳${(Math.round(((Number(itemToPrint.sellingPrice) || 0) + Number.EPSILON) * 100) / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
               </div>
             </div>
           `).join('')}

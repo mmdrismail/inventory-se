@@ -747,8 +747,8 @@ const getAuthenticStyles = (isThermal = false) => `
   .col-sl { width: 38px; text-align: center; background-color: #faf5ff; }
   .col-desc { text-align: left; background-color: #fffbeb; }
   .col-qty { width: 78px; text-align: center; background-color: #f0fdf4; white-space: nowrap; }
-  .col-rate { width: 92px; text-align: right; background-color: #fdf2f8; white-space: nowrap; }
-  .col-amount { width: 104px; text-align: right; background-color: #eff6ff; white-space: nowrap; }
+  .col-rate { min-width: 96px; width: 102px; text-align: right; background-color: #fdf2f8; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .col-amount { min-width: 106px; width: 112px; text-align: right; background-color: #eff6ff; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
   .memo-totals-table {
     width: 100%;
@@ -767,14 +767,16 @@ const getAuthenticStyles = (isThermal = false) => `
     text-align: right;
     padding-right: 12px;
     background: #f8fafc;
-    width: 75%;
+    width: 72%;
   }
 
   .totals-value {
     text-align: right;
     font-weight: 700;
     font-family: 'JetBrains Mono', monospace;
-    width: 25%;
+    font-variant-numeric: tabular-nums;
+    width: 28%;
+    min-width: 112px;
     background: #eff6ff;
     white-space: nowrap;
   }
@@ -1326,8 +1328,8 @@ export const generateOfficialPadHtml = (sale, settings = {}, options = {}) => {
               <th style="width: 35px;">${p.t.sl}</th>
               <th style="text-align: left;">${p.t.itemDesc}</th>
               <th style="width: 55px;">${p.t.qty}</th>
-              ${showRate ? `<th style="width: 80px;">${p.t.rate}</th>` : ''}
-              ${showLineTotal ? `<th style="width: 90px;">${p.t.amount}</th>` : ''}
+              ${showRate ? `<th style="width: 96px;">${p.t.rate}</th>` : ''}
+              ${showLineTotal ? `<th style="width: 110px;">${p.t.amount}</th>` : ''}
             </tr>
           </thead>
           <tbody>
@@ -1670,8 +1672,8 @@ export const generateQuotationHtml = (quotation, settings = {}, options = {}) =>
               <th style="width: 32px;">${p.t.sl}</th>
               <th style="text-align: left; padding-left: 8px;">${p.t.itemDesc}</th>
               <th style="width: 60px;">${p.t.qty}</th>
-              ${showRate ? `<th style="width: 80px;">${p.t.rate}</th>` : ''}
-              ${showLineTotal ? `<th style="width: 90px;">${p.t.amount}</th>` : ''}
+              ${showRate ? `<th style="width: 96px;">${p.t.rate}</th>` : ''}
+              ${showLineTotal ? `<th style="width: 110px;">${p.t.amount}</th>` : ''}
             </tr>
           </thead>
           <tbody>

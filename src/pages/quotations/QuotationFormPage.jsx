@@ -956,11 +956,11 @@ export const QuotationFormPage = () => {
 
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[780px] text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-y border-slate-200 dark:border-slate-800 text-slate-500 uppercase text-[10px] tracking-wider">
                 <tr>
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
-                  <th className="py-2.5 px-3 min-w-[260px]">
+                  <th className="py-2.5 px-3 min-w-[330px]">
                     {l({
                       bn: 'পণ্য বা যন্ত্রাংশের বিবরণ',
                       en: 'Product / Spare Part Description',
@@ -995,19 +995,19 @@ export const QuotationFormPage = () => {
 
                     {/* Product Name / Custom input with catalog autocomplete */}
                     <td className="py-2.5 px-3 space-y-1">
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5 items-center">
                         <input
                           type="text"
                           value={it.name}
                           onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
                           placeholder="e.g. Connecting Rod with Piston complete / Piston Ring"
-                          className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          className="flex-1 min-w-[170px] px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
                         />
                         {/* Optional quick picker from stock */}
                         <select
                           value={it.productId || ''}
                           onChange={(e) => handleItemChange(idx, 'productId', e.target.value)}
-                          className="w-36 shrink-0 px-2 py-1.5 text-[11px] rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                          className="w-32 shrink-0 px-2 py-1.5 text-[11px] rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
                           title={l({
                             bn: 'ইনভেন্টরি ক্যাটালগ থেকে বাছাই করুন',
                             en: 'Pick from existing inventory catalog',
@@ -1053,7 +1053,8 @@ export const QuotationFormPage = () => {
                     <td className="py-2.5 px-2 text-center">
                       <input
                         type="number"
-                        min="1"
+                        step="any"
+                        min="0.01"
                         value={it.quantity}
                         onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
                         className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-center font-mono font-bold"
