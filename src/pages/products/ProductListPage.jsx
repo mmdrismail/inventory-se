@@ -388,11 +388,12 @@ export const ProductListPage = () => {
                         <div className="min-w-0">
                           <Link
                             to={`/products/${p.id}`}
+                            data-transliterate="true"
                             className="font-semibold text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 truncate block max-w-xs"
                           >
                             {p.name}
                           </Link>
-                          <span className="text-[10px] text-slate-400 line-clamp-1">
+                          <span className="text-[10px] text-slate-400 line-clamp-1" data-transliterate="true">
                             {p.description}
                           </span>
                         </div>
@@ -513,7 +514,7 @@ export const ProductListPage = () => {
                 >
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                      <span className="font-bold text-xs text-slate-900 dark:text-slate-100" data-transliterate="true">
                         {row.partName}
                       </span>
                       <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800">
@@ -526,13 +527,18 @@ export const ProductListPage = () => {
                       )}
                     </div>
                     {mSummary && (
-                      <div className="text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold truncate">
+                      <div className="text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold truncate" data-transliterate="true">
                         {mSummary}
                       </div>
                     )}
                     <div className="text-[10px] text-slate-500">
                       {row.lastDocNumber ? `${row.lastDocNumber} · ` : ''}
-                      {row.lastCustomerName ? `${row.lastCustomerName} · ` : ''}
+                      {row.lastCustomerName && (
+                        <>
+                          <span data-transliterate="true">{row.lastCustomerName}</span>
+                          {' · '}
+                        </>
+                      )}
                       {row.lastDocDate ? formatDate(row.lastDocDate) : ''}
                     </div>
                   </div>

@@ -307,7 +307,7 @@ export const DashboardOverviewPage = () => {
                     recentMovements.map((m) => (
                       <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                         <td className="py-2.5 px-4">
-                          <div className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]">
+                          <div className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[180px]" data-transliterate="true">
                             {m.productName}
                           </div>
                           <div className="text-[10px] text-slate-400 font-mono">{m.sku}</div>
@@ -379,7 +379,7 @@ export const DashboardOverviewPage = () => {
                             {o.orderNumber}
                           </Link>
                         </td>
-                        <td className="py-2.5 px-3 text-slate-800 dark:text-slate-200 font-medium">
+                        <td className="py-2.5 px-3 text-slate-800 dark:text-slate-200 font-medium" data-transliterate="true">
                           {o.customerName}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-700 dark:text-slate-300">

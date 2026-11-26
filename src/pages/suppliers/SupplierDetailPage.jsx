@@ -67,7 +67,7 @@ export const SupplierDetailPage = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-transliterate="true">
                   {supplier.name}
                 </h1>
                 <Badge variant={supplier.status === 'active' ? 'emerald' : 'slate'} size="sm">
@@ -76,11 +76,11 @@ export const SupplierDetailPage = () => {
                     : l({ bn: 'নিষ্ক্রিয়', en: 'INACTIVE', obro: 'INACTIVE' })}
                 </Badge>
               </div>
-              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mt-0.5" data-transliterate="true">
                 {supplier.companyName}
               </p>
               {supplier.notes && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-xl">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-xl" data-transliterate="true">
                   {supplier.notes}
                 </p>
               )}

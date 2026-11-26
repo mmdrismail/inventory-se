@@ -204,7 +204,7 @@ export const AdminOrderDetailPage = () => {
             <span className="text-slate-400 font-semibold block uppercase text-[10px] mb-1">
               {l({ bn: 'গ্রাহকের বিবরণ', en: 'Customer Details', obro: 'Customer Details' })}
             </span>
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200" data-transliterate="true">
               {order.customerName}
             </h4>
             <p className="text-slate-500 mt-0.5">{l({ bn: 'ইমেইল: ', en: 'Email: ', obro: 'Email: ' })}{order.email}</p>
@@ -215,9 +215,9 @@ export const AdminOrderDetailPage = () => {
             <span className="text-slate-400 font-semibold block uppercase text-[10px] mb-1">
               {l({ bn: 'ডেলিভারি ও শিপিং ঠিকানা', en: 'Shipping & Delivery', obro: 'Shipping & Delivery' })}
             </span>
-            <p className="text-slate-700 dark:text-slate-300 font-medium">{order.deliveryAddress}</p>
+            <p className="text-slate-700 dark:text-slate-300 font-medium" data-transliterate="true">{order.deliveryAddress}</p>
             <p className="text-slate-500 mt-0.5">{l({ bn: 'পেমেন্ট মাধ্যম: ', en: 'Method: ', obro: 'Payment Method: ' })}{order.paymentMethod}</p>
-            {order.notes && <p className="text-slate-400 mt-1 italic">{l({ bn: 'নোট: ', en: 'Note: ', obro: 'Note: ' })}"{order.notes}"</p>}
+            {order.notes && <p className="text-slate-400 mt-1 italic">{l({ bn: 'নোট: ', en: 'Note: ', obro: 'Note: ' })}"<span data-transliterate="true">{order.notes}</span>"</p>}
           </div>
         </div>
 
@@ -239,7 +239,7 @@ export const AdminOrderDetailPage = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {(order.items || []).map((item, idx) => (
                   <tr key={idx}>
-                    <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
+                    <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200" data-transliterate="true">
                       {item.productName || item.name}
                     </td>
                     <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">

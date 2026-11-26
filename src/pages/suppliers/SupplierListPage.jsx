@@ -200,11 +200,12 @@ export const SupplierListPage = () => {
                   <div>
                     <Link
                       to={`/suppliers/${s.id}`}
+                      data-transliterate="true"
                       className="text-base font-bold text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                     >
                       {s.name}
                     </Link>
-                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5" data-transliterate="true">
                       {s.companyName}
                     </p>
                   </div>
@@ -212,7 +213,7 @@ export const SupplierListPage = () => {
                   <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300 pt-1">
                     {s.contactPerson && (
                       <div className="text-[11px] text-slate-500">
-                        Contact: <strong className="font-semibold text-slate-700 dark:text-slate-200">{s.contactPerson}</strong>
+                        Contact: <strong className="font-semibold text-slate-700 dark:text-slate-200" data-transliterate="true">{s.contactPerson}</strong>
                       </div>
                     )}
                     {s.email && (

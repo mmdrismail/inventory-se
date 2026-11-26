@@ -327,6 +327,7 @@ export const InventoryPage = () => {
                               <div>
                                 <Link
                                   to={`/products/${p.id}`}
+                                  data-transliterate="true"
                                   className="font-semibold text-slate-900 dark:text-slate-100 hover:text-emerald-600 truncate block max-w-xs"
                                 >
                                   {p.name}

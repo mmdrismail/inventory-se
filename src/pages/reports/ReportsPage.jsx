@@ -224,7 +224,7 @@ export const ReportsPage = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {inventoryReport.productBreakdown.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                      <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-slate-100">
+                      <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-slate-100" data-transliterate="true">
                         {p.name}
                       </td>
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
@@ -304,7 +304,7 @@ export const ReportsPage = () => {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {salesReport.productBreakdown.map((p) => (
                       <tr key={p.productId} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                        <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-slate-200">
+                        <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-slate-200" data-transliterate="true">
                           {p.name}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
@@ -449,14 +449,14 @@ export const ReportsPage = () => {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {lowStockReport.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                        <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-slate-100">
+                        <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-slate-100" data-transliterate="true">
                           {p.name}
                         </td>
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
                           {p.sku}
                         </td>
-                        <td className="py-2.5 px-3 text-slate-500">{p.category}</td>
-                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">{p.supplier}</td>
+                        <td className="py-2.5 px-3 text-slate-500" data-transliterate="true">{p.category}</td>
+                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400" data-transliterate="true">{p.supplier}</td>
                         <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
                           {p.quantity}
                         </td>

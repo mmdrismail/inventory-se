@@ -13,9 +13,14 @@
 
 import { TRANSLATIONS } from '../utils/translations.js';
 import { PUBLIC_TRANSLATIONS } from '../utils/publicTranslations.js';
+import {
+  transliterateBanglaToAvro,
+  transliterateEntityText,
+  localizeDisplayDigits,
+} from '../utils/phoneticTransliterator.js';
 
-const STORAGE_CACHE_KEY = 'stockline_translation_cache_v2';
-const LEGACY_STORAGE_CACHE_KEY = 'stockline_translation_cache';
+const STORAGE_CACHE_KEY = 'stockline_translation_cache_v3';
+const LEGACY_CACHE_KEYS = ['stockline_translation_cache', 'stockline_translation_cache_v2'];
 const MAX_ONLINE_CONCURRENCY = 4;
 
 // Contextless single stop-words/fragments that must never be word-by-word machine translated
@@ -56,159 +61,13 @@ const ISOLATED_STOPWORDS = new Set([
 
 const IDENTIFIER_KEY_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/i;
 
-const BN_INDEPENDENT_VOWELS = {
-  অ: 'o', আ: 'a', ই: 'i', ঈ: 'i', উ: 'u', ঊ: 'u', ঋ: 'ri', এ: 'e', ঐ: 'oi', ও: 'o', ঔ: 'ou',
-};
-const BN_MATRAS = {
-  '\u09BE': 'a', '\u09BF': 'i', '\u09C0': 'i', '\u09C1': 'u', '\u09C2': 'u',
-  '\u09C3': 'ri', '\u09C7': 'e', '\u09C8': 'oi', '\u09CB': 'o', '\u09CC': 'ou',
-};
-const BN_CONSONANTS = {
-  ক: 'k', খ: 'kh', গ: 'g', ঘ: 'gh', ঙ: 'ng',
-  চ: 'ch', ছ: 'chh', জ: 'j', ঝ: 'jh', ঞ: 'n',
-  ট: 't', ঠ: 'th', ড: 'd', ঢ: 'dh', ণ: 'n',
-  ত: 't', থ: 'th', দ: 'd', ধ: 'dh', ন: 'n',
-  প: 'p', ফ: 'f', ব: 'b', ভ: 'bh', ম: 'm',
-  য: 'j', র: 'r', ল: 'l', শ: 'sh', ষ: 'sh', স: 's', হ: 'h',
-  ড়: 'r', ঢ়: 'rh', য়: 'y', '\u09DC': 'r', '\u09DD': 'rh', '\u09DF': 'y',
-};
-const BN_SPECIAL_WORDS = {
-  এবং: 'ebong', কিন্তু: 'kintu', জন্য: 'jonno', থেকে: 'theke', সাথে: 'sathe',
-  দিয়ে: 'diye', দিয়ে: 'diye', করে: 'kore', করুন: 'korun', হবে: 'hobe', নেই: 'nei',
-  আছে: 'achhe', সব: 'shob', সকল: 'shokol', নতুন: 'notun', পুরনো: 'purono', পুরানো: 'purano',
-  খাতা: 'khata', অফলাইন: 'offline', অনলাইন: 'online', ডকুমেন্ট: 'document', হাব: 'hub',
-  মেশিন: 'machine', পার্টস: 'parts', প্রাইস: 'price', লিস্ট: 'list', স্টক: 'stock',
-  ইনভেন্টরি: 'inventory', ডাটাবেজ: 'database', ডাটাবেজে: 'database-e', ডাটাবেসে: 'database-e',
-  কোটেশন: 'quotation', চালান: 'challan', মেমো: 'memo', ক্যাশ: 'cash', রিসিপ্ট: 'receipt',
-  ইনভয়েস: 'invoice', কাস্টমার: 'customer', গ্রাহক: 'grahok', গ্রাহকের: 'grahoker',
-  প্রতিষ্ঠান: 'protishthan', প্রতিষ্ঠানের: 'protishthaner', পণ্য: 'ponno', পণ্যের: 'ponnyer',
-  তালিকা: 'talika', খুঁজুন: 'khujun', সার্চ: 'search', স্ক্যান: 'scan', ছবি: 'chhobi',
-  আপলোড: 'upload', সেভ: 'save', প্রিন্ট: 'print', ফর্ম: 'form', ফর্মে: 'form-e',
-  বকেয়া: 'bokeya', বাকি: 'baki', জমা: 'joma', পরিমাণ: 'poriman', একক: 'ekok',
-  দর: 'dor', মূল্য: 'mullo', মোট: 'mot', সর্বমোট: 'shorbomot', টাকা: 'taka',
-  তারিখ: 'tarikh', মোবাইল: 'mobile', নম্বর: 'nombor', নাম: 'nam', ঠিকানা: 'thikana',
-  বিবরণ: 'biboron', মডেল: 'model', ধরন: 'dhoron', সিলিন্ডার: 'cylinder', অশ্বশক্তি: 'HP',
-  অ্যাকশন: 'action', বাতিল: 'batil', মুছুন: 'muchhun', বিস্তারিত: 'bistarito', যুক্ত: 'jukto',
-  হয়েছে: 'hoyeche', হয়নি: 'hoyni', পাওয়া: 'paoa', যায়নি: 'jayni', যোগ: 'jog',
-  একটি: 'ekti', কমপক্ষে: 'kompokkhe', নির্ভুলতা: 'nirbhulota', উৎস: 'utso',
-  বই: 'boi', সিরিয়াল: 'serial', ঐচ্ছিক: 'oichhik', চালু: 'chalu', বন্ধ: 'bondho',
-};
-const BN_DIGITS = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
-
-const isBanglaLetter = (ch) => /[\u0980-\u09FF]/.test(ch || '');
-
-const transliterateBanglaWord = (word) => {
-  if (!word) return '';
-  if (BN_SPECIAL_WORDS[word]) return BN_SPECIAL_WORDS[word];
-
-  let out = '';
-  const chars = Array.from(word);
-  for (let i = 0; i < chars.length; i++) {
-    const ch = chars[i];
-    if (BN_DIGITS[ch] !== undefined) {
-      out += BN_DIGITS[ch];
-      continue;
-    }
-    if (ch === '।') {
-      out += '.';
-      continue;
-    }
-    if (BN_INDEPENDENT_VOWELS[ch]) {
-      out += BN_INDEPENDENT_VOWELS[ch];
-      continue;
-    }
-    if (ch === 'ৎ') {
-      out += 't';
-      continue;
-    }
-    if (ch === 'ং') {
-      out += 'ng';
-      continue;
-    }
-    if (ch === 'ঃ') {
-      out += 'h';
-      continue;
-    }
-    if (ch === 'ঁ' || ch === '\u09BC') {
-      continue;
-    }
-
-    const base = BN_CONSONANTS[ch];
-    if (!base) {
-      out += BN_MATRAS[ch] || '';
-      continue;
-    }
-
-    const next = chars[i + 1];
-    // Special conjuncts: ক্ষ (k+s+sh -> kh/kkh) and জ্ঞ (j+g+n -> gg)
-    if (ch === 'ক' && next === '\u09CD' && chars[i + 2] === 'ষ') {
-      out += i === 0 ? 'kh' : 'kkh';
-      i += 2;
-      const post = chars[i + 1];
-      if (BN_MATRAS[post]) {
-        out += BN_MATRAS[post];
-        i += 1;
-      } else if (post && isBanglaLetter(post) && post !== '\u09CD') {
-        out += 'o';
-      }
-      continue;
-    }
-    if (ch === 'জ' && next === '\u09CD' && chars[i + 2] === 'ঞ') {
-      out += 'gg';
-      i += 2;
-      const post = chars[i + 1];
-      if (BN_MATRAS[post]) {
-        out += BN_MATRAS[post];
-        i += 1;
-      } else if (post && isBanglaLetter(post) && post !== '\u09CD') {
-        out += 'o';
-      }
-      continue;
-    }
-
-    // Hasanta conjunct suppresses inherent vowel
-    if (next === '\u09CD') {
-      const joined = chars[i + 2];
-      if (joined === 'য') {
-        out += i === 0 ? `${base}y` : `${base}y`;
-        i += 2;
-        const post = chars[i + 1];
-        if (BN_MATRAS[post]) {
-          out += BN_MATRAS[post];
-          i += 1;
-        }
-        continue;
-      }
-      out += base;
-      i += 1; // Advance to hasanta so next iteration handles joined consonant
-      continue;
-    }
-
-    // Consonant followed by vowel sign (matra)
-    if (BN_MATRAS[next]) {
-      out += base + BN_MATRAS[next];
-      i += 1;
-      continue;
-    }
-
-    // Bare consonant: keep inherent 'o' only before continuing Bengali letters
-    const hasTrailingBn = next && isBanglaLetter(next);
-    out += hasTrailingBn ? `${base}o` : base;
-  }
-  return out;
-};
-
-const transliterateBanglaToAvro = (text) => {
-  if (!text || typeof text !== 'string') return text;
-  const converted = text.replace(/[\u0980-\u09FF]+/g, (segment) => transliterateBanglaWord(segment));
-  return converted.replace(/^[a-z]/, (c) => c.toUpperCase());
-};
-
-// Load persistent cache from LocalStorage (purge poisoned v1 fragment & raw identifier caches)
+// Load persistent cache from LocalStorage (purge legacy v1/v2 & raw identifier caches)
 const loadPersistentCache = () => {
   try {
-    if (localStorage.getItem(LEGACY_STORAGE_CACHE_KEY)) {
-      localStorage.removeItem(LEGACY_STORAGE_CACHE_KEY);
+    for (const legacyKey of LEGACY_CACHE_KEYS) {
+      if (localStorage.getItem(legacyKey)) {
+        localStorage.removeItem(legacyKey);
+      }
     }
     const raw = localStorage.getItem(STORAGE_CACHE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
@@ -248,6 +107,20 @@ class TranslationEngineService {
 
     this.initCuratedLexicon();
     this.indexBaseTranslations();
+  }
+
+  /**
+   * Phonetic transliteration only for entity names, companies, addresses, and spare parts
+   */
+  transliterateEntity(text, targetLang = 'bn') {
+    return transliterateEntityText(text, targetLang);
+  }
+
+  /**
+   * Format numerals cleanly (০-৯ in Bangla mode, 0-9 in English/Obro mode)
+   */
+  localizeDigits(text, targetLang = 'bn') {
+    return localizeDisplayDigits(text, targetLang);
   }
 
   /**

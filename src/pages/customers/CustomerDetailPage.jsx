@@ -182,7 +182,7 @@ export const CustomerDetailPage = () => {
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-transliterate="true">
                   {customer.name}
                 </h1>
                 <Badge
@@ -202,7 +202,7 @@ export const CustomerDetailPage = () => {
               {customer.companyName && (
                 <div className="text-sm font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1.5 mt-1">
                   <Building2 className="h-4 w-4 shrink-0" />
-                  <span>{customer.companyName}</span>
+                  <span data-transliterate="true">{customer.companyName}</span>
                 </div>
               )}
 
@@ -215,7 +215,7 @@ export const CustomerDetailPage = () => {
               </p>
 
               {customer.notes && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-xl">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 max-w-xl" data-transliterate="true">
                   {customer.notes}
                 </p>
               )}
@@ -261,7 +261,12 @@ export const CustomerDetailPage = () => {
           </div>
           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
             <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
-            <span className="truncate">{customer.address || customer.location || 'No address specified'}</span>
+            <span
+              className="truncate"
+              data-transliterate={customer.address || customer.location ? 'true' : undefined}
+            >
+              {customer.address || customer.location || 'No address specified'}
+            </span>
           </div>
         </div>
       </Card>
@@ -764,7 +769,7 @@ export const CustomerDetailPage = () => {
                           <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mr-1.5">
                             {mr.paymentMethod || 'cash'}
                           </span>
-                          <span className="text-slate-700 dark:text-slate-200">{mr.purpose}</span>
+                          <span className="text-slate-700 dark:text-slate-200" data-transliterate="true">{mr.purpose}</span>
                         </td>
                         <td className="py-3 px-4 text-right font-mono font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">
                           {formatCurrency(mr.amount || 0, settings.currency)}

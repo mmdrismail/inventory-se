@@ -345,7 +345,7 @@ export const PartPriceListPage = () => {
                     <React.Fragment key={rowKey}>
                       <tr className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
                         <td className="py-3 px-4">
-                          <div className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                          <div className="font-bold text-slate-900 dark:text-slate-100 text-sm" data-transliterate="true">
                             {row.partName}
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
@@ -373,7 +373,7 @@ export const PartPriceListPage = () => {
                           <div className="flex flex-wrap gap-1">
                             {row.machineName && (
                               <Badge variant="blue" size="sm">
-                                {row.machineName}
+                                <span data-transliterate="true">{row.machineName}</span>
                               </Badge>
                             )}
                             {row.model && (
@@ -383,7 +383,7 @@ export const PartPriceListPage = () => {
                             )}
                             {row.type && (
                               <Badge variant="slate" size="sm">
-                                {row.type}
+                                <span data-transliterate="true">{row.type}</span>
                               </Badge>
                             )}
                             {row.hp && (
@@ -403,7 +403,7 @@ export const PartPriceListPage = () => {
                             )}
                           </div>
                           {(row.others || row.description) && (
-                            <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+                            <p className="text-[11px] text-slate-500 mt-1 line-clamp-2" data-transliterate="true">
                               {[row.others, row.description].filter(Boolean).join(' · ')}
                             </p>
                           )}
@@ -432,7 +432,12 @@ export const PartPriceListPage = () => {
                             {row.lastDocNumber || '—'}
                           </span>
                           <span className="text-[10px] text-slate-400 block">
-                            {row.lastCustomerName ? `${row.lastCustomerName} · ` : ''}
+                            {row.lastCustomerName && (
+                              <>
+                                <span data-transliterate="true">{row.lastCustomerName}</span>
+                                {' · '}
+                              </>
+                            )}
                             {formatDate(row.lastDocDate)}
                           </span>
                           {hasHistory && (

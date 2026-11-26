@@ -2265,12 +2265,14 @@ export const OfflineRecordsPage = () => {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <span className="font-semibold text-slate-900 dark:text-slate-100 block">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100 block" data-transliterate="true">
                             {item.customerName}
                           </span>
                           {(item.customerCompany || item.customerPhone) && (
                             <span className="text-[10px] text-slate-500 block">
-                              {[item.customerCompany, item.customerPhone].filter(Boolean).join(' · ')}
+                              {item.customerCompany && <span data-transliterate="true">{item.customerCompany}</span>}
+                              {item.customerCompany && item.customerPhone ? ' · ' : ''}
+                              {item.customerPhone || ''}
                             </span>
                           )}
                         </td>

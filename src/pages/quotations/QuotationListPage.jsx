@@ -396,7 +396,7 @@ export const QuotationListPage = () => {
                     {/* Customer & Company Details */}
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <span>
+                        <span data-transliterate={quote.customerName ? 'true' : undefined}>
                           {quote.customerName ||
                             l({ bn: 'সাধারণ ক্লায়েন্ট', en: 'Direct Client', obro: 'Direct Client' })}
                         </span>
@@ -407,7 +407,7 @@ export const QuotationListPage = () => {
                       {quote.customerCompany ? (
                         <div className="text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1 mt-0.5 font-medium">
                           <Building2 className="h-3 w-3 shrink-0" />
-                          <span>{quote.customerCompany}</span>
+                          <span data-transliterate="true">{quote.customerCompany}</span>
                         </div>
                       ) : (
                         <span className="text-[10px] text-slate-400">

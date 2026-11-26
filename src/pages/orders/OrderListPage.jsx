@@ -271,7 +271,7 @@ export const OrderListPage = () => {
                     </td>
 
                     <td className="py-3 px-3">
-                      <div className="font-semibold text-slate-800 dark:text-slate-200">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200" data-transliterate="true">
                         {ord.customerName}
                       </div>
                       <div className="text-[10px] text-slate-400">{ord.phone}</div>

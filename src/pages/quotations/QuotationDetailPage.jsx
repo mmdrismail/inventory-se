@@ -348,13 +348,16 @@ export const QuotationDetailPage = () => {
                 obro: 'গ্রাহকের তথ্য (Client Information)',
               })}
             </span>
-            <p className="font-bold text-sm text-slate-900 dark:text-slate-100">
+            <p
+              className="font-bold text-sm text-slate-900 dark:text-slate-100"
+              data-transliterate={quotation.customerName ? 'true' : undefined}
+            >
               {quotation.customerName || l({ bn: 'সাধারণ ক্লায়েন্ট', en: 'Direct Client', obro: 'Direct Client' })}
             </p>
             {quotation.customerCompany && (
               <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1 mt-0.5">
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
-                <span>{quotation.customerCompany}</span>
+                <span data-transliterate="true">{quotation.customerCompany}</span>
               </p>
             )}
             <p className="text-[11px] text-slate-500 mt-1">
@@ -370,7 +373,7 @@ export const QuotationDetailPage = () => {
             {quotation.customerAddress ? (
               <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                 <MapPin className="h-3 w-3 shrink-0" />
-                <span>{quotation.customerAddress}</span>
+                <span data-transliterate="true">{quotation.customerAddress}</span>
               </p>
             ) : (
               <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
@@ -408,14 +411,14 @@ export const QuotationDetailPage = () => {
               <span>{l({ bn: 'মেশিন ও টেকনিক্যাল বিবরণ (Machine & Technical Profile)', en: 'Machine & Equipment Technical Profile' })}</span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-700 dark:text-slate-200">
-              {quotation.machineDetails.machineName && <span><strong>Machine:</strong> {quotation.machineDetails.machineName}</span>}
+              {quotation.machineDetails.machineName && <span><strong>Machine:</strong> <span data-transliterate="true">{quotation.machineDetails.machineName}</span></span>}
               {quotation.machineDetails.model && <span><strong>Model:</strong> {quotation.machineDetails.model}</span>}
-              {quotation.machineDetails.type && <span><strong>Type:</strong> {quotation.machineDetails.type}</span>}
+              {quotation.machineDetails.type && <span><strong>Type:</strong> <span data-transliterate="true">{quotation.machineDetails.type}</span></span>}
               {quotation.machineDetails.hp && <span><strong>HP:</strong> {quotation.machineDetails.hp}</span>}
               {quotation.machineDetails.ton && <span><strong>Ton:</strong> {quotation.machineDetails.ton}</span>}
               {quotation.machineDetails.cylinder && <span><strong>Cylinder:</strong> {quotation.machineDetails.cylinder}</span>}
-              {quotation.machineDetails.others && <span><strong>Others:</strong> {quotation.machineDetails.others}</span>}
-              {quotation.machineDetails.description && <span className="w-full text-slate-500">{quotation.machineDetails.description}</span>}
+              {quotation.machineDetails.others && <span><strong>Others:</strong> <span data-transliterate="true">{quotation.machineDetails.others}</span></span>}
+              {quotation.machineDetails.description && <span className="w-full text-slate-500" data-transliterate="true">{quotation.machineDetails.description}</span>}
             </div>
           </div>
         )}
@@ -513,7 +516,7 @@ export const QuotationDetailPage = () => {
                   <td className="py-2.5 px-3 text-center font-mono text-slate-500 border-r border-slate-200 dark:border-slate-800">
                     {idx + 1}.
                   </td>
-                  <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800">
+                  <td className="py-2.5 px-4 font-semibold text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800" data-transliterate="true">
                     {cleanItemName(it.name || it.productName)}
                     {it.description && (
                       <span className="block text-[11px] text-slate-400 font-normal">

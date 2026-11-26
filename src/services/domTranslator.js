@@ -55,12 +55,17 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOMAIN_OR_PATH_RE = /^(https?:\/\/|\/[a-z0-9/_-]*$|[a-z0-9.-]+\.(app|io|com|org|net)(\/.*)?$)/i;
 const PHONE_RE = /^\+?\d[\d\s\-()]{5,}$/;
 const IDENTIFIER_KEY_RE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
+const SINGLE_DIGIT_RE = /^[\d\u09E6-\u09EF]$/;
+const CURRENCY_OR_NUMBER_RE = /^[+-]?(?:\s*(?:৳|BDT|Tk\.?|USD|\$|€|£|₹)\s*)?[\d\u09E6-\u09EF,]+(?:\.[\d\u09E6-\u09EF]+)?%?$/i;
 
 const textMeta = new WeakMap();
 const attrMeta = new WeakMap();
 
-const shouldSkipText = (core) => {
-  if (!core || core.length < 2) return true;
+const shouldSkipText = (core, mode = 'ui') => {
+  if (!core) return true;
+  if (core.length < 2 && !SINGLE_DIGIT_RE.test(core)) return true;
+  if (mode !== 'transliterate' && CURRENCY_OR_NUMBER_RE.test(core)) return false;
+  if (mode === 'transliterate' && CURRENCY_OR_NUMBER_RE.test(core)) return false;
   if (!/[A-Za-z\u0980-\u09FF]/.test(core)) return true;
   if (SKIP_EXACT.has(core.toLowerCase())) return true;
   if (IDENTIFIER_KEY_RE.test(core)) return true;
@@ -69,14 +74,19 @@ const shouldSkipText = (core) => {
   return false;
 };
 
-const isElementSkipped = (el) => {
-  if (!el || el.nodeType !== 1) return true;
-  if (SKIP_TAGS.has(el.tagName)) return true;
-  if (el.closest('[data-no-translate], .notranslate, code, pre, svg')) return true;
-  return false;
+const getTranslationMode = (el) => {
+  if (!el || el.nodeType !== 1) return 'skip';
+  if (SKIP_TAGS.has(el.tagName)) return 'skip';
+  const marker = el.closest('[data-transliterate], [data-ui-translate], [data-no-translate], .notranslate, code, pre, svg');
+  if (!marker) return 'ui';
+  if (marker.hasAttribute('data-ui-translate')) return 'ui';
+  if (marker.hasAttribute('data-transliterate')) {
+    return marker.getAttribute('data-transliterate') === 'false' ? 'skip' : 'transliterate';
+  }
+  return 'skip';
 };
 
-const translateCore = (core, lang, allowOnline = true) => {
+const translateCoreUi = (core, lang, allowOnline = true) => {
   const hasBn = translationEngine.hasBangla(core);
 
   if (lang === 'en' && !hasBn) {
@@ -110,13 +120,24 @@ const translateCore = (core, lang, allowOnline = true) => {
   return direct || core;
 };
 
-const translatePreservingWhitespace = (raw, lang, allowOnline = true) => {
+const translateCore = (core, lang, allowOnline = true, mode = 'ui') => {
+  if (mode === 'transliterate') {
+    return translationEngine.transliterateEntity(core, lang);
+  }
+  if (CURRENCY_OR_NUMBER_RE.test(core)) {
+    return translationEngine.localizeDigits(core, lang);
+  }
+  const translated = translateCoreUi(core, lang, allowOnline);
+  return translationEngine.localizeDigits(translated, lang);
+};
+
+const translatePreservingWhitespace = (raw, lang, allowOnline = true, mode = 'ui') => {
   if (!raw || typeof raw !== 'string') return raw;
   const match = raw.match(/^(\s*)([\s\S]*?)(\s*)$/);
   if (!match) return raw;
   const [, leading, core, trailing] = match;
-  if (shouldSkipText(core)) return raw;
-  const translated = translateCore(core, lang, allowOnline);
+  if (shouldSkipText(core, mode)) return raw;
+  const translated = translateCore(core, lang, allowOnline, mode);
   return `${leading}${translated}${trailing}`;
 };
 
@@ -138,14 +159,16 @@ const syncTextNodeSource = (node) => {
  * Keeps every Text node reference intact in place so React 19 reconciles safely without DOM errors.
  */
 const translateTextRun = (run, parentEl, lang) => {
-  if (!run || run.length === 0 || !parentEl || isElementSkipped(parentEl)) return;
+  if (!run || run.length === 0 || !parentEl) return;
+  const mode = getTranslationMode(parentEl);
+  if (mode === 'skip') return;
 
   const metas = run.map(syncTextNodeSource);
   const rawCombined = metas.map((m) => m.source).join('');
   if (!rawCombined) return;
 
-  const allowOnline = parentEl.tagName !== 'OPTION';
-  const nextCombined = translatePreservingWhitespace(rawCombined, lang, allowOnline);
+  const allowOnline = parentEl.tagName !== 'OPTION' && mode === 'ui';
+  const nextCombined = translatePreservingWhitespace(rawCombined, lang, allowOnline, mode);
 
   // When restored back to exact source, restore individual split node values cleanly
   if (nextCombined === rawCombined) {
@@ -175,7 +198,8 @@ const translateTextRun = (run, parentEl, lang) => {
 const TRANSLATABLE_ATTRS = ['placeholder', 'title'];
 
 const translateElementAttrs = (el, lang) => {
-  if (!el || el.nodeType !== 1 || isElementSkipped(el)) return;
+  const mode = getTranslationMode(el);
+  if (mode === 'skip') return;
   let map = attrMeta.get(el);
 
   for (const attr of TRANSLATABLE_ATTRS) {
@@ -195,7 +219,7 @@ const translateElementAttrs = (el, lang) => {
       meta.lastApplied = current;
     }
 
-    const next = translatePreservingWhitespace(meta.source, lang, true);
+    const next = translatePreservingWhitespace(meta.source, lang, mode === 'ui', mode);
     if (current !== next) {
       meta.lastApplied = next;
       el.setAttribute(attr, next);
@@ -204,7 +228,7 @@ const translateElementAttrs = (el, lang) => {
 };
 
 const processElementSubtree = (el, lang) => {
-  if (!el || el.nodeType !== 1 || isElementSkipped(el)) return;
+  if (getTranslationMode(el) === 'skip') return;
 
   translateElementAttrs(el, lang);
 

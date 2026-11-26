@@ -218,24 +218,27 @@ export const SaleDetailPage = () => {
             {sale.customerId ? (
               <Link
                 to={`/customers/${sale.customerId}`}
-                data-no-translate="true"
+                data-transliterate="true"
                 className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400"
               >
                 {sale.customerName}
               </Link>
             ) : (
-              <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              <span
+                className="text-sm font-bold text-slate-800 dark:text-slate-200"
+                data-transliterate={sale.customerName ? 'true' : undefined}
+              >
                 {sale.customerName || l({ bn: 'খুচরা নগদ ক্রেতা', en: 'Walk-in Retail Customer', obro: 'Walk-in Customer' })}
               </span>
             )}
             {(customer?.companyName || sale.customerCompany) && (
-              <p className="text-purple-600 dark:text-purple-400 font-semibold mt-0.5" data-no-translate="true">
+              <p className="text-purple-600 dark:text-purple-400 font-semibold mt-0.5" data-transliterate="true">
                 {customer?.companyName || sale.customerCompany}
               </p>
             )}
             <p className="text-slate-500 mt-0.5">{customer?.phone || sale.customerPhone || l({ bn: 'কাউন্টার সরাসরি বিক্রয়', en: 'Direct counter sale', obro: 'Direct counter sale' })}</p>
             {(customer?.address || sale.customerAddress) && (
-              <p className="text-slate-400 mt-0.5" data-no-translate="true">{customer?.address || sale.customerAddress}</p>
+              <p className="text-slate-400 mt-0.5" data-transliterate="true">{customer?.address || sale.customerAddress}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -271,14 +274,14 @@ export const SaleDetailPage = () => {
               <span>{l({ bn: 'মেশিন ও টেকনিক্যাল বিবরণ (Machine Specs)', en: 'Machine & Equipment Specs' })}</span>
             </div>
             <div className="flex flex-wrap gap-2 text-[11px] text-slate-700 dark:text-slate-200">
-              {sale.machineDetails.machineName && <span><strong>Machine:</strong> {sale.machineDetails.machineName}</span>}
+              {sale.machineDetails.machineName && <span><strong>Machine:</strong> <span data-transliterate="true">{sale.machineDetails.machineName}</span></span>}
               {sale.machineDetails.model && <span>• <strong>Model:</strong> {sale.machineDetails.model}</span>}
-              {sale.machineDetails.type && <span>• <strong>Type:</strong> {sale.machineDetails.type}</span>}
+              {sale.machineDetails.type && <span>• <strong>Type:</strong> <span data-transliterate="true">{sale.machineDetails.type}</span></span>}
               {sale.machineDetails.hp && <span>• <strong>HP:</strong> {sale.machineDetails.hp}</span>}
               {sale.machineDetails.ton && <span>• <strong>Ton:</strong> {sale.machineDetails.ton}</span>}
               {sale.machineDetails.cylinder && <span>• <strong>Cyl:</strong> {sale.machineDetails.cylinder}</span>}
-              {sale.machineDetails.others && <span>• <strong>Others:</strong> {sale.machineDetails.others}</span>}
-              {sale.machineDetails.description && <span className="w-full text-slate-500">{sale.machineDetails.description}</span>}
+              {sale.machineDetails.others && <span>• <strong>Others:</strong> <span data-transliterate="true">{sale.machineDetails.others}</span></span>}
+              {sale.machineDetails.description && <span className="w-full text-slate-500" data-transliterate="true">{sale.machineDetails.description}</span>}
             </div>
           </div>
         )}
@@ -342,7 +345,7 @@ export const SaleDetailPage = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {(sale.items || []).map((item, i) => (
                   <tr key={i}>
-                    <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
+                    <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200" data-transliterate="true">
                       {cleanItemName(item.productName || item.productId)}
                     </td>
                     <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">

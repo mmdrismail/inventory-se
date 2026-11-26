@@ -167,7 +167,7 @@ export const SmartPartLookupModal = ({
                     >
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                          <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100" data-transliterate="true">
                             {row.partName}
                           </span>
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
@@ -188,7 +188,7 @@ export const SmartPartLookupModal = ({
                         {mSummary && (
                           <div className="text-[11px] text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-1.5 flex-wrap">
                             <Cpu className="h-3 w-3 shrink-0" />
-                            <span>{mSummary}</span>
+                            <span data-transliterate="true">{mSummary}</span>
                           </div>
                         )}
 
@@ -203,7 +203,11 @@ export const SmartPartLookupModal = ({
                               {row.lastDocNumber}
                             </span>
                           )}
-                          {row.lastCustomerName && <span>• {row.lastCustomerName}</span>}
+                          {row.lastCustomerName && (
+                            <span>
+                              • <span data-transliterate="true">{row.lastCustomerName}</span>
+                            </span>
+                          )}
                           {row.lastDocDate && <span>• {formatDate(row.lastDocDate)}</span>}
                           {row.lastQuotedPrice > 0 && (
                             <span className="text-purple-600 dark:text-purple-400 font-semibold">
@@ -278,11 +282,13 @@ export const SmartPartLookupModal = ({
                     className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 bg-white dark:bg-slate-900 flex items-center justify-between gap-2"
                   >
                     <div className="min-w-0">
-                      <div className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+                      <div className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate" data-transliterate="true">
                         {p.partName}
                       </div>
                       <div className="text-[10px] text-slate-500 truncate">
-                        {[p.machineName, p.model, `SKU: ${p.sku}`].filter(Boolean).join(' · ')}
+                        {p.machineName && <span data-transliterate="true">{p.machineName}</span>}
+                        {p.machineName && (p.model || p.sku) ? ' · ' : ''}
+                        {[p.model, `SKU: ${p.sku}`].filter(Boolean).join(' · ')}
                       </div>
                       <div className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 font-semibold mt-0.5">
                         {formatCurrency(p.price, settings.currency)} · Stock: {p.stockQty} {p.unit}

@@ -211,10 +211,13 @@ export const ProductDetailPage = () => {
             </div>
 
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white" data-transliterate="true">
                 {product.name}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+              <p
+                className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 leading-relaxed"
+                data-transliterate={product.description ? 'true' : undefined}
+              >
                 {product.description || 'No detailed description specified.'}
               </p>
             </div>

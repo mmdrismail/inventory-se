@@ -313,6 +313,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                             {renderConditionBadge(p.condition)}
                             <h4
                               onClick={() => handleSelect(`/products/${prodId}`)}
+                              data-transliterate="true"
                               className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 cursor-pointer truncate"
                             >
                               {p.name}
@@ -432,7 +433,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                     >
                       <div className="min-w-0 flex-1 pr-2">
                         <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
-                          <span>{row.partName}</span>
+                          <span data-transliterate="true">{row.partName}</span>
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                             {row.unit}
                           </span>
@@ -445,12 +446,17 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                         {mSummary && (
                           <div className="text-[10.5px] text-indigo-700 dark:text-indigo-300 font-semibold flex items-center gap-1 mt-0.5 truncate">
                             <Cpu className="h-3 w-3 shrink-0" />
-                            <span>{mSummary}</span>
+                            <span data-transliterate="true">{mSummary}</span>
                           </div>
                         )}
                         <div className="text-[10px] text-slate-500 mt-0.5">
                           {row.lastDocNumber ? `${row.lastDocNumber} · ` : ''}
-                          {row.lastCustomerName ? `${row.lastCustomerName} · ` : ''}
+                          {row.lastCustomerName && (
+                            <>
+                              <span data-transliterate="true">{row.lastCustomerName}</span>
+                              {' · '}
+                            </>
+                          )}
                           {row.lastDocDate ? formatDate(row.lastDocDate) : ''}
                         </div>
                       </div>
@@ -484,10 +490,10 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                     <div>
                       <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                         <span className="font-mono text-purple-600 dark:text-purple-400">{qItem.quotationNumber}</span>
-                        <span>• {qItem.customerName}</span>
+                        <span>• <span data-transliterate={qItem.customerName ? 'true' : undefined}>{qItem.customerName}</span></span>
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        {qItem.customerCompany || 'Direct Client'} · {qItem.items?.length || 0} items · Req: {qItem.requisitionRef || 'N/A'}
+                        <span data-transliterate={qItem.customerCompany ? 'true' : undefined}>{qItem.customerCompany || 'Direct Client'}</span> · {qItem.items?.length || 0} items · Req: {qItem.requisitionRef || 'N/A'}
                       </div>
                     </div>
                     <div className="text-right font-mono font-bold text-slate-800 dark:text-slate-200">
@@ -546,8 +552,8 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                     className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors"
                   >
                     <div>
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{c.name}</div>
-                      <div className="text-[11px] text-slate-400">{c.companyName || c.phone}</div>
+                      <div className="font-bold text-slate-900 dark:text-slate-100" data-transliterate="true">{c.name}</div>
+                      <div className="text-[11px] text-slate-400" data-transliterate={c.companyName ? 'true' : undefined}>{c.companyName || c.phone}</div>
                     </div>
                     <span className="text-blue-600 dark:text-blue-400 font-semibold text-[11px]">লেজার দেখুন</span>
                   </button>
@@ -573,7 +579,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                     <div>
                       <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                         <span className="font-mono text-emerald-600 dark:text-emerald-400">{s.invoiceNo || s.invoiceNumber}</span>
-                        <span>• {s.customerName || 'Walk-in'}</span>
+                        <span>• <span data-transliterate={s.customerName ? 'true' : undefined}>{s.customerName || 'Walk-in'}</span></span>
                       </div>
                       <div className="text-[11px] text-slate-400">
                         {s.items?.length || 0} items · {String(s.paymentStatus || 'PAID').toUpperCase()}

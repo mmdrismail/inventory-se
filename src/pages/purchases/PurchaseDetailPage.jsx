@@ -178,18 +178,19 @@ export const PurchaseDetailPage = () => {
             </span>
             <Link
               to={`/suppliers/${purchase.supplierId}`}
+              data-transliterate={supplier?.name ? 'true' : undefined}
               className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400"
             >
               {supplier?.name || 'Direct Supplier'}
             </Link>
-            <p className="text-slate-500 mt-0.5">{supplier?.companyName}</p>
+            <p className="text-slate-500 mt-0.5" data-transliterate={supplier?.companyName ? 'true' : undefined}>{supplier?.companyName}</p>
             <p className="text-slate-400 mt-0.5">{supplier?.phone || supplier?.email}</p>
           </div>
           <div>
             <span className="text-slate-400 font-semibold block uppercase text-[10px] mb-1">
               Notes & Reference
             </span>
-            <p className="text-slate-700 dark:text-slate-300">
+            <p className="text-slate-700 dark:text-slate-300" data-transliterate={purchase.notes ? 'true' : undefined}>
               {purchase.notes || 'No notes specified.'}
             </p>
             {purchase.receivedAt && (
@@ -218,7 +219,7 @@ export const PurchaseDetailPage = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {(purchase.items || []).map((item, i) => (
                   <tr key={i}>
-                    <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200">
+                    <td className="py-3 px-4 font-semibold text-slate-800 dark:text-slate-200" data-transliterate="true">
                       {item.productName || item.productId}
                     </td>
                     <td className="py-3 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">

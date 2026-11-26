@@ -639,7 +639,7 @@ export const PurchaseListPage = () => {
                           </Link>
                         </td>
 
-                        <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-medium">
+                        <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-medium" data-transliterate={supMap[p.supplierId] ? 'true' : undefined}>
                           {supMap[p.supplierId] || 'Direct Supplier'}
                         </td>
 
@@ -788,11 +788,11 @@ export const PurchaseListPage = () => {
                         </span>
                       </div>
 
-                      <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                      <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white" data-transliterate="true">
                         {lot.lotName}
                       </h3>
                       <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                        <span>জাহাজ / সূত্র: <strong className="text-slate-700 dark:text-slate-300">{lot.sourceShip || 'Scrap Yard'}</strong></span>
+                        <span>জাহাজ / সূত্র: <strong className="text-slate-700 dark:text-slate-300" data-transliterate={lot.sourceShip ? 'true' : undefined}>{lot.sourceShip || 'Scrap Yard'}</strong></span>
                         <span>• ক্রয়ের তারিখ: {formatDate(lot.purchaseDate || lot.createdAt)}</span>
                       </p>
                     </div>
@@ -871,10 +871,10 @@ export const PurchaseListPage = () => {
                               <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                                 <td className="py-2.5 px-3 font-mono text-slate-400">{idx + 1}</td>
                                 <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-slate-100">
-                                  {it.partName}
+                                  <span data-transliterate="true">{it.partName}</span>
                                   {it.brand && (
                                     <span className="block text-[10px] text-slate-400 font-normal">
-                                      Brand: {it.brand} {it.modelNumber ? `· Model: ${it.modelNumber}` : ''}
+                                      Brand: <span data-transliterate="true">{it.brand}</span> {it.modelNumber ? `· Model: ${it.modelNumber}` : ''}
                                     </span>
                                   )}
                                 </td>

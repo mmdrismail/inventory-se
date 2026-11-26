@@ -1014,7 +1014,7 @@ export const QuotationFormPage = () => {
                             {l({ bn: 'ক্যাটালগ...', en: 'Stock Catalog...', obro: 'Stock Catalog...' })}
                           </option>
                           {products.map((p) => (
-                            <option key={p.id} value={p.id}>
+                            <option key={p.id} value={p.id} data-transliterate="true">
                               {p.name}
                             </option>
                           ))}

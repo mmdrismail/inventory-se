@@ -326,10 +326,14 @@ export const SalesListPage = () => {
                         )}
                       </td>
 
-                      <td className="py-3 px-3 text-slate-800 dark:text-slate-200 font-medium" data-no-translate="true">
-                        {s.customerName || 'Walk-in Customer'}
+                      <td className="py-3 px-3 text-slate-800 dark:text-slate-200 font-medium">
+                        {s.customerName ? (
+                          <span data-transliterate="true">{s.customerName}</span>
+                        ) : (
+                          'Walk-in Customer'
+                        )}
                         {s.customerCompany && (
-                          <span className="block text-[11px] text-purple-600 dark:text-purple-400 font-normal">
+                          <span className="block text-[11px] text-purple-600 dark:text-purple-400 font-normal" data-transliterate="true">
                             {s.customerCompany}
                           </span>
                         )}
