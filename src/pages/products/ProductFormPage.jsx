@@ -107,12 +107,12 @@ export const ProductFormPage = () => {
           description: existing.description || '',
           categoryId: existing.categoryId || '',
           supplierId: existing.supplierId || '',
-          costPrice: String(existing.costPrice || 0),
-          staffPrice: String(existing.staffPrice || Math.round((existing.costPrice || 0) * 1.3)),
-          managerPrice: String(existing.managerPrice || Math.round((existing.costPrice || 0) * 1.5)),
-          sellingPrice: String(existing.sellingPrice || existing.customerPrice || 0),
-          quantity: String(existing.quantity || 0),
-          reorderLevel: String(existing.reorderLevel || 10),
+          costPrice: Number(existing.costPrice) > 0 ? String(existing.costPrice) : '',
+          staffPrice: Number(existing.staffPrice) > 0 ? String(existing.staffPrice) : '',
+          managerPrice: Number(existing.managerPrice) > 0 ? String(existing.managerPrice) : '',
+          sellingPrice: Number(existing.sellingPrice || existing.customerPrice) > 0 ? String(existing.sellingPrice || existing.customerPrice) : '',
+          quantity: Number(existing.quantity) > 0 ? String(existing.quantity) : '',
+          reorderLevel: existing.reorderLevel ? String(existing.reorderLevel) : '10',
           unit: normalizeUnit(existing.unit, 'pc'),
           imageUrl: existing.imageUrl || '',
           isPublic: existing.isPublic !== undefined ? existing.isPublic : true,
@@ -151,9 +151,11 @@ export const ProductFormPage = () => {
       };
       if (name === 'costPrice') {
         const cost = Number(value) || 0;
-        if (!prev.staffPrice || Number(prev.staffPrice) === 0) updated.staffPrice = String(Math.round(cost * 1.3));
-        if (!prev.managerPrice || Number(prev.managerPrice) === 0) updated.managerPrice = String(Math.round(cost * 1.5));
-        if (!prev.sellingPrice || Number(prev.sellingPrice) === 0) updated.sellingPrice = String(Math.round(cost * 1.8));
+        if (cost > 0) {
+          if (!prev.staffPrice || Number(prev.staffPrice) === 0) updated.staffPrice = String(Math.round(cost * 1.3));
+          if (!prev.managerPrice || Number(prev.managerPrice) === 0) updated.managerPrice = String(Math.round(cost * 1.5));
+          if (!prev.sellingPrice || Number(prev.sellingPrice) === 0) updated.sellingPrice = String(Math.round(cost * 1.8));
+        }
       }
       return updated;
     });
@@ -179,8 +181,8 @@ export const ProductFormPage = () => {
         name: '+0.25 mm Oversize',
         condition: formData.condition || 'original_oem',
         sku: `${formData.sku || 'SKU'}-${prev.length + 1}`,
-        costPrice: Number(formData.costPrice) || 0,
-        sellingPrice: Number(formData.sellingPrice) || 0,
+        costPrice: Number(formData.costPrice) > 0 ? formData.costPrice : '',
+        sellingPrice: Number(formData.sellingPrice) > 0 ? formData.sellingPrice : '',
         quantity: 5,
         location: `${formData.locZone.charAt(5) || 'A'}-${formData.locAisle}-${formData.locRack}-${formData.locShelf}-${formData.locBin}`,
       },
@@ -611,7 +613,7 @@ export const ProductFormPage = () => {
                     name="costPrice"
                     value={formData.costPrice}
                     onChange={handleChange}
-                    placeholder="0.00"
+                    placeholder="0"
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-semibold text-slate-800 dark:text-slate-200"
                     required
                   />
@@ -660,7 +662,7 @@ export const ProductFormPage = () => {
                     name="sellingPrice"
                     value={formData.sellingPrice}
                     onChange={handleChange}
-                    placeholder="0.00"
+                    placeholder="0"
                     className="w-full px-3 py-2 rounded-xl border border-emerald-400 dark:border-emerald-600 bg-white dark:bg-slate-900 font-mono font-bold text-emerald-600 dark:text-emerald-300"
                     required
                   />
@@ -766,8 +768,10 @@ export const ProductFormPage = () => {
                         <label className="text-[10px] font-bold text-slate-400 block">কেনা দর</label>
                         <input
                           type="number"
+                          step="any"
                           value={v.costPrice}
-                          onChange={(e) => handleUpdateVariant(idx, 'costPrice', Number(e.target.value))}
+                          onChange={(e) => handleUpdateVariant(idx, 'costPrice', e.target.value)}
+                          placeholder="0"
                           className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent font-mono"
                         />
                       </div>
@@ -775,8 +779,10 @@ export const ProductFormPage = () => {
                         <label className="text-[10px] font-bold text-slate-400 block">বিক্রয় দর</label>
                         <input
                           type="number"
+                          step="any"
                           value={v.sellingPrice}
-                          onChange={(e) => handleUpdateVariant(idx, 'sellingPrice', Number(e.target.value))}
+                          onChange={(e) => handleUpdateVariant(idx, 'sellingPrice', e.target.value)}
+                          placeholder="0"
                           className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent font-mono font-bold text-emerald-600"
                         />
                       </div>
@@ -785,7 +791,8 @@ export const ProductFormPage = () => {
                         <input
                           type="number"
                           value={v.quantity}
-                          onChange={(e) => handleUpdateVariant(idx, 'quantity', Number(e.target.value))}
+                          onChange={(e) => handleUpdateVariant(idx, 'quantity', e.target.value)}
+                          placeholder="0"
                           className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-transparent font-mono font-bold text-center"
                         />
                       </div>

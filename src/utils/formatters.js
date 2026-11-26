@@ -6,11 +6,12 @@ import { format, isValid, parseISO } from 'date-fns';
  */
 export const formatCurrency = (amount, currency = 'BDT') => {
   const num = Number(amount) || 0;
+  const rounded = Math.round((num + Number.EPSILON) * 100) / 100;
   const rawCurr = currency ? String(currency).trim() : 'BDT';
   const upperCurr = rawCurr.toUpperCase();
 
   if (upperCurr === 'BDT' || rawCurr === '৳' || upperCurr === 'TK') {
-    return `৳${num.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `৳${rounded.toLocaleString('en-BD', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 
   const symbolMap = { '$': 'USD', '€': 'EUR', '£': 'GBP', '₹': 'INR' };
@@ -20,10 +21,11 @@ export const formatCurrency = (amount, currency = 'BDT') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: isoCurrency,
-      minimumFractionDigits: 2,
-    }).format(num);
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(rounded);
   } catch {
-    return `${rawCurr} ${num.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${rawCurr} ${rounded.toLocaleString('en-BD', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   }
 };
 
@@ -32,7 +34,8 @@ export const formatCurrency = (amount, currency = 'BDT') => {
  */
 export const formatNumber = (val) => {
   const num = Number(val) || 0;
-  return num.toLocaleString();
+  const rounded = Math.round((num + Number.EPSILON) * 100) / 100;
+  return rounded.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 };
 
 /**

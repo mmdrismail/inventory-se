@@ -55,7 +55,7 @@ export const CustomerListPage = () => {
     phone: '',
     location: '',
     address: '',
-    totalDue: 0,
+    totalDue: '',
     notes: '',
   });
   const [errors, setErrors] = useState({});
@@ -139,7 +139,7 @@ export const CustomerListPage = () => {
       phone: '',
       location: '',
       address: '',
-      totalDue: 0,
+      totalDue: '',
       notes: '',
     });
     setErrors({});
@@ -157,7 +157,7 @@ export const CustomerListPage = () => {
       phone: c.phone || '',
       location: c.location || '',
       address: c.address || '',
-      totalDue: c.totalDue || 0,
+      totalDue: Number(c.totalDue) > 0 ? c.totalDue : '',
       notes: c.notes || '',
     });
     setErrors({});

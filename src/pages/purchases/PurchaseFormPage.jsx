@@ -47,7 +47,7 @@ export const PurchaseFormPage = () => {
       productId: products[0]?.id || '',
       quantity: 10,
       unit: normalizeUnit(products[0]?.unit),
-      unitCost: products[0]?.costPrice || 0,
+      unitCost: Number(products[0]?.costPrice) > 0 ? products[0].costPrice : '',
     },
   ]);
 
@@ -63,7 +63,7 @@ export const PurchaseFormPage = () => {
         productId: firstProd?.id || '',
         quantity: 5,
         unit: normalizeUnit(firstProd?.unit),
-        unitCost: firstProd?.costPrice || 0,
+        unitCost: Number(firstProd?.costPrice) > 0 ? firstProd.costPrice : '',
       },
     ]);
   };
@@ -175,7 +175,8 @@ export const PurchaseFormPage = () => {
       if (field === 'productId') {
         const prod = products.find((p) => p.id === value);
         if (prod) {
-          item.unitCost = prod.costPrice;
+          const costNum = Number(prod.costPrice) || 0;
+          item.unitCost = costNum > 0 ? prod.costPrice : '';
           item.unit = normalizeUnit(prod.unit);
         }
       }
@@ -505,6 +506,7 @@ export const PurchaseFormPage = () => {
                         min="0"
                         value={line.unitCost}
                         onChange={(e) => handleItemChange(idx, 'unitCost', e.target.value)}
+                        placeholder="0"
                         className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 font-mono text-slate-800 dark:text-slate-200 text-right"
                       />
                     </div>
@@ -592,6 +594,7 @@ export const PurchaseFormPage = () => {
               <Button
                 variant="primary"
                 icon={CheckCircle2}
+                data-enter-final-button="true"
                 isLoading={isSubmitting}
                 onClick={() => handleSubmit('received')}
               >

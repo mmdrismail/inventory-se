@@ -65,7 +65,11 @@ export const SmartPartLookupModal = ({
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 p-4 overflow-y-auto">
       <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10"
+      >
         {/* Header Search Input */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
@@ -91,6 +95,7 @@ export const SmartPartLookupModal = ({
             <Search className="h-4 w-4 text-indigo-500 absolute left-3 top-2.5" />
             <input
               type="text"
+              data-enter-ignore="true"
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}

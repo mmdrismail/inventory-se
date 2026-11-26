@@ -13,6 +13,7 @@ export const Input = ({
   ...props
 }) => {
   const inputId = id || props.name;
+  const resolvedPlaceholder = props.placeholder !== undefined ? props.placeholder : type === 'number' ? '0' : undefined;
 
   return (
     <div className={`flex flex-col gap-1.5 ${wrapperClassName}`}>
@@ -43,6 +44,7 @@ export const Input = ({
               : 'border-slate-200 dark:border-slate-800 focus:border-emerald-500'
           } ${className}`}
           {...props}
+          placeholder={resolvedPlaceholder}
         />
       </div>
       {error && <span className="text-xs text-red-500">{error}</span>}

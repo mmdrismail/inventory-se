@@ -73,7 +73,7 @@ export const ProductDetailPage = () => {
   const cost = Number(product.costPrice) || 0;
   const price = Number(product.sellingPrice) || 0;
   const qty = Number(product.quantity) || 0;
-  const margin = price > 0 ? (((price - cost) / price) * 100).toFixed(1) : 0;
+  const margin = price > 0 ? (((price - cost) / price) * 100).toFixed(1).replace(/\.0$/, '') : 0;
   const totalCostVal = cost * qty;
   const totalRetailVal = price * qty;
 

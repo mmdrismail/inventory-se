@@ -6,6 +6,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { handleFormEnterNavigation } from './utils/keyboardNavigation';
 
 // Layouts
 import { PublicLayout } from './layouts/PublicLayout';
@@ -91,7 +92,8 @@ import { ProfilePage } from './pages/settings/ProfilePage';
 export default function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
+      <div className="contents" onKeyDown={handleFormEnterNavigation}>
+        <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
         <LanguageProvider>
@@ -258,6 +260,7 @@ export default function App() {
       </LanguageProvider>
     </AuthProvider>
     </BrowserRouter>
+    </div>
     </ErrorBoundary>
   );
 }

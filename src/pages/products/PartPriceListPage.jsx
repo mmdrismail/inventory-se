@@ -71,9 +71,9 @@ export const PartPriceListPage = () => {
   const [promoteTarget, setPromoteTarget] = useState(null);
   const [promoteForm, setPromoteForm] = useState({
     sku: '',
-    quantity: '0',
-    costPrice: '0',
-    sellingPrice: '0',
+    quantity: '',
+    costPrice: '',
+    sellingPrice: '',
   });
 
   const unifiedIndex = useMemo(
@@ -146,11 +146,12 @@ export const PartPriceListPage = () => {
         .replace(/[^a-zA-Z0-9]/g, '')
         .slice(0, 4)
         .toUpperCase() || 'PART';
+    const sellVal = Number(row.lastPrice || row.lastQuotedPrice || row.lastSoldPrice) || 0;
     setPromoteForm({
       sku: `${baseSku}-${Math.floor(1000 + Math.random() * 9000)}`,
-      quantity: '0',
-      costPrice: '0',
-      sellingPrice: String(row.lastPrice || row.lastQuotedPrice || row.lastSoldPrice || 0),
+      quantity: '',
+      costPrice: '',
+      sellingPrice: sellVal > 0 ? String(sellVal) : '',
     });
     setPromoteTarget(row);
   };
@@ -749,6 +750,7 @@ export const PartPriceListPage = () => {
                   min="0"
                   value={promoteForm.quantity}
                   onChange={(e) => setPromoteForm((p) => ({ ...p, quantity: e.target.value }))}
+                  placeholder="0"
                   className="w-full px-2.5 py-2 font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                 />
               </div>
@@ -762,6 +764,7 @@ export const PartPriceListPage = () => {
                   step="any"
                   value={promoteForm.costPrice}
                   onChange={(e) => setPromoteForm((p) => ({ ...p, costPrice: e.target.value }))}
+                  placeholder="0"
                   className="w-full px-2.5 py-2 font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                 />
               </div>
@@ -775,6 +778,7 @@ export const PartPriceListPage = () => {
                   step="any"
                   value={promoteForm.sellingPrice}
                   onChange={(e) => setPromoteForm((p) => ({ ...p, sellingPrice: e.target.value }))}
+                  placeholder="0"
                   className="w-full px-2.5 py-2 font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                 />
               </div>

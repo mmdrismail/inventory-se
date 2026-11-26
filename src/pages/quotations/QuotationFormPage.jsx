@@ -129,7 +129,7 @@ export const QuotationFormPage = () => {
         name: '',
         quantity: 1,
         unit: 'pc',
-        unitPrice: 0,
+        unitPrice: '',
         lineTotal: 0,
       },
     ];
@@ -141,8 +141,8 @@ export const QuotationFormPage = () => {
   const [showGrandTotal, setShowGrandTotal] = useState(true);
 
   // Summary financials
-  const [discount, setDiscount] = useState(0);
-  const [tax, setTax] = useState(0);
+  const [discount, setDiscount] = useState('');
+  const [tax, setTax] = useState('');
   const [status, setStatus] = useState('draft');
   const [termsAndConditions, setTermsAndConditions] = useState(
     DEFAULT_TERMS[language] || DEFAULT_TERMS.bn
@@ -195,15 +195,18 @@ export const QuotationFormPage = () => {
 
       if (existingQuote.items && existingQuote.items.length > 0) {
         setItems(
-          existingQuote.items.map((it, idx) => ({
-            id: it.id || `item-${idx + 1}`,
-            productId: it.productId || '',
-            name: it.name || it.productName || '',
-            quantity: Number(it.quantity) || 1,
-            unit: normalizeUnit(it.unit),
-            unitPrice: Number(it.unitPrice || it.rate || it.price) || 0,
-            lineTotal: Number(it.lineTotal || it.amount || 0),
-          }))
+          existingQuote.items.map((it, idx) => {
+            const rateNum = Number(it.unitPrice || it.rate || it.price) || 0;
+            return {
+              id: it.id || `item-${idx + 1}`,
+              productId: it.productId || '',
+              name: it.name || it.productName || '',
+              quantity: Number(it.quantity) || 1,
+              unit: normalizeUnit(it.unit),
+              unitPrice: rateNum > 0 ? rateNum : '',
+              lineTotal: Number(it.lineTotal || it.amount || 0),
+            };
+          })
         );
       }
 
@@ -211,8 +214,8 @@ export const QuotationFormPage = () => {
       if (existingQuote.showLineTotal !== undefined) setShowLineTotal(existingQuote.showLineTotal);
       if (existingQuote.showGrandTotal !== undefined) setShowGrandTotal(existingQuote.showGrandTotal);
 
-      setDiscount(Number(existingQuote.discount) || 0);
-      setTax(Number(existingQuote.tax) || 0);
+      setDiscount(Number(existingQuote.discount) > 0 ? Number(existingQuote.discount) : '');
+      setTax(Number(existingQuote.tax) > 0 ? Number(existingQuote.tax) : '');
       setStatus(existingQuote.status || 'draft');
       setTermsAndConditions(existingQuote.termsAndConditions || DEFAULT_TERMS[language] || DEFAULT_TERMS.bn);
       setNotes(existingQuote.notes || '');
@@ -276,7 +279,7 @@ export const QuotationFormPage = () => {
         name: '',
         quantity: 1,
         unit: 'pc',
-        unitPrice: 0,
+        unitPrice: '',
         lineTotal: 0,
       },
     ]);
@@ -328,8 +331,9 @@ export const QuotationFormPage = () => {
       if (field === 'productId' && value) {
         const prod = products.find((p) => p.id === value);
         if (prod) {
+          const pRate = Number(prod.sellingPrice || prod.price) || 0;
           cur.name = prod.name;
-          cur.unitPrice = prod.price || 0;
+          cur.unitPrice = pRate > 0 ? pRate : '';
           cur.unit = normalizeUnit(prod.unit);
         }
       }
@@ -1065,6 +1069,7 @@ export const QuotationFormPage = () => {
                           step="any"
                           value={it.unitPrice}
                           onChange={(e) => handleItemChange(idx, 'unitPrice', e.target.value)}
+                          placeholder="0"
                           className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-right font-mono"
                         />
                       </td>
@@ -1161,8 +1166,10 @@ export const QuotationFormPage = () => {
                     <input
                       type="number"
                       min="0"
+                      step="any"
                       value={discount}
                       onChange={(e) => setDiscount(e.target.value)}
+                      placeholder="0"
                       className="w-28 px-2 py-1 text-xs text-right font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                     />
                   </div>
@@ -1174,8 +1181,10 @@ export const QuotationFormPage = () => {
                     <input
                       type="number"
                       min="0"
+                      step="any"
                       value={tax}
                       onChange={(e) => setTax(e.target.value)}
+                      placeholder="0"
                       className="w-28 px-2 py-1 text-xs text-right font-mono rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                     />
                   </div>
@@ -1249,7 +1258,7 @@ export const QuotationFormPage = () => {
         <Button variant="secondary" icon={Printer} onClick={() => handleSave(true)}>
           {l({ bn: 'সংরক্ষণ ও প্রিন্ট প্যাড', en: 'Save & Print Quotation Pad', obro: 'Save & Print Quotation Pad' })}
         </Button>
-        <Button variant="primary" icon={Save} onClick={() => handleSave(false)}>
+        <Button variant="primary" icon={Save} data-enter-final-button="true" onClick={() => handleSave(false)}>
           {isEditing
             ? l({ bn: 'কোটেশন আপডেট করুন', en: 'Update Quotation', obro: 'Update Quotation' })
             : l({ bn: 'কোটেশন তৈরি করুন', en: 'Create Quotation', obro: 'Create Quotation' })}
@@ -1281,7 +1290,7 @@ export const QuotationFormPage = () => {
                 productId: picked.productId === 'custom' ? '' : picked.productId,
                 name: picked.name,
                 unit: unitVal,
-                unitPrice: rateVal,
+                unitPrice: rateVal > 0 ? rateVal : '',
                 lineTotal: Math.round(q * rateVal * 100) / 100,
               };
               return updated;

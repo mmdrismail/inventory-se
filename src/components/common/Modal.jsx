@@ -41,6 +41,8 @@ export const Modal = ({
 
       {/* Modal Dialog */}
       <div
+        role="dialog"
+        aria-modal="true"
         className={`relative w-full ${maxWidth} bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 overflow-hidden transform transition-all duration-200 scale-100 my-auto`}
         onClick={(e) => e.stopPropagation()}
       >

@@ -100,7 +100,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
 
   // Editable items data (Description, Qty, Rate, Line Total)
   const [editableItems, setEditableItems] = useState([]);
-  const [customDiscount, setCustomDiscount] = useState('0');
+  const [customDiscount, setCustomDiscount] = useState('');
 
   // Editable stationery profile overrides
   const [customInfo, setCustomInfo] = useState({
@@ -142,13 +142,13 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
           sku: it.sku || '',
           quantity: qty,
           unit: normalizeUnit(it.unit),
-          unitPrice: rate,
+          unitPrice: rate > 0 ? rate : '',
           lineTotal: Number(it.lineTotal !== undefined ? it.lineTotal : (it.total || qty * rate)),
           description: it.description || '',
         };
       });
       setEditableItems(initialItems);
-      setCustomDiscount(sale.discount !== undefined ? String(sale.discount) : '0');
+      setCustomDiscount(Number(sale.discount) > 0 ? String(sale.discount) : '');
     }
   }, [sale, isOpen]);
 
@@ -198,7 +198,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
         sku: '',
         quantity: 1,
         unit: 'pc',
-        unitPrice: 0,
+        unitPrice: '',
         lineTotal: 0,
         description: '',
       },
@@ -954,6 +954,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                               step="any"
                               value={it.unitPrice}
                               onChange={(e) => handleItemChange(idx, 'unitPrice', e.target.value)}
+                              placeholder="0"
                               className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-right text-emerald-700 dark:text-emerald-400"
                             />
                           </td>
@@ -1002,6 +1003,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                         step="any"
                         value={customDiscount}
                         onChange={(e) => setCustomDiscount(e.target.value)}
+                        placeholder="0"
                         className="w-20 px-2 py-0.5 rounded border border-slate-300 dark:border-slate-700 font-mono text-xs font-bold text-right"
                       />
                     </div>

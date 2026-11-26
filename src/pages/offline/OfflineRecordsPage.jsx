@@ -91,7 +91,7 @@ const createEmptyItem = (firstProduct = null) => ({
   productName: firstProduct?.name || '',
   quantity: 1,
   unit: normalizeUnit(firstProduct?.unit || 'pc'),
-  unitPrice: Number(firstProduct?.sellingPrice) || 0,
+  unitPrice: Number(firstProduct?.sellingPrice) > 0 ? Number(firstProduct.sellingPrice) : '',
 });
 
 const createBatchRow = () => ({
@@ -195,7 +195,7 @@ export const OfflineRecordsPage = () => {
   const [autoSaveCustomer, setAutoSaveCustomer] = useState(true);
 
   const [items, setItems] = useState(() => [createEmptyItem(null)]);
-  const [discount, setDiscount] = useState('0');
+  const [discount, setDiscount] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [notes, setNotes] = useState('');
@@ -407,9 +407,10 @@ export const OfflineRecordsPage = () => {
       if (field === 'productId') {
         const prod = products.find((p) => p.id === val || p._id === val);
         if (prod) {
+          const sellNum = Number(prod.sellingPrice) || 0;
           cur.productName = prod.name;
           cur.unit = normalizeUnit(prod.unit || 'pc');
-          cur.unitPrice = Number(prod.sellingPrice) || 0;
+          cur.unitPrice = sellNum > 0 ? sellNum : '';
         }
       }
       next[idx] = cur;
@@ -1741,7 +1742,7 @@ export const OfflineRecordsPage = () => {
                                   step="any"
                                   value={it.unitPrice}
                                   onChange={(e) => handleItemChange(idx, 'unitPrice', e.target.value)}
-                                  placeholder="Rate"
+                                  placeholder="0"
                                   className="w-full px-2 py-1.5 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                                   title="Rate"
                                 />
@@ -1779,6 +1780,7 @@ export const OfflineRecordsPage = () => {
                           step="any"
                           value={discount}
                           onChange={(e) => setDiscount(e.target.value)}
+                          placeholder="0"
                           className="w-full px-2.5 py-1.5 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                         />
                       </div>

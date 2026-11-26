@@ -81,8 +81,8 @@ export const SalesFormPage = () => {
   const [paymentStatus, setPaymentStatus] = useState('paid'); // 'paid', 'partial', 'due'
   const [paymentMethod, setPaymentMethod] = useState(prefill?.paymentMethod || 'cash');
   const [paidAmountInput, setPaidAmountInput] = useState('');
-  const [discount, setDiscount] = useState(prefill?.discount ? String(prefill.discount) : '0');
-  const [tax, setTax] = useState(prefill?.tax ? String(prefill.tax) : '0');
+  const [discount, setDiscount] = useState(Number(prefill?.discount) > 0 ? String(prefill.discount) : '');
+  const [tax, setTax] = useState(Number(prefill?.tax) > 0 ? String(prefill.tax) : '');
   const [notes, setNotes] = useState(prefill ? `Generated from Quotation #${prefill.quotationNumber}` : '');
   const [requisitionRef, setRequisitionRef] = useState(prefill?.requisitionRef || '');
   const [quotationId, setQuotationId] = useState(prefill?.id || prefill?._id || '');
@@ -125,10 +125,10 @@ export const SalesFormPage = () => {
       setPaymentStatus(existingSale.paymentStatus || 'paid');
       setPaymentMethod(existingSale.paymentMethod || 'cash');
       setPaidAmountInput(
-        existingSale.paidAmount !== undefined ? String(existingSale.paidAmount) : ''
+        Number(existingSale.paidAmount) > 0 ? String(existingSale.paidAmount) : ''
       );
-      setDiscount(existingSale.discount !== undefined ? String(existingSale.discount) : '0');
-      setTax(existingSale.tax !== undefined ? String(existingSale.tax) : '0');
+      setDiscount(Number(existingSale.discount) > 0 ? String(existingSale.discount) : '');
+      setTax(Number(existingSale.tax) > 0 ? String(existingSale.tax) : '');
       setNotes(existingSale.notes || '');
       setRequisitionRef(existingSale.requisitionRef || '');
       setQuotationId(existingSale.quotationId || '');
@@ -145,14 +145,17 @@ export const SalesFormPage = () => {
       }
       if (existingSale.items && existingSale.items.length > 0) {
         setItems(
-          existingSale.items.map((it) => ({
-            productId: it.productId || 'custom',
-            productName: it.productName || it.name || '',
-            sku: it.sku || '',
-            quantity: it.quantity || 1,
-            unit: normalizeUnit(it.unit),
-            unitPrice: it.unitPrice !== undefined ? it.unitPrice : it.price || 0,
-          }))
+          existingSale.items.map((it) => {
+            const rateNum = Number(it.unitPrice !== undefined ? it.unitPrice : it.price) || 0;
+            return {
+              productId: it.productId || 'custom',
+              productName: it.productName || it.name || '',
+              sku: it.sku || '',
+              quantity: it.quantity || 1,
+              unit: normalizeUnit(it.unit),
+              unitPrice: rateNum > 0 ? rateNum : '',
+            };
+          })
         );
       }
     }
@@ -166,12 +169,13 @@ export const SalesFormPage = () => {
     if (prefill?.items && prefill.items.length > 0) {
       return prefill.items.map((it) => {
         const prod = products.find((p) => p.name === it.name || p.id === it.productId);
+        const r = Number(it.unitPrice) || 0;
         return {
           productId: prod?.id || 'custom',
           productName: it.name || prod?.name || '',
           quantity: it.quantity || 1,
           unit: normalizeUnit(it.unit || prod?.unit),
-          unitPrice: it.unitPrice || 0,
+          unitPrice: r > 0 ? r : '',
         };
       });
     }
@@ -184,17 +188,18 @@ export const SalesFormPage = () => {
           productName: prefillPart.partName || prod?.name || '',
           quantity: 1,
           unit: normalizeUnit(prefillPart.unit || prod?.unit || 'pc'),
-          unitPrice: rate,
+          unitPrice: rate > 0 ? rate : '',
         },
       ];
     }
+    const initSell = Number(availableProducts[0]?.sellingPrice) || 0;
     return [
       {
         productId: availableProducts[0]?.id || 'custom',
         productName: availableProducts[0]?.name || '',
         quantity: 1,
         unit: normalizeUnit(availableProducts[0]?.unit),
-        unitPrice: availableProducts[0]?.sellingPrice || 0,
+        unitPrice: initSell > 0 ? initSell : '',
       },
     ];
   });
@@ -308,13 +313,14 @@ export const SalesFormPage = () => {
 
   const handleAddItem = () => {
     const firstAvailable = availableProducts[0];
+    const sellPrice = Number(firstAvailable?.sellingPrice) || 0;
     setItems((prev) => [
       ...prev,
       {
         productId: firstAvailable?.id || '',
         quantity: 1,
         unit: normalizeUnit(firstAvailable?.unit),
-        unitPrice: firstAvailable?.sellingPrice || 0,
+        unitPrice: sellPrice > 0 ? sellPrice : '',
       },
     ]);
   };
@@ -339,8 +345,9 @@ export const SalesFormPage = () => {
         } else {
           const prod = products.find((p) => p.id === value);
           if (prod) {
+            const sellNum = Number(prod.sellingPrice) || 0;
             item.productId = prod.id;
-            item.unitPrice = prod.sellingPrice;
+            item.unitPrice = sellNum > 0 ? prod.sellingPrice : '';
             item.productName = prod.name;
             item.unit = normalizeUnit(prod.unit);
           }
@@ -1129,7 +1136,7 @@ export const SalesFormPage = () => {
                           min="0"
                           value={line.unitPrice}
                           onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
-                          placeholder="বিক্রয় দর"
+                          placeholder="0"
                         />
                       </div>
                     )}
@@ -1313,6 +1320,7 @@ export const SalesFormPage = () => {
                 <Button
                   variant="primary"
                   icon={Save}
+                  data-enter-final-button="true"
                   isLoading={isSubmitting}
                   onClick={() => handleSubmit(existingSale?.status || 'completed')}
                   className="shadow-md shadow-emerald-500/20 font-bold"
@@ -1332,6 +1340,7 @@ export const SalesFormPage = () => {
                   <Button
                     variant="primary"
                     icon={CheckCircle2}
+                    data-enter-final-button="true"
                     isLoading={isSubmitting}
                     onClick={() => handleSubmit('completed')}
                     className="shadow-md shadow-emerald-500/20 font-bold"

@@ -213,7 +213,11 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
       {/* Backdrop */}
       <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150"
+      >
         {/* Search Header Bar */}
         <div className="flex items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 gap-3 bg-slate-50/50 dark:bg-slate-900/50">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -221,6 +225,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
           </div>
           <input
             type="text"
+            data-enter-ignore="true"
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
