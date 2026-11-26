@@ -5,6 +5,7 @@ import { AppDataProvider } from './context/AppDataContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { ScrollToTop } from './components/common/ScrollToTop';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Layouts
 import { PublicLayout } from './layouts/PublicLayout';
@@ -89,7 +90,8 @@ import { ProfilePage } from './pages/settings/ProfilePage';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
         <LanguageProvider>
@@ -256,5 +258,6 @@ export default function App() {
       </LanguageProvider>
     </AuthProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }

@@ -82,30 +82,33 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
   // Google-Like Smart Fuzzy Multi-Token Search across machinery attributes & alternatives
   const matchedProducts = useMemo(() => {
     if (!q) return [];
-    return products.filter((p) => {
-      const variantText = Array.isArray(p.variants)
-        ? p.variants.map((v) => `${v.name || ''} ${v.sku || ''}`).join(' ')
-        : '';
-      return matchesMultiTokens(q, [
-        p.name,
-        p.sku,
-        p.barcode,
-        p.brand,
-        p.modelNumber,
-        p.dimensions,
-        p.description,
-        p.oemPartNumber,
-        p.impaCode,
-        p.condition,
-        p.lotNumber,
-        p.warehouseLocation?.code,
-        p.warehouseLocation?.rack,
-        p.warehouseLocation?.zone,
-        p.compatibleModels,
-        p.alternatives,
-        variantText,
-      ]);
-    }).slice(0, 6);
+    return (Array.isArray(products) ? products : [])
+      .filter((p) => {
+        if (!p) return false;
+        const variantText = Array.isArray(p.variants)
+          ? p.variants.map((v) => `${v?.name || ''} ${v?.sku || ''}`).join(' ')
+          : '';
+        return matchesMultiTokens(q, [
+          p.name,
+          p.sku,
+          p.barcode,
+          p.brand,
+          p.modelNumber,
+          p.dimensions,
+          p.description,
+          p.oemPartNumber,
+          p.impaCode,
+          p.condition,
+          p.lotNumber,
+          p.warehouseLocation?.code,
+          p.warehouseLocation?.rack,
+          p.warehouseLocation?.zone,
+          p.compatibleModels,
+          p.alternatives,
+          variantText,
+        ]);
+      })
+      .slice(0, 6);
   }, [products, q]);
 
   const unifiedPartsIndex = useMemo(
@@ -123,50 +126,72 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
   // Quotations search (including machineDetails & items)
   const matchedQuotations = useMemo(() => {
     if (!q) return [];
-    return (quotations || []).filter((quote) => {
-      const mdText = formatMachineSummary(quote.machineDetails);
-      const itemNames = (quote.items || []).map((it) => it.name || '').join(' ');
-      return matchesMultiTokens(q, [
-        quote.quotationNumber,
-        quote.customerName,
-        quote.customerCompany,
-        quote.requisitionRef,
-        mdText,
-        quote.machineDetails?.description,
-        itemNames,
-      ]);
-    }).slice(0, 3);
+    return (Array.isArray(quotations) ? quotations : [])
+      .filter((quote) => {
+        if (!quote) return false;
+        const mdText = formatMachineSummary(quote.machineDetails);
+        const itemNames = (Array.isArray(quote.items) ? quote.items : [])
+          .map((it) => it?.name || it?.productName || '')
+          .join(' ');
+        return matchesMultiTokens(q, [
+          quote.quotationNumber,
+          quote.customerName,
+          quote.customerCompany,
+          quote.requisitionRef,
+          mdText,
+          quote.machineDetails?.description,
+          itemNames,
+        ]);
+      })
+      .slice(0, 3);
   }, [quotations, q]);
 
   // Lots & Scrap Purchases search
   const matchedLots = useMemo(() => {
     if (!q) return [];
-    return (lotPurchases || []).filter((lot) => {
-      const num = lot.lotNumber?.toLowerCase().includes(q);
-      const name = lot.lotName?.toLowerCase().includes(q);
-      const ship = lot.sourceShip?.toLowerCase().includes(q);
-      const notes = lot.notes?.toLowerCase().includes(q);
-      return num || name || ship || notes;
-    }).slice(0, 2);
+    return (Array.isArray(lotPurchases) ? lotPurchases : [])
+      .filter((lot) => {
+        if (!lot) return false;
+        const num = String(lot.lotNumber || '').toLowerCase().includes(q);
+        const name = String(lot.lotName || '').toLowerCase().includes(q);
+        const ship = String(lot.sourceShip || '').toLowerCase().includes(q);
+        const notes = String(lot.notes || '').toLowerCase().includes(q);
+        return num || name || ship || notes;
+      })
+      .slice(0, 2);
   }, [lotPurchases, q]);
 
   if (!isOpen) return null;
 
   const matchedCustomers = q
-    ? customers.filter((c) => c.name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.companyName?.toLowerCase().includes(q)).slice(0, 3)
+    ? (Array.isArray(customers) ? customers : [])
+        .filter(
+          (c) =>
+            c &&
+            (String(c.name || '').toLowerCase().includes(q) ||
+              String(c.phone || '').includes(q) ||
+              String(c.companyName || '').toLowerCase().includes(q))
+        )
+        .slice(0, 3)
     : [];
 
   const matchedSales = q
-    ? sales.filter((s) =>
-        matchesMultiTokens(q, [
-          s.invoiceNo,
-          s.invoiceNumber,
-          s.customerName,
-          s.customerCompany,
-          formatMachineSummary(s.machineDetails),
-          (s.items || []).map((it) => it.productName || it.name).join(' '),
-        ])
-      ).slice(0, 3)
+    ? (Array.isArray(sales) ? sales : [])
+        .filter(
+          (s) =>
+            s &&
+            matchesMultiTokens(q, [
+              s.invoiceNo,
+              s.invoiceNumber,
+              s.customerName,
+              s.customerCompany,
+              formatMachineSummary(s.machineDetails),
+              (Array.isArray(s.items) ? s.items : [])
+                .map((it) => it?.productName || it?.name || '')
+                .join(' '),
+            ])
+        )
+        .slice(0, 3)
     : [];
 
   const hasResults =
@@ -264,14 +289,16 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="space-y-2 mt-1">
-                {matchedProducts.map((p) => {
+                {matchedProducts.map((p, idx) => {
+                  const prodId = p.id || p._id || idx;
                   const locCode = p.warehouseLocation?.code || (p.warehouseLocation?.rack ? `${p.warehouseLocation.zone || ''} ${p.warehouseLocation.rack}` : null);
                   const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
                   const hasAlternatives = Array.isArray(p.alternatives) && p.alternatives.length > 0;
+                  const compatList = Array.isArray(p.compatibleModels) ? p.compatibleModels : [];
 
                   return (
                     <div
-                      key={p.id}
+                      key={prodId}
                       className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 bg-slate-50/50 dark:bg-slate-850 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-xs"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -285,7 +312,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                             )}
                             {renderConditionBadge(p.condition)}
                             <h4
-                              onClick={() => handleSelect(`/products/${p.id}`)}
+                              onClick={() => handleSelect(`/products/${prodId}`)}
                               className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 cursor-pointer truncate"
                             >
                               {p.name}
@@ -310,11 +337,11 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                           </div>
 
                           {/* Compatible Engine Models */}
-                          {p.compatibleModels && p.compatibleModels.length > 0 && (
+                          {compatList.length > 0 && (
                             <div className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 flex items-center gap-1 flex-wrap">
                               <span className="font-semibold text-slate-500">মডেল ম্যাচ:</span>
-                              {p.compatibleModels.slice(0, 3).map((m, idx) => (
-                                <span key={idx} className="bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.2 rounded text-[10px] font-mono">
+                              {compatList.slice(0, 3).map((m, i) => (
+                                <span key={i} className="bg-slate-200/80 dark:bg-slate-800 px-1.5 py-0.2 rounded text-[10px] font-mono">
                                   {m}
                                 </span>
                               ))}
@@ -347,7 +374,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                           {hasVariants && (
                             <div className="mt-1 text-[10.5px] text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-1">
                               <Boxes className="h-3 w-3" />
-                              <span>{p.variants.length} টি ভ্যারিয়েন্ট উপলব্ধ ({p.variants.map((v) => v.name).join(', ')})</span>
+                              <span>{p.variants.length} টি ভ্যারিয়েন্ট উপলব্ধ ({p.variants.map((v) => v?.name || '').filter(Boolean).join(', ')})</span>
                             </div>
                           )}
                         </div>
@@ -355,14 +382,14 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                         {/* Price & Action */}
                         <div className="text-right shrink-0">
                           <div className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(p.sellingPrice, settings.currency)}
+                            {formatCurrency(p.sellingPrice || 0, settings?.currency)}
                           </div>
                           <div className="text-[10px] font-mono text-slate-500 mt-0.5">
-                            Stock: <strong className={p.quantity <= 5 ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}>{p.quantity}</strong> pcs
+                            Stock: <strong className={(p.quantity || 0) <= 5 ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}>{p.quantity || 0}</strong> pcs
                           </div>
                           <button
                             type="button"
-                            onClick={() => handleSelect(`/products/${p.id}`)}
+                            onClick={() => handleSelect(`/products/${prodId}`)}
                             className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-colors"
                           >
                             <span>ডিটেইলস</span>
@@ -429,7 +456,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                       </div>
                       <div className="text-right shrink-0">
                         <div className="font-mono font-black text-sm text-indigo-600 dark:text-indigo-400">
-                          {formatCurrency(row.price, settings.currency)}
+                          {formatCurrency(row.price, settings?.currency)}
                         </div>
                         <div className="text-[10px] text-slate-400">সর্বশেষ দর</div>
                       </div>
@@ -464,7 +491,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                       </div>
                     </div>
                     <div className="text-right font-mono font-bold text-slate-800 dark:text-slate-200">
-                      {formatCurrency(qItem.totalAmount, settings.currency)}
+                      {formatCurrency(qItem.totalAmount, settings?.currency)}
                     </div>
                   </button>
                 ))}
@@ -496,7 +523,7 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                       </div>
                     </div>
                     <div className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(lot.totalLotCost, settings.currency)}
+                      {formatCurrency(lot.totalLotCost, settings?.currency)}
                     </div>
                   </button>
                 ))}
@@ -537,23 +564,23 @@ export const GlobalSearchModal = ({ isOpen, onClose }) => {
                 <span>বিক্রয় চালান / Invoices ({matchedSales.length})</span>
               </div>
               <div className="space-y-1.5 mt-1">
-                {matchedSales.map((s) => (
+                {matchedSales.map((s, idx) => (
                   <button
-                    key={s.id}
-                    onClick={() => handleSelect(`/sales/${s.id}`)}
+                    key={s.id || s._id || idx}
+                    onClick={() => handleSelect(`/sales/${s.id || s._id}`)}
                     className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between text-xs transition-colors"
                   >
                     <div>
                       <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                        <span className="font-mono text-emerald-600 dark:text-emerald-400">{s.invoiceNo}</span>
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400">{s.invoiceNo || s.invoiceNumber}</span>
                         <span>• {s.customerName || 'Walk-in'}</span>
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        {s.items?.length || 0} items · {s.paymentStatus?.toUpperCase()}
+                        {s.items?.length || 0} items · {String(s.paymentStatus || 'PAID').toUpperCase()}
                       </div>
                     </div>
                     <div className="text-right font-mono font-bold text-slate-900 dark:text-slate-100">
-                      {formatCurrency(s.total || s.totalAmount, settings.currency)}
+                      {formatCurrency(s.total || s.totalAmount || 0, settings?.currency)}
                     </div>
                   </button>
                 ))}

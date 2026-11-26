@@ -95,10 +95,16 @@ export const buildUnifiedPartsIndex = ({
   quotations = [],
   sales = [],
 } = {}) => {
+  const safeProducts = Array.isArray(products) ? products.filter((p) => p && typeof p === 'object') : [];
+  const safePriceCatalog = Array.isArray(priceCatalog) ? priceCatalog.filter((r) => r && typeof r === 'object') : [];
+  const safeQuotations = Array.isArray(quotations) ? quotations.filter((q) => q && typeof q === 'object') : [];
+  const safeSales = Array.isArray(sales) ? sales.filter((s) => s && typeof s === 'object') : [];
+
   const byProductId = new Map();
   const byProductName = new Map();
 
-  for (const p of products) {
+  for (const p of safeProducts) {
+    if (!p) continue;
     const pid = p.id || p._id;
     if (pid) byProductId.set(String(pid), p);
     if (p.name) byProductName.set(cleanStr(p.name).toLowerCase(), p);
@@ -159,7 +165,8 @@ export const buildUnifiedPartsIndex = ({
   };
 
   // Seed from formal PriceCatalog collection first
-  for (const row of priceCatalog) {
+  for (const row of safePriceCatalog) {
+    if (!row) continue;
     upsertCatalogEntry({
       id: row.id || row._id,
       _id: row._id,
@@ -188,9 +195,11 @@ export const buildUnifiedPartsIndex = ({
   }
 
   // Enrich live from all Quotations (catches older quotes too)
-  for (const q of quotations) {
+  for (const q of safeQuotations) {
+    if (!q) continue;
     const md = normalizeMachineDetails(q.machineDetails);
-    for (const it of q.items || []) {
+    for (const it of Array.isArray(q.items) ? q.items : []) {
+      if (!it || typeof it !== 'object') continue;
       const partName = cleanStr(it.name || it.productName);
       if (!partName) continue;
       const rate = Number(it.unitPrice || it.rate || it.price) || 0;
@@ -219,11 +228,12 @@ export const buildUnifiedPartsIndex = ({
   }
 
   // Enrich live from all active Sales / Challans
-  for (const s of sales) {
-    if (s.status === 'cancelled') continue;
+  for (const s of safeSales) {
+    if (!s || s.status === 'cancelled') continue;
     const md = normalizeMachineDetails(s.machineDetails);
     const isChallan = s.documentType === 'challan';
-    for (const it of s.items || []) {
+    for (const it of Array.isArray(s.items) ? s.items : []) {
+      if (!it || typeof it !== 'object') continue;
       const partName = cleanStr(it.productName || it.name);
       if (!partName) continue;
       const rate = Number(it.unitPrice || it.rate || it.price || it.sellingPrice) || 0;
@@ -254,7 +264,7 @@ export const buildUnifiedPartsIndex = ({
   const priceListEntries = Array.from(catalogMap.values()).sort((a, b) => (b._dateMs || 0) - (a._dateMs || 0));
 
   return {
-    products,
+    products: safeProducts,
     priceListEntries,
   };
 };
@@ -264,7 +274,10 @@ export const buildUnifiedPartsIndex = ({
  * Ranks entries matching `preferredMachine` higher.
  */
 export const searchUnifiedParts = (query = '', index = { products: [], priceListEntries: [] }, options = {}) => {
-  const { preferredMachine = {}, maxResults = 30 } = options;
+  const safeIndex = index && typeof index === 'object' ? index : { products: [], priceListEntries: [] };
+  const indexProducts = Array.isArray(safeIndex.products) ? safeIndex.products : [];
+  const indexPriceEntries = Array.isArray(safeIndex.priceListEntries) ? safeIndex.priceListEntries : [];
+  const { preferredMachine = {}, maxResults = 30 } = options || {};
   const prefName = cleanStr(preferredMachine?.machineName).toLowerCase();
   const prefModel = cleanStr(preferredMachine?.model).toLowerCase();
 
@@ -277,8 +290,9 @@ export const searchUnifiedParts = (query = '', index = { products: [], priceList
     return score;
   };
 
-  const matchedProducts = (index.products || [])
+  const matchedProducts = indexProducts
     .filter((p) =>
+      p &&
       matchesMultiTokens(query, [
         p.name,
         p.sku,
@@ -317,8 +331,9 @@ export const searchUnifiedParts = (query = '', index = { products: [], priceList
     .sort((a, b) => b._score - a._score)
     .slice(0, maxResults);
 
-  const matchedPriceEntries = (index.priceListEntries || [])
+  const matchedPriceEntries = indexPriceEntries
     .filter((row) =>
+      row &&
       matchesMultiTokens(query, [
         row.partName,
         row.machineName,
