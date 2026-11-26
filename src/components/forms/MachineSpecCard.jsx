@@ -33,6 +33,7 @@ export const MachineSpecCard = ({
   quotations = [],
   sales = [],
   priceCatalog = [],
+  machineModels = [],
   language = 'bn',
   accentColor = 'purple', // 'purple' | 'emerald'
   compact = false,
@@ -55,13 +56,19 @@ export const MachineSpecCard = ({
       const m = normalizeMachineDetails(raw);
       if (!m.machineName && !m.model && !m.hp && !m.ton && !m.cylinder) return;
       const key = `${m.machineName}|${m.model}|${m.type}|${m.hp}|${m.ton}|${m.cylinder}`.toLowerCase();
-      if (!map.has(key)) map.set(key, m);
+      if (!map.has(key)) {
+        map.set(key, {
+          ...m,
+          machineModelId: raw?._id || raw?.id || m.machineModelId || null,
+        });
+      }
     };
+    (machineModels || []).forEach(pushSpec);
     (priceCatalog || []).forEach(pushSpec);
     (quotations || []).forEach((q) => pushSpec(q.machineDetails));
     (sales || []).forEach((s) => pushSpec(s.machineDetails));
-    return Array.from(map.values()).slice(0, 60);
-  }, [priceCatalog, quotations, sales]);
+    return Array.from(map.values()).slice(0, 80);
+  }, [machineModels, priceCatalog, quotations, sales]);
 
   const knownMachineNames = useMemo(() => {
     const set = new Set(COMMON_MACHINES);

@@ -28,6 +28,9 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  FolderTree,
+  List,
+  Package,
 } from 'lucide-react';
 
 export const PartPriceListPage = () => {
@@ -36,6 +39,7 @@ export const PartPriceListPage = () => {
     priceCatalog,
     quotations,
     sales,
+    machineCatalogHierarchy,
     savePriceCatalogEntry,
     deletePriceCatalogEntry,
     syncPriceCatalogHistory,
@@ -56,7 +60,9 @@ export const PartPriceListPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [machineFilter, setMachineFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all'); // 'all' | 'price_only' | 'in_stock' | 'quotation' | 'sale'
+  const [viewMode, setViewMode] = useState('hierarchy'); // 'hierarchy' | 'table'
   const [expandedRowKey, setExpandedRowKey] = useState(null);
+  const [collapsedBrands, setCollapsedBrands] = useState({});
 
   // Add / Edit Price Entry Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -114,6 +120,52 @@ export const PartPriceListPage = () => {
       ]);
     });
   }, [unifiedIndex.priceListEntries, searchTerm, machineFilter, stockFilter]);
+
+  const filteredHierarchy = useMemo(() => {
+    const hierarchy = Array.isArray(machineCatalogHierarchy) ? machineCatalogHierarchy : [];
+    return hierarchy
+      .map((brandGroup) => {
+        const models = (brandGroup.models || [])
+          .filter((m) => machineFilter === 'all' || m.machineName?.toLowerCase() === machineFilter.toLowerCase())
+          .map((m) => {
+            const matchingPriceEntries = (m.priceEntries || []).filter((row) => {
+              if (stockFilter === 'price_only' && row.inStockDb) return false;
+              if (stockFilter === 'in_stock' && !row.inStockDb) return false;
+              if (stockFilter === 'quotation' && row.sourceType !== 'quotation') return false;
+              if (stockFilter === 'sale' && row.sourceType !== 'sale' && row.sourceType !== 'challan') return false;
+              return matchesMultiTokens(searchTerm, [
+                row.partName,
+                row.machineName,
+                row.model,
+                row.type,
+                row.hp,
+                row.ton,
+                row.cylinder,
+                row.others,
+                row.description,
+                row.lastDocNumber,
+                row.lastCustomerName,
+              ]);
+            });
+            const matchingStock = (m.stockProducts || []).filter((p) => {
+              if (stockFilter === 'price_only' || stockFilter === 'quotation' || stockFilter === 'sale') return false;
+              return matchesMultiTokens(searchTerm, [p.name, p.sku, p.brand, p.modelNumber, m.machineName, m.model]);
+            });
+            return {
+              ...m,
+              priceEntries: matchingPriceEntries,
+              stockProducts: matchingStock,
+            };
+          })
+          .filter((m) => m.priceEntries.length > 0 || m.stockProducts.length > 0 || !searchTerm);
+
+        return {
+          ...brandGroup,
+          models,
+        };
+      })
+      .filter((b) => b.models.length > 0);
+  }, [machineCatalogHierarchy, searchTerm, machineFilter, stockFilter]);
 
   const stats = useMemo(() => {
     const all = unifiedIndex.priceListEntries;
@@ -204,6 +256,32 @@ export const PartPriceListPage = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('hierarchy')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                viewMode === 'hierarchy'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <FolderTree className="h-3.5 w-3.5" />
+              <span>{l({ bn: 'হায়ারার্কিকাল ট্রি', en: 'Hierarchy Tree' })}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <List className="h-3.5 w-3.5" />
+              <span>{l({ bn: 'ফ্ল্যাট তালিকা', en: 'Flat Table' })}</span>
+            </button>
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -313,8 +391,169 @@ export const PartPriceListPage = () => {
         </div>
       </Card>
 
-      {/* Catalog Table */}
-      <Card className="overflow-hidden">
+      {/* Hierarchical Brand -> Machine Model -> Parts View */}
+      {viewMode === 'hierarchy' ? (
+        <div className="space-y-4">
+          {filteredHierarchy.length === 0 ? (
+            <Card className="p-10 text-center text-slate-400 text-xs">
+              <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              {l({
+                bn: 'হায়ারার্কিকাল মেশিন প্রোফাইল বা পার্টস খুঁজে পাওয়া যায়নি।',
+                en: 'No matching machine hierarchy nodes found.',
+              })}
+            </Card>
+          ) : (
+            filteredHierarchy.map((brandGroup) => {
+              const isCollapsed = Boolean(collapsedBrands[brandGroup.brand]);
+              return (
+                <Card key={brandGroup.brand} className="overflow-hidden border border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsedBrands((prev) => ({
+                        ...prev,
+                        [brandGroup.brand]: !prev[brandGroup.brand],
+                      }))
+                    }
+                    className="w-full px-4 py-3 bg-slate-50/90 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-left"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <FolderTree className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate" data-transliterate="true">
+                          {brandGroup.brand}
+                        </h3>
+                        <p className="text-[11px] text-slate-500">
+                          {brandGroup.models.length} {l({ bn: 'টি মেশিন মডেল', en: 'model profile(s)' })} ·{' '}
+                          {brandGroup.models.reduce((s, m) => s + m.priceEntries.length, 0)} {l({ bn: 'টি প্রাইস পার্টস', en: 'catalog parts' })} ·{' '}
+                          {brandGroup.models.reduce((s, m) => s + m.stockProducts.length, 0)} {l({ bn: 'টি স্টক আইটেম', en: 'in-stock items' })}
+                        </p>
+                      </div>
+                    </div>
+                    {isCollapsed ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
+                  </button>
+
+                  {!isCollapsed && (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {brandGroup.models.map((mNode) => (
+                        <div key={mNode.machineKey} className="p-4 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="blue" size="sm">
+                                <span data-transliterate="true">{mNode.machineName}</span>
+                              </Badge>
+                              {mNode.model && <Badge variant="purple" size="sm">Model: {mNode.model}</Badge>}
+                              {mNode.type && <Badge variant="slate" size="sm">{mNode.type}</Badge>}
+                              {mNode.hp && <Badge variant="emerald" size="sm">{mNode.hp} HP</Badge>}
+                              {mNode.ton && <Badge variant="amber" size="sm">{mNode.ton} Ton</Badge>}
+                              {mNode.cylinder && <Badge variant="slate" size="sm">{mNode.cylinder} Cyl</Badge>}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                              <span>Quotes: {mNode.quotationCount || 0}</span>
+                              <span>·</span>
+                              <span>Sales: {mNode.saleCount || 0}</span>
+                            </div>
+                          </div>
+
+                          {mNode.stockProducts.length > 0 && (
+                            <div className="pl-3 border-l-2 border-emerald-300 dark:border-emerald-800 space-y-1.5">
+                              <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                                <Package className="h-3.5 w-3.5" />
+                                <span>{l({ bn: 'যুক্ত স্টক ইনভেন্টরি পার্টস', en: 'Linked Stock Inventory' })}</span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {mNode.stockProducts.map((sp) => (
+                                  <div
+                                    key={sp.id || sp._id}
+                                    className="px-3 py-2 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-900 flex items-center justify-between gap-2 text-xs"
+                                  >
+                                    <div className="min-w-0">
+                                      <Link to={`/products/${sp.id || sp._id}`} className="font-bold text-slate-900 dark:text-slate-100 hover:underline truncate block">
+                                        {sp.name}
+                                      </Link>
+                                      <span className="text-[10px] font-mono text-slate-500">
+                                        SKU: {sp.sku} · Qty: {sp.quantity} {sp.unit || 'pc'}
+                                      </span>
+                                    </div>
+                                    <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 shrink-0">
+                                      {formatCurrency(sp.sellingPrice, settings.currency)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {mNode.priceEntries.length > 0 && (
+                            <div className="pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-1.5">
+                              <div className="text-[11px] font-bold text-indigo-700 dark:text-indigo-400">
+                                {l({ bn: 'দর ও পার্টস ক্যাটালগ', en: 'Catalog Part Rates' })}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {mNode.priceEntries.map((row) => (
+                                  <div
+                                    key={row.id || row._id || row.compositeKey}
+                                    className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="font-bold text-slate-900 dark:text-slate-100 truncate" data-transliterate="true">
+                                        {row.partName}
+                                      </div>
+                                      <div className="text-[10px] text-slate-500">
+                                        {row.lastDocNumber || row.sourceType} · {row.unit}
+                                        {row.inStockDb ? ` · স্টক: ${row.stockQty}` : ''}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className="font-mono font-black text-indigo-600 dark:text-indigo-400">
+                                        {formatCurrency(row.lastPrice, settings.currency)}
+                                      </span>
+                                      {!row.inStockDb && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openPromoteModal(row)}
+                                          className="p-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                          title={l({ bn: 'স্টক প্রোডাক্টে নিন', en: 'Promote to Stock Product' })}
+                                        >
+                                          <PackagePlus className="h-3.5 w-3.5" />
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => openInQuotation(row)}
+                                        className="p-1 rounded-lg text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                                        title={l({ bn: 'কোটেশন বানান', en: 'Create Quotation' })}
+                                      >
+                                        <FileSpreadsheet className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openInSale(row)}
+                                        className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                                        title={l({ bn: 'ক্যাশ মেমো বানান', en: 'Create Sale' })}
+                                      >
+                                        <Receipt className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              );
+            })
+          )}
+        </div>
+      ) : (
+        /* Catalog Table */
+        <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
@@ -545,6 +784,7 @@ export const PartPriceListPage = () => {
           </table>
         </div>
       </Card>
+      )}
 
       {/* Manual Add to Price List Modal */}
       <Modal

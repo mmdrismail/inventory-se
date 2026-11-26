@@ -37,7 +37,7 @@ export const ProductFormPage = () => {
     return texts.bn;
   };
 
-  const { products, categories, suppliers, addProduct, updateProduct } = useAppData();
+  const { products, categories, flatCategories, machineModels, suppliers, addProduct, updateProduct } = useAppData();
 
   const uniqueSuppliers = useMemo(() => {
     const seen = new Set();
@@ -62,6 +62,7 @@ export const ProductFormPage = () => {
     dimensions: '',
     description: '',
     categoryId: '',
+    primaryMachineModelId: '',
     supplierId: '',
     costPrice: '',
     staffPrice: '',
@@ -106,6 +107,7 @@ export const ProductFormPage = () => {
           dimensions: existing.dimensions || '',
           description: existing.description || '',
           categoryId: existing.categoryId || '',
+          primaryMachineModelId: existing.primaryMachineModelId || '',
           supplierId: existing.supplierId || '',
           costPrice: Number(existing.costPrice) > 0 ? String(existing.costPrice) : '',
           staffPrice: Number(existing.staffPrice) > 0 ? String(existing.staffPrice) : '',
@@ -454,14 +456,44 @@ export const ProductFormPage = () => {
             {/* Category & Supplier */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select
-                label="Category"
+                label="Category (Hierarchy)"
                 name="categoryId"
                 value={formData.categoryId}
                 onChange={handleChange}
                 error={errors.categoryId}
                 required
-                options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                options={(flatCategories && flatCategories.length > 0 ? flatCategories : categories).map((c) => ({
+                  value: c.id,
+                  label: c.indentLabel || c.name,
+                }))}
               />
+
+              {Array.isArray(machineModels) && machineModels.length > 0 && (
+                <Select
+                  label="Linked Machine Profile (Optional)"
+                  name="primaryMachineModelId"
+                  value={formData.primaryMachineModelId}
+                  onChange={(e) => {
+                    const pickedId = e.target.value;
+                    const mach = machineModels.find((m) => String(m.id || m._id) === String(pickedId));
+                    setFormData((prev) => ({
+                      ...prev,
+                      primaryMachineModelId: pickedId,
+                      brand: prev.brand || mach?.brand || mach?.machineName || '',
+                      modelNumber: prev.modelNumber || mach?.model || '',
+                    }));
+                  }}
+                  options={[
+                    { value: '', label: 'কোনো মেশিন সিলেক্ট করুন (Optional)...' },
+                    ...machineModels.map((m) => ({
+                      value: m.id || m._id,
+                      label: [m.machineName, m.model, m.hp ? `${m.hp}HP` : '', m.ton ? `${m.ton}T` : '']
+                        .filter(Boolean)
+                        .join(' · '),
+                    })),
+                  ]}
+                />
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">

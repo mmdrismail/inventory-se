@@ -10,7 +10,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { Search, ShoppingBag, Eye, CheckCircle2, AlertTriangle, XCircle, ArrowUpDown } from 'lucide-react';
 
 export const ShopPage = () => {
-  const { products, categories, addToCart, settings } = useAppData();
+  const { products, categories, flatCategories, categoryById, categoryDescendantMap, addToCart, settings } = useAppData();
   const { l } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -18,9 +18,17 @@ export const ShopPage = () => {
 
   const catMap = useMemo(() => {
     const map = {};
-    categories.forEach((c) => (map[c.id] = c.name));
+    (categories || []).forEach((c) => {
+      const node = categoryById?.get(String(c.id || c._id));
+      map[c.id || c._id] = node?.path || c.path || c.name;
+    });
     return map;
-  }, [categories]);
+  }, [categories, categoryById]);
+
+  const orderedCategories = useMemo(
+    () => (flatCategories && flatCategories.length > 0 ? flatCategories : categories),
+    [flatCategories, categories]
+  );
 
   // Only public products
   const publicProducts = useMemo(() => {
@@ -28,12 +36,15 @@ export const ShopPage = () => {
   }, [products]);
 
   const filteredProducts = useMemo(() => {
+    const catFilterSet = selectedCategory
+      ? categoryDescendantMap?.[String(selectedCategory)] || new Set([String(selectedCategory)])
+      : null;
     return publicProducts
       .filter((p) => {
         const q = searchTerm.toLowerCase();
         const matchesSearch =
           !searchTerm || p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q);
-        const matchesCategory = !selectedCategory || p.categoryId === selectedCategory;
+        const matchesCategory = !catFilterSet || (p.categoryId && catFilterSet.has(String(p.categoryId)));
         return matchesSearch && matchesCategory;
       })
       .sort((a, b) => {
@@ -42,7 +53,7 @@ export const ShopPage = () => {
         if (sortBy === 'name') return a.name.localeCompare(b.name);
         return 0; // featured / default
       });
-  }, [publicProducts, searchTerm, selectedCategory, sortBy]);
+  }, [publicProducts, searchTerm, selectedCategory, categoryDescendantMap, sortBy]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -81,10 +92,10 @@ export const ShopPage = () => {
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">All Categories ({categories.length})</option>
-              {categories.map((c) => (
+              <option value="">All Categories ({orderedCategories.length})</option>
+              {orderedCategories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.indentLabel || c.name}
                 </option>
               ))}
             </select>

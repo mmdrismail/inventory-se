@@ -10,7 +10,17 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { Plus, Search, Edit2, Trash2, FolderTree, Package } from 'lucide-react';
 
 export const CategoryListPage = () => {
-  const { categories, products, addCategory, updateCategory, deleteCategory, confirmAction } = useAppData();
+  const {
+    categories,
+    flatCategories,
+    categoryById,
+    categoryDescendantMap,
+    products,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    confirmAction,
+  } = useAppData();
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,30 +28,42 @@ export const CategoryListPage = () => {
 
   const [formData, setFormData] = useState({
     name: '',
+    parentId: '',
     description: '',
     status: 'active',
   });
   const [errors, setErrors] = useState({});
 
-  // Count products per category
-  const productCountMap = useMemo(() => {
-    const map = {};
-    products.forEach((p) => {
-      map[p.categoryId] = (map[p.categoryId] || 0) + 1;
-    });
-    return map;
-  }, [products]);
+  const orderedCategories = useMemo(
+    () => (flatCategories && flatCategories.length > 0 ? flatCategories : categories),
+    [flatCategories, categories]
+  );
 
   const filteredCategories = useMemo(() => {
-    return categories.filter((c) => {
-      const q = searchTerm.toLowerCase();
-      return c.name.toLowerCase().includes(q) || (c.description && c.description.toLowerCase().includes(q));
+    const q = searchTerm.toLowerCase();
+    return orderedCategories.filter((c) => {
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (c.pathLabel && c.pathLabel.toLowerCase().includes(q)) ||
+        (c.description && c.description.toLowerCase().includes(q))
+      );
     });
-  }, [categories, searchTerm]);
+  }, [orderedCategories, searchTerm]);
 
-  const handleOpenAdd = () => {
+  const validParentOptions = useMemo(() => {
+    const blockedIds = editingCategory ? categoryDescendantMap?.[editingCategory.id] || new Set([editingCategory.id]) : new Set();
+    return [
+      { value: '', label: 'মূল ক্যাটাগরি (Root Category)' },
+      ...orderedCategories
+        .filter((c) => !blockedIds.has(String(c.id)))
+        .map((c) => ({ value: c.id, label: c.indentLabel || c.pathLabel || c.name })),
+    ];
+  }, [orderedCategories, editingCategory, categoryDescendantMap]);
+
+  const handleOpenAdd = (defaultParentId = '') => {
     setEditingCategory(null);
-    setFormData({ name: '', description: '', status: 'active' });
+    setFormData({ name: '', parentId: defaultParentId, description: '', status: 'active' });
     setErrors({});
     setIsModalOpen(true);
   };
@@ -50,6 +72,7 @@ export const CategoryListPage = () => {
     setEditingCategory(category);
     setFormData({
       name: category.name,
+      parentId: category.parentId || '',
       description: category.description || '',
       status: category.status || 'active',
     });
@@ -58,9 +81,15 @@ export const CategoryListPage = () => {
   };
 
   const handleDelete = (category) => {
-    const count = productCountMap[category.id] || 0;
-    if (count > 0) {
-      alert(`Cannot delete category "${category.name}" because it currently has ${count} product(s) assigned. Please reassign or delete those products first.`);
+    const hasChild = orderedCategories.some((c) => c.parentId && String(c.parentId) === String(category.id));
+    if (hasChild) {
+      alert(`Cannot delete "${category.name}" because it has child sub-categories. Remove or move child categories first.`);
+      return;
+    }
+
+    const ownCount = category.ownProductCount ?? products.filter((p) => String(p.categoryId) === String(category.id)).length;
+    if (ownCount > 0) {
+      alert(`Cannot delete category "${category.name}" because it currently has ${ownCount} product(s) assigned. Please reassign or delete those products first.`);
       return;
     }
 
@@ -82,15 +111,20 @@ export const CategoryListPage = () => {
       return;
     }
 
+    const payload = {
+      ...formData,
+      parentId: formData.parentId || null,
+    };
+
     if (editingCategory) {
-      const res = updateCategory(editingCategory.id, formData);
+      const res = updateCategory(editingCategory.id, payload);
       if (res.success) {
         setIsModalOpen(false);
       } else {
         setErrors({ form: res.message });
       }
     } else {
-      const res = addCategory(formData);
+      const res = addCategory(payload);
       if (res.success) {
         setIsModalOpen(false);
       } else {
@@ -112,7 +146,7 @@ export const CategoryListPage = () => {
           </p>
         </div>
 
-        <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenAdd}>
+        <Button variant="primary" size="sm" icon={Plus} onClick={() => handleOpenAdd('')}>
           {t('btn_add_category', 'Add Category')}
         </Button>
       </div>
@@ -142,18 +176,28 @@ export const CategoryListPage = () => {
           title="No categories found"
           description="Try adjusting your search query or create a new category."
           actionText="Add Category"
-          onAction={handleOpenAdd}
+          onAction={() => handleOpenAdd('')}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredCategories.map((c) => {
-            const count = productCountMap[c.id] || 0;
+            const ownCount = c.ownProductCount ?? products.filter((p) => String(p.categoryId) === String(c.id)).length;
+            const totalCount = c.totalProductCount ?? ownCount;
+            const depth = c.depth || c.level || 0;
+            const parentCat = c.parentId ? categoryById?.get(String(c.parentId)) : null;
             return (
               <Card key={c.id} className="p-5 flex flex-col justify-between hover:shadow-md transition-all">
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                      <FolderTree className="h-5 w-5" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <FolderTree className="h-5 w-5" />
+                      </div>
+                      {depth > 0 && (
+                        <Badge variant="blue" size="sm">
+                          Sub-level {depth}
+                        </Badge>
+                      )}
                     </div>
                     <Badge variant={c.status === 'active' ? 'emerald' : 'slate'} size="sm">
                       {c.status || 'Active'}
@@ -161,6 +205,11 @@ export const CategoryListPage = () => {
                   </div>
 
                   <div>
+                    {parentCat && (
+                      <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 mb-0.5 truncate">
+                        {c.pathLabel || `${parentCat.name} › ${c.name}`}
+                      </div>
+                    )}
                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                       {c.name}
                     </h3>
@@ -173,10 +222,20 @@ export const CategoryListPage = () => {
                 <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                     <Package className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{count} product{count === 1 ? '' : 's'}</span>
+                    <span>
+                      {totalCount} product{totalCount === 1 ? '' : 's'}
+                      {totalCount > ownCount ? ` (${ownCount} direct)` : ''}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenAdd(c.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                      title="Add Sub-Category"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
                     <button
                       onClick={() => handleOpenEdit(c)}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
@@ -221,6 +280,14 @@ export const CategoryListPage = () => {
             error={errors.name}
             placeholder="e.g. Electrical & Lighting"
             required
+          />
+
+          <Select
+            label="Parent Category (Hierarchy)"
+            name="parentId"
+            value={formData.parentId}
+            onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
+            options={validParentOptions}
           />
 
           <Textarea

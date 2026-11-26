@@ -3,190 +3,29 @@ const PartPriceCatalog = require('../models/PartPriceCatalog');
 const Product = require('../models/Product');
 const Quotation = require('../models/Quotation');
 const Sale = require('../models/Sale');
-
-const cleanStr = (v) => String(v || '').trim();
-
-const normalizeMachineDetails = (raw = {}) => {
-  if (!raw || typeof raw !== 'object') {
-    return {
-      machineName: '',
-      model: '',
-      type: '',
-      hp: '',
-      ton: '',
-      cylinder: '',
-      others: '',
-      description: '',
-      autoSaveToPriceCatalog: true,
-    };
-  }
-  return {
-    machineName: cleanStr(raw.machineName),
-    model: cleanStr(raw.model || raw.machineModel),
-    type: cleanStr(raw.type || raw.machineType),
-    hp: cleanStr(raw.hp),
-    ton: cleanStr(raw.ton),
-    cylinder: cleanStr(raw.cylinder || raw.cylender),
-    others: cleanStr(raw.others),
-    description: cleanStr(raw.description),
-    autoSaveToPriceCatalog: raw.autoSaveToPriceCatalog !== undefined ? Boolean(raw.autoSaveToPriceCatalog) : true,
-  };
-};
-
-const buildMachineKey = (md = {}) => {
-  const parts = [md.machineName, md.model, md.type, md.hp, md.ton, md.cylinder]
-    .map((x) => cleanStr(x).toLowerCase())
-    .filter(Boolean);
-  return parts.join('|');
-};
-
-/**
- * Automatically indexes line items + machine specs from a Quotation or Sale
- * into MongoDB PartPriceCatalog so shop staff can search previous rates later.
- */
-const syncDocumentToPriceCatalog = async (items = [], machineDetailsRaw = {}, meta = {}) => {
-  try {
-    if (!Array.isArray(items) || items.length === 0) return [];
-    const md = normalizeMachineDetails(machineDetailsRaw);
-    if (md.autoSaveToPriceCatalog === false) return [];
-
-    const docType = meta.docType || 'quotation'; // 'quotation' | 'sale' | 'challan' | 'manual'
-    const docNumber = cleanStr(meta.docNumber);
-    const docDate = meta.date ? new Date(meta.date) : new Date();
-    const customerName = cleanStr(meta.customerName);
-    const machineKey = buildMachineKey(md);
-
-    const updatedEntries = [];
-
-    for (const item of items) {
-      const partName = cleanStr(item.name || item.productName || item.partName);
-      if (!partName || partName.length < 2) continue;
-
-      const normalizedPartName = partName.toLowerCase();
-      const priceNum = Number(
-        item.unitPrice !== undefined
-          ? item.unitPrice
-          : item.rate !== undefined
-          ? item.rate
-          : item.price !== undefined
-          ? item.price
-          : 0
-      );
-      const safePrice = Number.isFinite(priceNum) && priceNum >= 0 ? Math.round(priceNum * 100) / 100 : 0;
-      const unit = cleanStr(item.unit) || 'pc';
-
-      // Check linked Product if item references one or shares exact name
-      let linkedProductId = null;
-      if (item.productId && mongoose.Types.ObjectId.isValid(item.productId)) {
-        linkedProductId = item.productId;
-      } else {
-        const escaped = partName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const matchedProd = await Product.findOne({ name: new RegExp(`^${escaped}$`, 'i') })
-          .select('_id')
-          .lean();
-        if (matchedProd) linkedProductId = matchedProd._id;
-      }
-
-      let existing = await PartPriceCatalog.findOne({ normalizedPartName, machineKey });
-      const historyPoint = {
-        price: safePrice,
-        unit,
-        docType,
-        docNumber,
-        date: docDate,
-        customerName,
-        machineName: md.machineName,
-        model: md.model,
-        hp: md.hp,
-        ton: md.ton,
-        cylinder: md.cylinder,
-      };
-
-      if (!existing) {
-        existing = await PartPriceCatalog.create({
-          partName,
-          normalizedPartName,
-          machineName: md.machineName,
-          model: md.model,
-          type: md.type,
-          hp: md.hp,
-          ton: md.ton,
-          cylinder: md.cylinder,
-          others: md.others,
-          description: md.description,
-          machineKey,
-          unit,
-          lastQuotedPrice: docType === 'quotation' ? safePrice : 0,
-          lastSoldPrice: docType === 'sale' || docType === 'challan' ? safePrice : 0,
-          lastPrice: safePrice,
-          minPrice: safePrice,
-          maxPrice: safePrice,
-          sourceType: docType,
-          lastDocNumber: docNumber,
-          lastDocDate: docDate,
-          lastCustomerName: customerName,
-          linkedProductId,
-          entryCount: 1,
-          history: safePrice > 0 || docNumber ? [historyPoint] : [],
-        });
-      } else {
-        if (md.others && !existing.others) existing.others = md.others;
-        if (md.description && !existing.description) existing.description = md.description;
-        if (!existing.linkedProductId && linkedProductId) existing.linkedProductId = linkedProductId;
-        if (unit) existing.unit = unit;
-
-        if (safePrice > 0) {
-          existing.lastPrice = safePrice;
-          if (docType === 'quotation') existing.lastQuotedPrice = safePrice;
-          if (docType === 'sale' || docType === 'challan') existing.lastSoldPrice = safePrice;
-          existing.minPrice = existing.minPrice > 0 ? Math.min(existing.minPrice, safePrice) : safePrice;
-          existing.maxPrice = Math.max(existing.maxPrice || 0, safePrice);
-        }
-
-        const isNewerDoc = !existing.lastDocDate || docDate >= new Date(existing.lastDocDate);
-        if (isNewerDoc) {
-          existing.sourceType = docType;
-          if (docNumber) existing.lastDocNumber = docNumber;
-          existing.lastDocDate = docDate;
-          if (customerName) existing.lastCustomerName = customerName;
-        }
-
-        const dupIdx = docNumber
-          ? existing.history.findIndex((h) => h.docNumber === docNumber && h.docType === docType)
-          : -1;
-        if (dupIdx !== -1) {
-          existing.history[dupIdx] = historyPoint;
-        } else {
-          existing.history.unshift(historyPoint);
-          if (existing.history.length > 20) {
-            existing.history = existing.history.slice(0, 20);
-          }
-          existing.entryCount = (existing.entryCount || 1) + 1;
-        }
-
-        await existing.save();
-      }
-      updatedEntries.push(existing);
-    }
-
-    return updatedEntries;
-  } catch (err) {
-    console.warn('[PriceCatalog sync notice]:', err.message);
-    return [];
-  }
-};
+const {
+  cleanStr,
+  roundMoney,
+  normalizeMachineDetails,
+  buildMachineKey,
+  escapeRegex,
+} = require('../utils/domainNormalizers');
+const { resolveOrUpsertMachineModel } = require('../services/hierarchyService');
+const { syncDocumentToPriceCatalog } = require('../services/priceCatalogService');
 
 // @desc    Get all price catalog entries with multi-word search across part + machine specs
 // @route   GET /api/price-catalog
 // @access  Private
 exports.getPriceCatalog = async (req, res, next) => {
   try {
-    const { search, machineName, sourceType } = req.query;
+    const { search, machineName, machineModelId, sourceType } = req.query;
     const filter = {};
 
+    if (machineModelId) {
+      filter.machineModelId = machineModelId;
+    }
     if (machineName && machineName !== 'all') {
-      const esc = cleanStr(machineName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.machineName = { $regex: esc, $options: 'i' };
+      filter.machineName = { $regex: escapeRegex(machineName), $options: 'i' };
     }
     if (sourceType && sourceType !== 'all') {
       filter.sourceType = sourceType;
@@ -196,8 +35,7 @@ exports.getPriceCatalog = async (req, res, next) => {
     if (search && cleanStr(search)) {
       const tokens = cleanStr(search).split(/\s+/).filter(Boolean);
       const tokenClauses = tokens.map((tok) => {
-        const safe = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = { $regex: safe, $options: 'i' };
+        const re = { $regex: escapeRegex(tok), $options: 'i' };
         return {
           $or: [
             { partName: re },
@@ -243,10 +81,12 @@ exports.upsertPriceCatalogEntry = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Part / item name is required.' });
     }
 
-    const md = normalizeMachineDetails(req.body);
-    const machineKey = buildMachineKey(md);
+    const { machineModelId, machineKey, machineDetails: md } = await resolveOrUpsertMachineModel(req.body, {
+      categoryId: req.body.categoryId || null,
+      createIfMissing: Boolean(cleanStr(req.body.machineName)),
+    });
     const normalizedPartName = partName.toLowerCase();
-    const priceVal = Math.max(0, Number(req.body.lastPrice ?? req.body.unitPrice ?? req.body.sellingPrice ?? 0) || 0);
+    const priceVal = roundMoney(Math.max(0, Number(req.body.lastPrice ?? req.body.unitPrice ?? req.body.sellingPrice ?? 0) || 0));
     const unit = cleanStr(req.body.unit) || 'pc';
     const sourceType = ['sale', 'challan', 'quotation', 'product', 'manual'].includes(req.body.sourceType)
       ? req.body.sourceType
@@ -271,6 +111,8 @@ exports.upsertPriceCatalogEntry = async (req, res, next) => {
         others: md.others,
         description: md.description,
         machineKey,
+        machineModelId,
+        categoryId: req.body.categoryId || null,
         unit,
         lastQuotedPrice: Number(req.body.lastQuotedPrice) || (sourceType === 'quotation' ? priceVal : 0),
         lastSoldPrice: Number(req.body.lastSoldPrice) || (sourceType === 'sale' || sourceType === 'challan' ? priceVal : 0),
@@ -306,6 +148,8 @@ exports.upsertPriceCatalogEntry = async (req, res, next) => {
       entry.others = md.others || entry.others;
       entry.description = md.description || entry.description;
       entry.unit = unit || entry.unit;
+      if (machineModelId && !entry.machineModelId) entry.machineModelId = machineModelId;
+      if (req.body.categoryId) entry.categoryId = req.body.categoryId;
       if (priceVal > 0) {
         entry.lastPrice = priceVal;
         if (sourceType === 'quotation') entry.lastQuotedPrice = priceVal;
@@ -351,7 +195,11 @@ exports.updatePriceCatalogEntry = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Price catalog entry not found.' });
     }
 
-    const md = normalizeMachineDetails({ ...existing.toObject(), ...req.body });
+    const mergedRaw = { ...existing.toObject(), ...req.body };
+    const { machineModelId, machineKey, machineDetails: md } = await resolveOrUpsertMachineModel(mergedRaw, {
+      categoryId: req.body.categoryId || existing.categoryId || null,
+      createIfMissing: Boolean(cleanStr(mdOrRawName(mergedRaw))),
+    });
     const nextPartName = cleanStr(req.body.partName) || existing.partName;
     existing.partName = nextPartName;
     existing.normalizedPartName = nextPartName.toLowerCase();
@@ -363,10 +211,12 @@ exports.updatePriceCatalogEntry = async (req, res, next) => {
     existing.cylinder = md.cylinder;
     existing.others = md.others;
     existing.description = md.description;
-    existing.machineKey = buildMachineKey(md);
+    existing.machineKey = machineKey;
+    if (machineModelId) existing.machineModelId = machineModelId;
+    if (req.body.categoryId !== undefined) existing.categoryId = req.body.categoryId;
     if (req.body.unit) existing.unit = cleanStr(req.body.unit);
     if (req.body.lastPrice !== undefined) {
-      const p = Math.max(0, Number(req.body.lastPrice) || 0);
+      const p = roundMoney(Math.max(0, Number(req.body.lastPrice) || 0));
       existing.lastPrice = p;
       existing.minPrice = existing.minPrice > 0 ? Math.min(existing.minPrice, p) : p;
       existing.maxPrice = Math.max(existing.maxPrice || 0, p);
@@ -379,6 +229,8 @@ exports.updatePriceCatalogEntry = async (req, res, next) => {
     next(error);
   }
 };
+
+const mdOrRawName = (raw) => raw?.machineName;
 
 // @desc    Delete a price catalog entry
 // @route   DELETE /api/price-catalog/:id
@@ -459,6 +311,11 @@ exports.promoteToProduct = async (req, res, next) => {
       }
     }
 
+    const { machineModelId } = await resolveOrUpsertMachineModel(entry, {
+      categoryId: entry.categoryId || null,
+      createIfMissing: Boolean(entry.machineName),
+    });
+
     const specParts = [
       entry.type && `Type: ${entry.type}`,
       entry.hp && `HP: ${entry.hp}`,
@@ -483,6 +340,9 @@ exports.promoteToProduct = async (req, res, next) => {
       brand: entry.machineName || '',
       modelNumber: entry.model || '',
       compatibleModels: [entry.machineName, entry.model].filter(Boolean),
+      primaryMachineModelId: machineModelId || entry.machineModelId || null,
+      compatibleMachineIds: machineModelId ? [machineModelId] : [],
+      categoryId: req.body.categoryId || entry.categoryId || null,
       dimensions: specParts.join(' · '),
       description: entry.description || specParts.join(' | '),
       costPrice,
@@ -495,6 +355,7 @@ exports.promoteToProduct = async (req, res, next) => {
     });
 
     entry.linkedProductId = product._id;
+    if (machineModelId && !entry.machineModelId) entry.machineModelId = machineModelId;
     await entry.save();
 
     res.status(201).json({

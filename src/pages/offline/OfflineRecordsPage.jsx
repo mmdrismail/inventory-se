@@ -122,6 +122,7 @@ export const OfflineRecordsPage = () => {
     quotations,
     moneyReceipts,
     priceCatalog,
+    machineModels,
     settings,
     createSale,
     createQuotation,
@@ -1480,6 +1481,7 @@ export const OfflineRecordsPage = () => {
                     quotations={quotations}
                     sales={sales}
                     priceCatalog={priceCatalog}
+                    machineModels={machineModels}
                     language={language}
                     compact
                     defaultExpanded={false}

@@ -4,7 +4,9 @@ const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
 const Customer = require('../models/Customer');
-const { normalizeMachineDetails, syncDocumentToPriceCatalog } = require('./priceCatalogController');
+const { normalizeLineItem, calculateDocumentTotals } = require('../utils/domainNormalizers');
+const { resolveOrUpsertMachineModel } = require('../services/hierarchyService');
+const { syncDocumentToPriceCatalog } = require('../services/priceCatalogService');
 
 // Safe query helper supporting MongoDB ObjectId, custom String ID, or Quotation Number
 const findQuotationQuery = (id) => {
@@ -121,24 +123,12 @@ exports.createQuotation = async (req, res, next) => {
       req.body.quotationNumber ||
       `QT-${new Date().getFullYear()}-${String(count + 541).padStart(4, '0')}`;
 
-    const normalizedItems = items.map((it) => {
-      const quantity = Number(it.quantity) || 1;
-      const unitPrice = Number(it.unitPrice || it.rate || it.price) || 0;
-      const lineTotal = Number(it.lineTotal || it.amount || quantity * unitPrice) || 0;
-      return {
-        productId: it.productId || null,
-        name: it.name || it.productName || 'Equipment Part',
-        description: it.description || '',
-        quantity,
-        unit: it.unit || 'pc',
-        unitPrice,
-        lineTotal,
-      };
+    const normalizedItems = items.map((it) => normalizeLineItem(it, { style: 'quotation', defaultName: 'Equipment Part' }));
+    const { subtotal: calculatedSubtotal, discount: discountVal, tax: taxVal, totalAmount: calculatedTotal } =
+      calculateDocumentTotals(normalizedItems, { discount, tax, totalAmount });
+    const { machineDetails } = await resolveOrUpsertMachineModel(req.body.machineDetails, {
+      createIfMissing: Boolean(req.body.machineDetails?.machineName),
     });
-
-    const calculatedSubtotal = normalizedItems.reduce((sum, it) => sum + it.lineTotal, 0);
-    const calculatedTotal = Number(totalAmount) || calculatedSubtotal - (Number(discount) || 0) + (Number(tax) || 0);
-    const machineDetails = normalizeMachineDetails(req.body.machineDetails);
 
     const quotation = await Quotation.create({
       quotationNumber,
@@ -158,8 +148,8 @@ exports.createQuotation = async (req, res, next) => {
       machineDetails,
       items: normalizedItems,
       subtotal: calculatedSubtotal,
-      discount: Number(discount) || 0,
-      tax: Number(tax) || 0,
+      discount: discountVal,
+      tax: taxVal,
       totalAmount: calculatedTotal,
       status: req.body.status || 'draft',
       termsAndConditions: termsAndConditions || '১. সকল মালামাল প্রাপ্যতা সাপেক্ষে সরবরাহ করা হইবে।\n২. কার্যাদেশ প্রাপ্তির ৩ কার্যদিবসের মধ্যে ডেলিভারি সম্পন্ন হইবে।\n৩. এই কোটেশনের মেয়াদ জারির তারিখ হইতে ১৫ দিন পর্যন্ত বৈধ।',
@@ -212,20 +202,9 @@ exports.updateQuotation = async (req, res, next) => {
     }
 
     if (updates.items && Array.isArray(updates.items)) {
-      updates.items = updates.items.map((it) => {
-        const quantity = Number(it.quantity) || 1;
-        const unitPrice = Number(it.unitPrice || it.rate || it.price) || 0;
-        const lineTotal = Number(it.lineTotal || it.amount || quantity * unitPrice) || 0;
-        return {
-          productId: it.productId || null,
-          name: it.name || it.productName || 'Equipment Part',
-          description: it.description || '',
-          quantity,
-          unit: it.unit || 'pc',
-          unitPrice,
-          lineTotal,
-        };
-      });
+      updates.items = updates.items.map((it) =>
+        normalizeLineItem(it, { style: 'quotation', defaultName: 'Equipment Part' })
+      );
     }
 
     if (
@@ -279,7 +258,10 @@ exports.updateQuotation = async (req, res, next) => {
     }
 
     if (updates.machineDetails !== undefined) {
-      updates.machineDetails = normalizeMachineDetails(updates.machineDetails);
+      const resolved = await resolveOrUpsertMachineModel(updates.machineDetails, {
+        createIfMissing: Boolean(updates.machineDetails?.machineName),
+      });
+      updates.machineDetails = resolved.machineDetails;
     }
 
     const updated = await Quotation.findByIdAndUpdate(existing._id, updates, {

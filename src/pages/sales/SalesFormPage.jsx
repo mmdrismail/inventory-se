@@ -34,7 +34,7 @@ import {
 import { playBarcodeBeep, playSuccessChime, playErrorTone } from '../../utils/soundEffects';
 
 export const SalesFormPage = () => {
-  const { customers, products, sales, quotations, priceCatalog, createSale, updateSale, settings } = useAppData();
+  const { customers, products, sales, quotations, priceCatalog, machineModels, createSale, updateSale, settings } = useAppData();
   const { language, t } = useLanguage();
 
   const l = (texts) => {
@@ -816,6 +816,7 @@ export const SalesFormPage = () => {
             quotations={quotations}
             sales={sales}
             priceCatalog={priceCatalog}
+            machineModels={machineModels}
             language={language}
             accentColor="emerald"
             compact

@@ -41,6 +41,9 @@ export const ProductListPage = () => {
   const {
     products,
     categories,
+    flatCategories,
+    categoryById,
+    categoryDescendantMap,
     priceCatalog,
     quotations,
     sales,
@@ -69,15 +72,27 @@ export const ProductListPage = () => {
 
   const navigate = useNavigate();
 
-  // Category lookup map
+  // Category lookup map (uses hierarchical path if nested)
   const catMap = useMemo(() => {
     const map = {};
-    categories.forEach((c) => (map[c.id] = c.name));
+    (categories || []).forEach((c) => {
+      const node = categoryById?.get(String(c.id || c._id));
+      map[c.id || c._id] = node?.path || c.path || c.name;
+    });
     return map;
-  }, [categories]);
+  }, [categories, categoryById]);
 
-  // Filtering & Sorting (multi-keyword across product specs & compatible models)
+  const orderedCategories = useMemo(
+    () => (flatCategories && flatCategories.length > 0 ? flatCategories : categories),
+    [flatCategories, categories]
+  );
+
+  // Filtering & Sorting (multi-keyword across product specs & compatible models + hierarchical categories)
   const filteredProducts = useMemo(() => {
+    const catFilterSet = selectedCategory
+      ? categoryDescendantMap?.[String(selectedCategory)] || new Set([String(selectedCategory)])
+      : null;
+
     return products.filter((p) => {
       const matchesSearch = matchesMultiTokens(searchTerm, [
         p.name,
@@ -92,8 +107,8 @@ export const ProductListPage = () => {
         p.compatibleModels,
       ]);
 
-      // Category filter
-      const matchesCategory = !selectedCategory || p.categoryId === selectedCategory;
+      // Hierarchical category filter (parent matches all nested child sub-categories too)
+      const matchesCategory = !catFilterSet || (p.categoryId && catFilterSet.has(String(p.categoryId)));
 
       // Stock status filter
       let matchesStatus = true;
@@ -117,7 +132,7 @@ export const ProductListPage = () => {
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [products, searchTerm, selectedCategory, selectedStatus, sortField, sortDirection]);
+  }, [products, searchTerm, selectedCategory, categoryDescendantMap, selectedStatus, sortField, sortDirection]);
 
   // Unified Historical Machine/Parts matches from Quotations & Sales (shown when searching)
   const unifiedIndex = useMemo(
@@ -270,10 +285,10 @@ export const ProductListPage = () => {
               }}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">{t('all_categories', 'All Categories')} ({categories.length})</option>
-              {categories.map((c) => (
+              <option value="">{t('all_categories', 'All Categories')} ({orderedCategories.length})</option>
+              {orderedCategories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.indentLabel || c.name}
                 </option>
               ))}
             </select>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { storageService, STORAGE_KEYS } from '../services/storageService';
 import { productService } from '../services/productService';
 import { categoryService } from '../services/categoryService';
@@ -9,12 +9,30 @@ import { salesService } from '../services/salesService';
 import { quotationService } from '../services/quotationService';
 import { moneyReceiptService } from '../services/moneyReceiptService';
 import { priceCatalogService } from '../services/priceCatalogService';
+import { machineService } from '../services/machineService';
 import { lotService } from '../services/lotService';
 import { inventoryService } from '../services/inventoryService';
 import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
 import { settingsService } from '../services/settingsService';
 import { apiClient } from '../services/apiClient';
+import { buildCategoryTree, flattenCategoryTree } from '../domain/categoryHierarchy';
+import { buildMachineCatalogTree } from '../domain/catalogHierarchy';
+import {
+  normalizeReconcileKey,
+  normalizeReconcilePhone,
+  reconcileAndPushNewerLocal,
+  settleReconcilePushes,
+} from './modules/syncReconciler';
+import {
+  withNormalizedId,
+  normalizeSupplierList,
+  normalizePurchaseRecord,
+  normalizeSaleRecord,
+  normalizeQuotationRecord,
+  normalizeMoneyReceiptRecord,
+  normalizeOrderRecord,
+} from './modules/collectionNormalizers';
 
 const AppDataContext = createContext(null);
 
@@ -41,6 +59,7 @@ export const AppDataProvider = ({ children }) => {
   const [quotations, setQuotations] = useState(() => storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
   const [moneyReceipts, setMoneyReceipts] = useState(() => storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []));
   const [priceCatalog, setPriceCatalog] = useState(() => storageService.getItem(STORAGE_KEYS.PRICE_CATALOG, []));
+  const [machineModels, setMachineModels] = useState(() => storageService.getItem(STORAGE_KEYS.MACHINE_MODELS, []));
   const [lotPurchases, setLotPurchases] = useState(() => storageService.getItem(STORAGE_KEYS.LOT_PURCHASES, []));
   const [inventoryMovements, setInventoryMovements] = useState(() => storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
   const [orders, setOrders] = useState(() => storageService.getItem(STORAGE_KEYS.ORDERS, []));
@@ -61,178 +80,6 @@ export const AppDataProvider = ({ children }) => {
     onConfirm: null,
   });
 
-  const normalizeReconcileKey = (val) => String(val || '').trim().toLowerCase();
-  const normalizeReconcilePhone = (val) => {
-    const digits = String(val || '').replace(/\D+/g, '');
-    return digits.length >= 6 ? digits : '';
-  };
-
-  // Two-way timestamp reconciliation: preserves & pushes newer localStorage edits (and temp-ID offline records) up to MongoDB
-  const reconcileAndPushNewerLocal = (localList, remoteList, pushFn, options = {}) => {
-    const {
-      getFallbackKeys,
-      createFn,
-      shouldAutoCreate,
-      entityTag = 'item',
-    } = options;
-
-    if (!globalThis.__stocklinePendingTempCreates) {
-      globalThis.__stocklinePendingTempCreates = new Set();
-    }
-    const pendingTempCreates = globalThis.__stocklinePendingTempCreates;
-
-    const TEMP_LOCAL_ID_RE = /^(cust|sal|quote|mr|pc)-\d{10,}/;
-    const IGNORED_DIFF_KEYS = new Set([
-      'id',
-      '_id',
-      '__v',
-      'createdAt',
-      'updatedAt',
-      'totalSales',
-      'totalPaid',
-      'totalDue',
-    ]);
-    const isNonEmpty = (val) =>
-      Array.isArray(val) ? val.length > 0 : val !== undefined && val !== null && String(val).trim() !== '';
-
-    const locals = Array.isArray(localList) ? localList : [];
-    const remotes = Array.isArray(remoteList) ? remoteList : [];
-
-    const localById = new Map();
-    for (const item of locals) {
-      const k = item?._id || item?.id;
-      if (k) localById.set(String(k), item);
-    }
-
-    // Count remote fallback keys so ambiguous keys never mismatch distinct records
-    const remoteKeyCounts = new Map();
-    if (typeof getFallbackKeys === 'function') {
-      for (const remote of remotes) {
-        const keys = new Set(getFallbackKeys(remote).filter(Boolean));
-        for (const k of keys) {
-          remoteKeyCounts.set(k, (remoteKeyCounts.get(k) || 0) + 1);
-        }
-      }
-    }
-
-    const matchedLocals = new Set();
-    const primaryMatches = new Map();
-    for (const remote of remotes) {
-      const rid = String(remote._id || remote.id);
-      const exactLocal = localById.get(rid);
-      if (exactLocal) {
-        primaryMatches.set(rid, exactLocal);
-        matchedLocals.add(exactLocal);
-      }
-    }
-
-    const findFallbackLocal = (remote) => {
-      if (typeof getFallbackKeys !== 'function') return null;
-      const keys = getFallbackKeys(remote).filter((k) => k && remoteKeyCounts.get(k) === 1);
-      for (const key of keys) {
-        const candidates = locals.filter((loc) => !matchedLocals.has(loc) && getFallbackKeys(loc).includes(key));
-        if (candidates.length === 1) return candidates[0];
-      }
-      return null;
-    };
-
-    const pushPromises = [];
-    const mergeAndMaybePush = (rid, remote, local) => {
-      const localTime = local?.updatedAt ? new Date(local.updatedAt).getTime() : NaN;
-      const remoteTime = remote?.updatedAt ? new Date(remote.updatedAt).getTime() : NaN;
-      const isNewerLocal =
-        !Number.isNaN(localTime) &&
-        ((!Number.isNaN(remoteTime) && localTime > remoteTime + 2000) || Number.isNaN(remoteTime));
-
-      if (isNewerLocal) {
-        const nextItem = { ...remote, ...local, id: rid, _id: rid };
-        if (typeof pushFn === 'function') {
-          pushPromises.push(pushFn(rid, nextItem));
-        }
-        return nextItem;
-      }
-
-      if (local && !local._id) {
-        let filledAny = false;
-        const patched = { ...remote };
-        for (const [k, v] of Object.entries(local)) {
-          if (IGNORED_DIFF_KEYS.has(k)) continue;
-          if (isNonEmpty(v) && !isNonEmpty(patched[k])) {
-            patched[k] = v;
-            filledAny = true;
-          }
-        }
-        if (filledAny) {
-          const nextItem = { ...patched, id: rid, _id: rid };
-          if (typeof pushFn === 'function') {
-            pushPromises.push(pushFn(rid, nextItem));
-          }
-          return nextItem;
-        }
-      }
-
-      return { ...remote, id: rid, _id: rid };
-    };
-
-    const merged = remotes.map((remote) => {
-      const rid = String(remote._id || remote.id);
-      const local = primaryMatches.get(rid) || findFallbackLocal(remote);
-      if (local) {
-        matchedLocals.add(local);
-        return mergeAndMaybePush(rid, remote, local);
-      }
-      return { ...remote, id: rid, _id: rid };
-    });
-
-    // Auto-create local-only dynamic temp-ID records (never static seed IDs like cust-1..cust-10)
-    for (const local of locals) {
-      if (matchedLocals.has(local) || local?._id) continue;
-      const localId = String(local?.id || '');
-      if (!TEMP_LOCAL_ID_RE.test(localId)) continue;
-      if (typeof shouldAutoCreate === 'function' && !shouldAutoCreate(local)) continue;
-
-      const preserved = { ...local, id: localId };
-      merged.push(preserved);
-
-      const dedupeKey = `${entityTag}:${localId}`;
-      if (typeof createFn === 'function' && !pendingTempCreates.has(dedupeKey)) {
-        pendingTempCreates.add(dedupeKey);
-        const promise = Promise.resolve(createFn(preserved))
-          .then((res) => {
-            const created = res?.data?._id ? res.data : res?._id ? res : null;
-            if (!created) {
-              pendingTempCreates.delete(dedupeKey);
-              return null;
-            }
-            const createdId = String(created._id || created.id);
-            const idx = merged.findIndex((m) => String(m.id || m._id) === localId);
-            if (idx !== -1) {
-              merged[idx] = { ...preserved, ...created, id: createdId, _id: createdId };
-            }
-            return { __created: true, data: created };
-          })
-          .catch(() => {
-            pendingTempCreates.delete(dedupeKey);
-            return null;
-          });
-        pushPromises.push(promise);
-      }
-    }
-
-    return { merged, pushPromises };
-  };
-
-  const settleReconcilePushes = async (pushPromises, merged, setState, storageKey) => {
-    if (!pushPromises || pushPromises.length === 0) return;
-    const results = await Promise.allSettled(pushPromises);
-    const hasCreated = results.some((r) => r.status === 'fulfilled' && r.value?.__created);
-    if (hasCreated) {
-      const snapshot = [...merged];
-      setState(snapshot);
-      storageService.setItem(storageKey, snapshot);
-    }
-  };
-
   // Synchronize state with MongoDB Atlas backend if online
   const syncWithBackend = async (forceFresh = false) => {
     try {
@@ -250,7 +97,7 @@ export const AppDataProvider = ({ children }) => {
       }
 
       const reqConfig = { bypassCache: true };
-      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, mrRes, pcRes, ordsRes, setsRes, lotsRes] =
+      const [prodsRes, catsRes, supsRes, custsRes, pursRes, salesRes, quotesRes, mrRes, pcRes, machRes, ordsRes, setsRes, lotsRes] =
         await Promise.allSettled([
           apiClient.get('/products', {}, reqConfig),
           apiClient.get('/categories', {}, reqConfig),
@@ -261,6 +108,7 @@ export const AppDataProvider = ({ children }) => {
           apiClient.get('/quotations', {}, reqConfig),
           apiClient.get('/money-receipts', {}, reqConfig),
           apiClient.get('/price-catalog', {}, reqConfig),
+          apiClient.get('/machines', {}, reqConfig),
           apiClient.get('/orders', {}, reqConfig),
           apiClient.get('/settings', {}, reqConfig),
           apiClient.get('/lots', {}, reqConfig),
@@ -284,26 +132,13 @@ export const AppDataProvider = ({ children }) => {
       }
 
       if (catsRes.status === 'fulfilled' && catsRes.value?.success && Array.isArray(catsRes.value.data) && catsRes.value.data.length > 0) {
-        const normalized = catsRes.value.data.map((c) => ({
-          ...c,
-          id: c._id || c.id,
-          _id: c._id || c.id,
-        }));
+        const normalized = catsRes.value.data.map(withNormalizedId);
         setCategories(normalized);
         storageService.setItem(STORAGE_KEYS.CATEGORIES, normalized);
       }
 
       if (supsRes.status === 'fulfilled' && supsRes.value?.success && Array.isArray(supsRes.value.data) && supsRes.value.data.length > 0) {
-        const seen = new Set();
-        const normalized = [];
-        for (const s of supsRes.value.data) {
-          const item = { ...s, id: s._id || s.id, _id: s._id || s.id };
-          const k = (item.name || '').trim().toLowerCase();
-          if (k && !seen.has(k)) {
-            seen.add(k);
-            normalized.push(item);
-          }
-        }
+        const normalized = normalizeSupplierList(supsRes.value.data);
         setSuppliers(normalized);
         storageService.setItem(STORAGE_KEYS.SUPPLIERS, normalized);
       }
@@ -347,41 +182,14 @@ export const AppDataProvider = ({ children }) => {
       }
 
       if (pursRes.status === 'fulfilled' && pursRes.value?.success && Array.isArray(pursRes.value.data) && pursRes.value.data.length > 0) {
-        const normalized = pursRes.value.data.map((p) => {
-          const tot = Number(p.total !== undefined ? p.total : p.totalAmount) || 0;
-          return {
-            ...p,
-            id: p._id || p.id,
-            _id: p._id || p.id,
-            total: tot,
-            totalAmount: tot,
-            date: p.date || p.createdAt,
-          };
-        });
+        const normalized = pursRes.value.data.map(normalizePurchaseRecord);
         setPurchases(normalized);
         storageService.setItem(STORAGE_KEYS.PURCHASES, normalized);
       }
 
       if (salesRes.status === 'fulfilled' && salesRes.value?.success && Array.isArray(salesRes.value.data) && salesRes.value.data.length > 0) {
         const localSales = storageService.getItem(STORAGE_KEYS.SALES, []);
-        const rawNormalized = salesRes.value.data.map((s) => {
-          const tot = Number(s.total !== undefined ? s.total : s.totalAmount) || 0;
-          const paid = Number(s.paidAmount !== undefined ? s.paidAmount : s.paymentStatus === 'paid' ? tot : 0) || 0;
-          const due = Math.max(0, tot - paid);
-          const inv = s.invoiceNo || s.invoiceNumber || `INV-${s._id || s.id}`;
-          return {
-            ...s,
-            id: s._id || s.id,
-            _id: s._id || s.id,
-            invoiceNo: inv,
-            invoiceNumber: inv,
-            total: tot,
-            totalAmount: tot,
-            paidAmount: paid,
-            dueAmount: s.dueAmount !== undefined ? Number(s.dueAmount) : due,
-            date: s.date || s.createdAt,
-          };
-        });
+        const rawNormalized = salesRes.value.data.map(normalizeSaleRecord);
         const { merged, pushPromises } = reconcileAndPushNewerLocal(
           localSales,
           rawNormalized,
@@ -409,17 +217,7 @@ export const AppDataProvider = ({ children }) => {
 
       if (quotesRes.status === 'fulfilled' && quotesRes.value?.success && Array.isArray(quotesRes.value.data) && quotesRes.value.data.length > 0) {
         const localQuotes = storageService.getItem(STORAGE_KEYS.QUOTATIONS, []);
-        const rawNormalized = quotesRes.value.data.map((q) => {
-          const tot = Number(q.totalAmount !== undefined ? q.totalAmount : q.total) || 0;
-          return {
-            ...q,
-            id: q._id || q.id,
-            _id: q._id || q.id,
-            totalAmount: tot,
-            total: tot,
-            date: q.date || q.createdAt,
-          };
-        });
+        const rawNormalized = quotesRes.value.data.map(normalizeQuotationRecord);
         const { merged, pushPromises } = reconcileAndPushNewerLocal(
           localQuotes,
           rawNormalized,
@@ -447,13 +245,7 @@ export const AppDataProvider = ({ children }) => {
 
       if (mrRes.status === 'fulfilled' && mrRes.value?.success && Array.isArray(mrRes.value.data)) {
         const localReceipts = storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []);
-        const rawNormalized = mrRes.value.data.map((r) => ({
-          ...r,
-          id: r._id || r.id,
-          _id: r._id || r.id,
-          amount: Number(r.amount) || 0,
-          date: r.date || r.createdAt,
-        }));
+        const rawNormalized = mrRes.value.data.map(normalizeMoneyReceiptRecord);
         const { merged, pushPromises } = reconcileAndPushNewerLocal(
           localReceipts,
           rawNormalized,
@@ -478,11 +270,7 @@ export const AppDataProvider = ({ children }) => {
 
       if (pcRes.status === 'fulfilled' && pcRes.value?.success && Array.isArray(pcRes.value.data)) {
         const localPc = storageService.getItem(STORAGE_KEYS.PRICE_CATALOG, []);
-        const rawPc = pcRes.value.data.map((r) => ({
-          ...r,
-          id: r._id || r.id,
-          _id: r._id || r.id,
-        }));
+        const rawPc = pcRes.value.data.map(withNormalizedId);
         const { merged, pushPromises } = reconcileAndPushNewerLocal(
           localPc,
           rawPc,
@@ -506,18 +294,14 @@ export const AppDataProvider = ({ children }) => {
         await settleReconcilePushes(pushPromises, merged, setPriceCatalog, STORAGE_KEYS.PRICE_CATALOG);
       }
 
+      if (machRes.status === 'fulfilled' && machRes.value?.success && Array.isArray(machRes.value.data)) {
+        const normalizedMachines = machRes.value.data.map(withNormalizedId);
+        setMachineModels(normalizedMachines);
+        storageService.setItem(STORAGE_KEYS.MACHINE_MODELS, normalizedMachines);
+      }
+
       if (ordsRes.status === 'fulfilled' && ordsRes.value?.success && Array.isArray(ordsRes.value.data) && ordsRes.value.data.length > 0) {
-        const normalized = ordsRes.value.data.map((o) => {
-          const tot = Number(o.totalAmount !== undefined ? o.totalAmount : o.total) || 0;
-          return {
-            ...o,
-            id: o._id || o.id,
-            _id: o._id || o.id,
-            total: tot,
-            totalAmount: tot,
-            date: o.date || o.createdAt,
-          };
-        });
+        const normalized = ordsRes.value.data.map(normalizeOrderRecord);
         setOrders(normalized);
         storageService.setItem(STORAGE_KEYS.ORDERS, normalized);
       }
@@ -529,11 +313,7 @@ export const AppDataProvider = ({ children }) => {
       }
 
       if (lotsRes.status === 'fulfilled' && lotsRes.value?.success && Array.isArray(lotsRes.value.data) && lotsRes.value.data.length > 0) {
-        const normalized = lotsRes.value.data.map((l) => ({
-          ...l,
-          id: l._id || l.id,
-          _id: l._id || l.id,
-        }));
+        const normalized = lotsRes.value.data.map(withNormalizedId);
         setLotPurchases(normalized);
         storageService.setItem(STORAGE_KEYS.LOT_PURCHASES, normalized);
       }
@@ -554,6 +334,7 @@ export const AppDataProvider = ({ children }) => {
     setQuotations(storageService.getItem(STORAGE_KEYS.QUOTATIONS, []));
     setMoneyReceipts(storageService.getItem(STORAGE_KEYS.MONEY_RECEIPTS, []));
     setPriceCatalog(storageService.getItem(STORAGE_KEYS.PRICE_CATALOG, []));
+    setMachineModels(storageService.getItem(STORAGE_KEYS.MACHINE_MODELS, []));
     setInventoryMovements(storageService.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, []));
     setOrders(storageService.getItem(STORAGE_KEYS.ORDERS, []));
     setUsers(storageService.getItem(STORAGE_KEYS.USERS, []));
@@ -1091,6 +872,55 @@ export const AppDataProvider = ({ children }) => {
     return res;
   };
 
+  // ================= HIERARCHICAL MACHINE MODELS & UNIFIED TREE =================
+  const saveMachineModel = (data) => {
+    const res = machineService.saveOrUpsert(data);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({
+        title: 'মেশিন প্রোফাইল সংরক্ষিত',
+        message: `"${res.machine.machineName}" প্রোফাইল মাস্টার ক্যাটালগে সেভ হয়েছে।`,
+        type: 'success',
+      });
+    } else {
+      addToast({ title: 'Error', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
+  const deleteMachineModel = (id) => {
+    const res = machineService.remove(id);
+    if (res.success) {
+      reloadAfterMutation(res);
+      addToast({ title: 'মেশিন প্রোফাইল সরানো হয়েছে', message: res.message });
+    } else {
+      addToast({ title: 'Error', message: res.message, type: 'error' });
+    }
+    return res;
+  };
+
+  const categoryTreeData = useMemo(
+    () => buildCategoryTree(categories, products),
+    [categories, products]
+  );
+
+  const flatCategories = useMemo(
+    () => flattenCategoryTree(categoryTreeData.roots),
+    [categoryTreeData]
+  );
+
+  const machineCatalogHierarchy = useMemo(
+    () =>
+      buildMachineCatalogTree({
+        machineModels,
+        products,
+        priceCatalog,
+        quotations,
+        sales,
+      }),
+    [machineModels, products, priceCatalog, quotations, sales]
+  );
+
   // ================= LOT AUCTION PURCHASES =================
   const createLotPurchase = (data) => {
     const res = lotService.create(data);
@@ -1362,6 +1192,12 @@ export const AppDataProvider = ({ children }) => {
     quotations,
     moneyReceipts,
     priceCatalog,
+    machineModels,
+    categoryTree: categoryTreeData.roots,
+    categoryById: categoryTreeData.byId,
+    categoryDescendantMap: categoryTreeData.descendantMap,
+    flatCategories,
+    machineCatalogHierarchy,
     lotPurchases,
     inventoryMovements,
     orders,
@@ -1406,6 +1242,8 @@ export const AppDataProvider = ({ children }) => {
     deletePriceCatalogEntry,
     syncPriceCatalogHistory,
     promotePriceEntryToProduct,
+    saveMachineModel,
+    deleteMachineModel,
     createLotPurchase,
     updateLotPurchase,
     deleteLotPurchase,

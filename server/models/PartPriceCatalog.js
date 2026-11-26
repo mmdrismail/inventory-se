@@ -98,6 +98,16 @@ const partPriceCatalogSchema = new mongoose.Schema(
       ref: 'Product',
       default: null,
     },
+    machineModelId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: 'MachineModel',
+      default: null,
+    },
+    categoryId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: 'Category',
+      default: null,
+    },
     entryCount: {
       type: Number,
       default: 1,
@@ -112,6 +122,8 @@ const partPriceCatalogSchema = new mongoose.Schema(
 
 partPriceCatalogSchema.index({ normalizedPartName: 1, machineKey: 1 }, { unique: true });
 partPriceCatalogSchema.index({ machineName: 1, model: 1 });
+partPriceCatalogSchema.index({ machineModelId: 1 });
+partPriceCatalogSchema.index({ categoryId: 1 });
 partPriceCatalogSchema.index({ linkedProductId: 1 });
 partPriceCatalogSchema.index({ lastDocDate: -1, updatedAt: -1 });
 partPriceCatalogSchema.index({

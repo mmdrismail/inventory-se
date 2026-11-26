@@ -1,6 +1,7 @@
 /**
  * Centralized calculation utilities for StockLine
  */
+import { resolveItemRate } from '../domain/documentSchema';
 
 export const calculateLineTotal = (unitPrice, quantity) => {
   const price = Number(unitPrice) || 0;
@@ -20,15 +21,7 @@ export const calculatePurchaseTotals = (items = []) => {
 
 export const calculateSaleTotals = (items = [], discount = 0, tax = 0) => {
   const subtotal = items.reduce((sum, item) => {
-    const rate =
-      item.unitPrice !== undefined
-        ? item.unitPrice
-        : item.rate !== undefined
-        ? item.rate
-        : item.price !== undefined
-        ? item.price
-        : item.sellingPrice;
-    return sum + calculateLineTotal(rate, item.quantity);
+    return sum + calculateLineTotal(resolveItemRate(item), item.quantity);
   }, 0);
   const discountVal = Math.min(subtotal, Math.max(0, Number(discount) || 0));
   const taxVal = Math.max(0, Number(tax) || 0);

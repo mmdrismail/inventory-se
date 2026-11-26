@@ -81,6 +81,15 @@ const productSchema = new mongoose.Schema(
       type: [String],
       default: [], // e.g. ["4PES-12Y", "4NES-14Y", "4G-20.2", "Daikin 4C-75"]
     },
+    primaryMachineModelId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: 'MachineModel',
+      default: null,
+    },
+    compatibleMachineIds: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
     condition: {
       type: String,
       enum: ['new', 'original_oem', 'reconditioned', 'used', 'std_overhaul'],
@@ -219,6 +228,8 @@ productSchema.index({ impaCode: 1 });
 productSchema.index({ oemPartNumber: 1 });
 productSchema.index({ lotNumber: 1 });
 productSchema.index({ quantity: 1, reorderLevel: 1 });
+productSchema.index({ primaryMachineModelId: 1 });
+productSchema.index({ compatibleMachineIds: 1 });
 productSchema.index({
   name: 'text',
   sku: 'text',

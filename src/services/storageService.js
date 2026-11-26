@@ -26,6 +26,7 @@ export const STORAGE_KEYS = {
   QUOTATIONS: `${PREFIX}quotations`,
   MONEY_RECEIPTS: `${PREFIX}money_receipts`,
   PRICE_CATALOG: `${PREFIX}price_catalog`,
+  MACHINE_MODELS: `${PREFIX}machine_models`,
   INVENTORY_MOVEMENTS: `${PREFIX}inventory_movements`,
   ORDERS: `${PREFIX}orders`,
   USERS: `${PREFIX}users`,
@@ -109,6 +110,9 @@ class StorageService {
     if (!this.getItem(STORAGE_KEYS.PRICE_CATALOG)) {
       this.setItem(STORAGE_KEYS.PRICE_CATALOG, []);
     }
+    if (!this.getItem(STORAGE_KEYS.MACHINE_MODELS)) {
+      this.setItem(STORAGE_KEYS.MACHINE_MODELS, []);
+    }
     if (!this.getItem(STORAGE_KEYS.INVENTORY_MOVEMENTS)) {
       this.setItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, INITIAL_INVENTORY_MOVEMENTS);
     }
@@ -143,6 +147,7 @@ class StorageService {
     this.setItem(STORAGE_KEYS.QUOTATIONS, INITIAL_QUOTATIONS);
     this.setItem(STORAGE_KEYS.MONEY_RECEIPTS, []);
     this.setItem(STORAGE_KEYS.PRICE_CATALOG, []);
+    this.setItem(STORAGE_KEYS.MACHINE_MODELS, []);
     this.setItem(STORAGE_KEYS.INVENTORY_MOVEMENTS, INITIAL_INVENTORY_MOVEMENTS);
     this.setItem(STORAGE_KEYS.ORDERS, INITIAL_ORDERS);
     this.setItem(STORAGE_KEYS.USERS, INITIAL_USERS);

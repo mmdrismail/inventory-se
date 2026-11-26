@@ -5,7 +5,9 @@ const StockMovement = require('../models/StockMovement');
 const Customer = require('../models/Customer');
 const Quotation = require('../models/Quotation');
 const { recalculateCustomerFinancials } = require('./customerController');
-const { normalizeMachineDetails, syncDocumentToPriceCatalog } = require('./priceCatalogController');
+const { normalizeLineItem } = require('../utils/domainNormalizers');
+const { resolveOrUpsertMachineModel } = require('../services/hierarchyService');
+const { syncDocumentToPriceCatalog } = require('../services/priceCatalogService');
 
 // Safe query helper supporting MongoDB ObjectId, custom String ID, or Invoice Number
 const findSaleQuery = (id) => {
@@ -130,20 +132,7 @@ exports.createSale = async (req, res, next) => {
       });
     }
 
-    const normalizedItems = items.map((it) => {
-      const quantity = Number(it.quantity) || 1;
-      const unitPrice = Number(it.unitPrice !== undefined ? it.unitPrice : (it.price !== undefined ? it.price : it.sellingPrice)) || 0;
-      const lineTotal = Number(it.lineTotal !== undefined ? it.lineTotal : (it.subtotal !== undefined ? it.subtotal : (it.total !== undefined ? it.total : quantity * unitPrice))) || 0;
-      return {
-        productId: it.productId || it.id,
-        productName: it.productName || it.name || '',
-        sku: it.sku || '',
-        quantity,
-        unit: it.unit || 'pc',
-        unitPrice,
-        lineTotal,
-      };
-    });
+    const normalizedItems = items.map((it) => normalizeLineItem(it, { style: 'sale' }));
 
     // Helper to find product by id or sku
     const resolveProduct = async (it) => {
@@ -271,7 +260,9 @@ exports.createSale = async (req, res, next) => {
       await activeCustomer.save();
     }
 
-    const machineDetails = normalizeMachineDetails(req.body.machineDetails);
+    const { machineDetails } = await resolveOrUpsertMachineModel(req.body.machineDetails, {
+      createIfMissing: Boolean(req.body.machineDetails?.machineName),
+    });
 
     // Step 5: Create sale record
     const sale = await Sale.create({
@@ -374,9 +365,7 @@ exports.updateSale = async (req, res, next) => {
     if (updates.items && Array.isArray(updates.items)) {
       const resolvedItems = [];
       for (const it of updates.items) {
-        const quantity = Number(it.quantity) || 1;
-        const unitPrice = Number(it.unitPrice !== undefined ? it.unitPrice : (it.price !== undefined ? it.price : it.sellingPrice)) || 0;
-        const lineTotal = Number(it.lineTotal !== undefined ? it.lineTotal : (it.subtotal !== undefined ? it.subtotal : (it.total !== undefined ? it.total : quantity * unitPrice))) || 0;
+        const normalized = normalizeLineItem(it, { style: 'sale' });
         let resolvedProdId = null;
         if (it.productId && mongoose.Types.ObjectId.isValid(it.productId)) {
           const prodDoc = await Product.findById(it.productId).select('_id').lean();
@@ -386,13 +375,8 @@ exports.updateSale = async (req, res, next) => {
           if (prodDoc) resolvedProdId = prodDoc._id;
         }
         resolvedItems.push({
+          ...normalized,
           productId: resolvedProdId,
-          productName: it.productName || it.name || '',
-          sku: it.sku || '',
-          quantity,
-          unit: it.unit || 'pc',
-          unitPrice,
-          lineTotal,
         });
       }
       updates.items = resolvedItems;
@@ -526,7 +510,10 @@ exports.updateSale = async (req, res, next) => {
     }
 
     if (updates.machineDetails !== undefined) {
-      updates.machineDetails = normalizeMachineDetails(updates.machineDetails);
+      const resolved = await resolveOrUpsertMachineModel(updates.machineDetails, {
+        createIfMissing: Boolean(updates.machineDetails?.machineName),
+      });
+      updates.machineDetails = resolved.machineDetails;
     }
 
     const updated = await Sale.findOneAndUpdate(saleQuery, updates, {

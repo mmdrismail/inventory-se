@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
+const Category = require('../models/Category');
 const Sale = require('../models/Sale');
 const Purchase = require('../models/Purchase');
 const Order = require('../models/Order');
@@ -20,7 +21,7 @@ const findProduct = async (idOrSku) => {
 // @access  Public
 exports.getProducts = async (req, res, next) => {
   try {
-    const { search, category, status, stockStatus, isPublic, page, limit } = req.query;
+    const { search, category, machineModelId, status, stockStatus, isPublic, page, limit } = req.query;
     const query = {};
 
     if (search && String(search).trim()) {
@@ -44,7 +45,23 @@ exports.getProducts = async (req, res, next) => {
     }
 
     if (category && category !== 'all') {
-      query.categoryId = category;
+      const childCats = await Category.find({
+        $or: [{ parentId: category }, { ancestors: category }],
+      })
+        .select('_id')
+        .lean();
+      if (childCats.length > 0) {
+        query.categoryId = { $in: [category, ...childCats.map((c) => c._id)] };
+      } else {
+        query.categoryId = category;
+      }
+    }
+
+    if (machineModelId) {
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [{ primaryMachineModelId: machineModelId }, { compatibleMachineIds: machineModelId }],
+      });
     }
 
     if (status && status !== 'all') {
@@ -157,6 +174,8 @@ exports.createProduct = async (req, res, next) => {
       brand: req.body.brand || '',
       modelNumber: req.body.modelNumber || '',
       compatibleModels: Array.isArray(req.body.compatibleModels) ? req.body.compatibleModels : [],
+      primaryMachineModelId: req.body.primaryMachineModelId || null,
+      compatibleMachineIds: Array.isArray(req.body.compatibleMachineIds) ? req.body.compatibleMachineIds : [],
       condition: req.body.condition || 'new',
       dimensions: req.body.dimensions || '',
       impaCode: req.body.impaCode || '',

@@ -10,6 +10,7 @@
  */
 
 import { formatCurrency, formatDateTime, formatDate, numberToWords } from './formatters';
+import { normalizeMachineDetails } from '../domain/machineSpecs';
 
 export const DOCUMENT_TYPES = {
   CASH_MEMO: 'cash_memo',
@@ -880,8 +881,9 @@ export const cleanItemSku = (sku) => {
  * 1. CASH MEMO (ক্যাশ মেমো - ১ম কপি)
  * Supports live customizable info & English/Bangla switching
  */
-const renderMachinePrintStrip = (md, lang = 'bn') => {
-  if (!md || typeof md !== 'object') return '';
+const renderMachinePrintStrip = (rawMd, lang = 'bn') => {
+  if (!rawMd || typeof rawMd !== 'object') return '';
+  const md = normalizeMachineDetails(rawMd);
   const specs = [
     md.machineName ? `Machine: <strong>${md.machineName}</strong>` : '',
     md.model ? `Model: <strong class="font-mono">${md.model}</strong>` : '',

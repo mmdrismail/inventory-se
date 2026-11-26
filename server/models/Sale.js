@@ -1,55 +1,7 @@
 const mongoose = require('mongoose');
+const { machineDetailsSchema, createLineItemSchema } = require('../schemas/sharedSchemas');
 
-const saleItemSchema = new mongoose.Schema({
-  productId: {
-    type: mongoose.Schema.Types.Mixed,
-    ref: 'Product',
-    required: false,
-    default: null,
-  },
-  productName: {
-    type: String,
-    default: '',
-  },
-  sku: {
-    type: String,
-    default: '',
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 0.01,
-  },
-  unit: {
-    type: String,
-    default: 'pc',
-  },
-  unitPrice: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  lineTotal: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-});
-
-const machineDetailsSchema = new mongoose.Schema(
-  {
-    machineName: { type: String, default: '', trim: true },
-    model: { type: String, default: '', trim: true },
-    type: { type: String, default: '', trim: true },
-    hp: { type: String, default: '', trim: true },
-    ton: { type: String, default: '', trim: true },
-    cylinder: { type: String, default: '', trim: true },
-    others: { type: String, default: '', trim: true },
-    description: { type: String, default: '', trim: true },
-    autoSaveToPriceCatalog: { type: Boolean, default: true },
-  },
-  { _id: false }
-);
+const saleItemSchema = createLineItemSchema({ style: 'sale' });
 
 const saleSchema = new mongoose.Schema(
   {

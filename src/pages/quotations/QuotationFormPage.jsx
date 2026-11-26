@@ -44,6 +44,7 @@ export const QuotationFormPage = () => {
     quotations,
     sales,
     priceCatalog,
+    machineModels,
     createQuotation,
     updateQuotation,
     settings,
@@ -855,6 +856,7 @@ export const QuotationFormPage = () => {
         quotations={quotations}
         sales={sales}
         priceCatalog={priceCatalog}
+        machineModels={machineModels}
         language={language}
         accentColor="purple"
       />
