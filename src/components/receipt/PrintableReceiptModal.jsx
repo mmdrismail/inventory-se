@@ -912,8 +912,8 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                               className="w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-right text-emerald-700 dark:text-emerald-400"
                             />
                           </td>
-                          <td className="py-1.5 px-3 text-right font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-                            ৳ {Number(it.lineTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <td className="py-1.5 px-3 text-right font-mono font-bold text-xs text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                            {formatCurrency(it.lineTotal || 0, settings.currency)}
                           </td>
                           <td className="py-1.5 px-2 text-center">
                             <button
@@ -946,7 +946,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                   <div className="flex items-center gap-4 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 font-mono text-xs">
                     <div>
                       <span className="text-slate-500 font-sans mr-1">সাবটোটাল:</span>
-                      <strong>৳ {liveSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                      <strong>{formatCurrency(liveSubtotal, settings.currency)}</strong>
                     </div>
 
                     <div className="flex items-center gap-1 font-sans">
@@ -963,7 +963,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
 
                     <div className="text-emerald-700 dark:text-emerald-400 font-bold">
                       <span className="font-sans mr-1">সর্বমোট (Net):</span>
-                      <span>৳ {liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      <span>{formatCurrency(liveGrandTotal, settings.currency)}</span>
                     </div>
                   </div>
                 </div>
@@ -1763,7 +1763,7 @@ export const PrintableReceiptModal = ({ isOpen, onClose, sale, initialDocType })
                     <div key={idx} className="border-b border-dotted border-slate-200 pb-1">
                       <p className="font-bold font-['Hind_Siliguri']">{cleanItemName(item.productName || item.name)}</p>
                       <div className="flex justify-between text-slate-600 text-[10px]">
-                        <span>{qty} x {rate}</span>
+                        <span>{qty} {item.unit || 'pc'} x {formatCurrency(rate, profile.currencySymbol)}</span>
                         <span className="font-bold text-slate-900">{formatCurrency(amt, profile.currencySymbol)}</span>
                       </div>
                     </div>

@@ -715,8 +715,8 @@ const getAuthenticStyles = (isThermal = false) => `
   .col-sl { width: 38px; text-align: center; background-color: #faf5ff; }
   .col-desc { text-align: left; background-color: #fffbeb; }
   .col-qty { width: 78px; text-align: center; background-color: #f0fdf4; white-space: nowrap; }
-  .col-rate { width: 85px; text-align: right; background-color: #fdf2f8; }
-  .col-amount { width: 95px; text-align: right; background-color: #eff6ff; }
+  .col-rate { width: 92px; text-align: right; background-color: #fdf2f8; white-space: nowrap; }
+  .col-amount { width: 104px; text-align: right; background-color: #eff6ff; white-space: nowrap; }
 
   .memo-totals-table {
     width: 100%;
@@ -1418,7 +1418,7 @@ export const generateThermalReceiptHtml = (sale, settings = {}, options = {}) =>
             </tr>
             <tr style="border-bottom: 1px dotted #e2e8f0;">
               <td style="font-size: 9px; color: #64748b;">${cleanItemSku(it.sku)}</td>
-              <td style="text-align: center;">${qty} ${unit} x ${rate}</td>
+              <td style="text-align: center;">${qty} ${unit} x ${formatCurrency(rate, p.currencySymbol)}</td>
               <td style="text-align: right; font-weight: 700;">${formatCurrency(amt, p.currencySymbol)}</td>
             </tr>
           `;
