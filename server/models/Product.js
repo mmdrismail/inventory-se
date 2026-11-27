@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { productImageRefSchema } = require('../schemas/sharedSchemas');
 
 const variantSchema = new mongoose.Schema({
   id: {
@@ -202,6 +203,14 @@ const productSchema = new mongoose.Schema(
     imageUrl: {
       type: String,
       default: '',
+    },
+    thumbnailUrl: {
+      type: String,
+      default: '',
+    },
+    images: {
+      type: [productImageRefSchema],
+      default: [],
     },
     isPublic: {
       type: Boolean,

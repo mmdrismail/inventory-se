@@ -145,8 +145,9 @@ export const ShopPage = () => {
                   {/* Image container */}
                   <div className="relative h-48 bg-slate-100 dark:bg-slate-800 overflow-hidden">
                     <img
-                      src={p.imageUrl}
+                      src={p.thumbnailUrl || p.imageUrl}
                       alt={p.name}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-2.5 left-2.5">

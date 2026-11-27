@@ -42,8 +42,23 @@ export const ProductDetailPage = () => {
 
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
   const [selectedVariantForLabel, setSelectedVariantForLabel] = useState(null);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
 
   const product = products.find((p) => p.id === id);
+
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+    const list = Array.isArray(product.images) ? product.images.filter((im) => im && im.url) : [];
+    if (list.length > 0) return list;
+    return [
+      {
+        url: product.imageUrl || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=60',
+        thumbnailUrl: product.thumbnailUrl || product.imageUrl || '',
+        tag: 'primary',
+        caption: product.name,
+      },
+    ];
+  }, [product]);
 
   const category = useMemo(() => {
     return categories.find((c) => c.id === product?.categoryId);
@@ -182,11 +197,45 @@ export const ProductDetailPage = () => {
       {/* Main product header card */}
       <Card className="p-6">
         <div className="flex flex-col md:flex-row gap-6 items-start">
-          <img
-            src={product.imageUrl || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=60'}
-            alt={product.name}
-            className="w-full md:w-56 h-56 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 bg-slate-100"
-          />
+          <div className="w-full md:w-60 shrink-0 space-y-2">
+            {(() => {
+              const activeImg = galleryImages[activeImageIdx] || galleryImages[0];
+              return (
+                <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm bg-slate-100 dark:bg-slate-800">
+                  <img
+                    src={activeImg?.url || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=60'}
+                    alt={activeImg?.caption || product.name}
+                    className="w-full h-56 object-cover"
+                  />
+                  {activeImg?.tag && (
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-slate-900/75 text-white text-[10px] font-semibold">
+                      {activeImg.tag}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+
+            {galleryImages.length > 1 && (
+              <div className="grid grid-cols-4 gap-1.5">
+                {galleryImages.map((im, idx) => (
+                  <button
+                    key={`${im.url.slice(0, 30)}-${idx}`}
+                    type="button"
+                    onClick={() => setActiveImageIdx(idx)}
+                    className={`h-12 rounded-lg overflow-hidden border transition-all ${
+                      idx === activeImageIdx
+                        ? 'border-emerald-500 ring-2 ring-emerald-500/30'
+                        : 'border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100'
+                    }`}
+                    title={im.caption || im.tag}
+                  >
+                    <img src={im.thumbnailUrl || im.url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex-1 space-y-4">
             <div className="flex flex-wrap items-center gap-2">

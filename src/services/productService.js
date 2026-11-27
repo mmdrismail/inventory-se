@@ -21,6 +21,16 @@ class ProductService {
       return { success: false, message: `A product with SKU "${productData.sku}" already exists.` };
     }
 
+    const normalizedImages = Array.isArray(productData.images)
+      ? productData.images.filter((im) => im && typeof im === 'object' && im.url)
+      : [];
+    const primaryImg = normalizedImages.find((im) => im.isPrimary) || normalizedImages[0];
+    const resolvedImageUrl =
+      productData.imageUrl?.trim() ||
+      primaryImg?.url ||
+      'https://images.unsplash.com/photo-1589710751893-f9a6770ad71b?w=500&auto=format&fit=crop&q=60';
+    const resolvedThumbUrl = productData.thumbnailUrl?.trim() || primaryImg?.thumbnailUrl || resolvedImageUrl;
+
     const newProduct = {
       ...productData,
       id: `prod-${Date.now()}`,
@@ -30,7 +40,9 @@ class ProductService {
       quantity: Number(productData.quantity) || 0,
       reorderLevel: Number(productData.reorderLevel) || 10,
       isPublic: productData.isPublic !== undefined ? Boolean(productData.isPublic) : true,
-      imageUrl: productData.imageUrl?.trim() || 'https://images.unsplash.com/photo-1589710751893-f9a6770ad71b?w=500&auto=format&fit=crop&q=60',
+      imageUrl: resolvedImageUrl,
+      thumbnailUrl: resolvedThumbUrl,
+      images: normalizedImages,
       createdAt: new Date().toISOString(),
     };
 
@@ -76,6 +88,10 @@ class ProductService {
       reorderLevel: newProduct.reorderLevel,
       unit: newProduct.unit || 'pcs',
       imageUrl: newProduct.imageUrl,
+      thumbnailUrl: newProduct.thumbnailUrl,
+      images: newProduct.images,
+      primaryMachineModelId: newProduct.primaryMachineModelId || null,
+      compatibleMachineIds: Array.isArray(newProduct.compatibleMachineIds) ? newProduct.compatibleMachineIds : [],
       isPublic: newProduct.isPublic,
     }).then((res) => {
       if (res && res.data && res.data._id) {
@@ -120,6 +136,11 @@ class ProductService {
       reorderLevel: updates.reorderLevel !== undefined ? Number(updates.reorderLevel) : products[index].reorderLevel,
       updatedAt: new Date().toISOString(),
     };
+    if (Array.isArray(updates.images)) {
+      const primary = updates.images.find((im) => im.isPrimary) || updates.images[0];
+      if (!updates.imageUrl && primary?.url) updatedProduct.imageUrl = primary.url;
+      if (primary?.thumbnailUrl) updatedProduct.thumbnailUrl = primary.thumbnailUrl;
+    }
 
     products[index] = updatedProduct;
     storageService.setItem(STORAGE_KEYS.PRODUCTS, products);

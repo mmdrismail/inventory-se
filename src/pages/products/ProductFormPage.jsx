@@ -9,12 +9,12 @@ import { Input, Select, Textarea } from '../../components/forms/FormControls';
 import { generateSKU } from '../../utils/formatters';
 import { getUnitSelectOptions, normalizeUnit } from '../../utils/units';
 import { QuickAddSupplierModal } from '../../components/suppliers/QuickAddSupplierModal';
+import { ProductMediaManager } from '../../components/products/ProductMediaManager';
 import { generateStickerPriceDisplay, calculateTierDefaults } from '../../utils/priceCipher';
 import {
   ArrowLeft,
   Save,
   Sparkles,
-  Image as ImageIcon,
   MapPin,
   GitFork,
   Boxes,
@@ -72,6 +72,8 @@ export const ProductFormPage = () => {
     reorderLevel: '10',
     unit: 'pc',
     imageUrl: '',
+    thumbnailUrl: '',
+    images: [],
     isPublic: true,
     lotNumber: '',
     compatibleModelsText: '',
@@ -117,6 +119,8 @@ export const ProductFormPage = () => {
           reorderLevel: existing.reorderLevel ? String(existing.reorderLevel) : '10',
           unit: normalizeUnit(existing.unit, 'pc'),
           imageUrl: existing.imageUrl || '',
+          thumbnailUrl: existing.thumbnailUrl || '',
+          images: Array.isArray(existing.images) ? existing.images : [],
           isPublic: existing.isPublic !== undefined ? existing.isPublic : true,
           lotNumber: existing.lotNumber || '',
           compatibleModelsText: Array.isArray(existing.compatibleModels) ? existing.compatibleModels.join(', ') : '',
@@ -851,41 +855,24 @@ export const ProductFormPage = () => {
               )}
             </div>
 
-            {/* Product Image URL & Preview */}
-            <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-start">
-                <div className="sm:col-span-3">
-                  <Input
-                    label="Image URL"
-                    name="imageUrl"
-                    type="url"
-                    value={formData.imageUrl}
-                    onChange={handleChange}
-                    placeholder="https://images.unsplash.com/..."
-                    helperText="Paste any image web link or leave blank for a default placeholder."
-                  />
-                </div>
-                <div className="sm:col-span-1 flex flex-col items-center">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 self-start sm:self-center">
-                    Image Preview
-                  </span>
-                  <div className="w-20 h-20 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
-                    {formData.imageUrl ? (
-                      <img
-                        src={formData.imageUrl}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=60';
-                        }}
-                      />
-                    ) : (
-                      <ImageIcon className="h-6 w-6 text-slate-400" />
-                    )}
-                  </div>
-                </div>
-              </div>
+            {/* Product Multi-Reference Image Gallery & Compression Pipeline */}
+            <div className="space-y-3">
+              <ProductMediaManager
+                imageUrl={formData.imageUrl}
+                images={formData.images}
+                sku={formData.sku}
+                categoryId={formData.categoryId || null}
+                machineModelId={formData.primaryMachineModelId || null}
+                productId={isEditMode ? id : null}
+                onChange={({ imageUrl: nextUrl, thumbnailUrl: nextThumb, images: nextImages }) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    imageUrl: nextUrl,
+                    thumbnailUrl: nextThumb,
+                    images: nextImages,
+                  }))
+                }
+              />
 
               {/* Public Storefront visibility */}
               <div className="pt-2">

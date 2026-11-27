@@ -80,6 +80,42 @@ const settingSchema = new mongoose.Schema(
       enum: ['light', 'dark', 'system'],
       default: 'light',
     },
+    // Hierarchical Cloud Media & Quota Monitor Config (Cloudinary Free CDN + MongoDB Atlas Quota)
+    cloudinaryCloudName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    cloudinaryUploadPreset: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    cloudinaryDefaultFolder: {
+      type: String,
+      default: 'stockline/products',
+      trim: true,
+    },
+    mediaMaxWidthPx: {
+      type: Number,
+      default: 1200,
+    },
+    mediaQuality: {
+      type: Number,
+      default: 0.78,
+    },
+    mongoQuotaMb: {
+      type: Number,
+      default: 512,
+    },
+    cloudMediaQuotaMb: {
+      type: Number,
+      default: 1024,
+    },
+    cloudMonthlyCreditsLimit: {
+      type: Number,
+      default: 25,
+    },
   },
   { timestamps: true, strict: false }
 );

@@ -106,7 +106,39 @@ const createLineItemSchema = ({ style = 'quotation' } = {}) => {
   });
 };
 
+const productImageRefSchema = new mongoose.Schema(
+  {
+    mediaAssetId: {
+      type: mongoose.Schema.Types.Mixed,
+      ref: 'MediaAsset',
+      default: null,
+    },
+    url: { type: String, required: true, trim: true },
+    thumbnailUrl: { type: String, default: '', trim: true },
+    tag: {
+      type: String,
+      enum: ['primary', 'front', 'part_number_stamp', 'nameplate', 'packaging', 'machine_diagram', 'other'],
+      default: 'primary',
+    },
+    caption: { type: String, default: '', trim: true },
+    sha256: { type: String, default: '', trim: true },
+    provider: {
+      type: String,
+      enum: ['cloudinary', 'external_url', 'inline_webp'],
+      default: 'external_url',
+    },
+    publicId: { type: String, default: '', trim: true },
+    originalBytes: { type: Number, min: 0, default: 0 },
+    compressedBytes: { type: Number, min: 0, default: 0 },
+    width: { type: Number, min: 0, default: 0 },
+    height: { type: Number, min: 0, default: 0 },
+    isPrimary: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 module.exports = {
   machineDetailsSchema,
   createLineItemSchema,
+  productImageRefSchema,
 };

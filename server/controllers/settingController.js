@@ -1,5 +1,6 @@
 const Setting = require('../models/Setting');
 const { seedAllData } = require('../seeder');
+const { getStorageAnalytics } = require('../services/storageAnalyticsService');
 
 // @desc    Get system settings
 // @route   GET /api/settings
@@ -56,6 +57,24 @@ exports.resetDatabase = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Database has been cleanly reset and re-populated with demo data.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Read-only storage & overflow capacity analytics across MongoDB Atlas & Media Vault
+// @route   GET /api/settings/storage-analytics
+// @access  Private
+exports.getStorageAnalyticsReport = async (req, res, next) => {
+  try {
+    const data = await getStorageAnalytics({
+      mongoQuotaMb: req.query.mongoQuotaMb,
+      cloudMediaQuotaMb: req.query.cloudMediaQuotaMb,
+    });
+    res.json({
+      success: true,
+      data,
     });
   } catch (error) {
     next(error);

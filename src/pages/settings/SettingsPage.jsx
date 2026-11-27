@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/commo
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
 import { Input, Select, Textarea } from '../../components/forms/FormControls';
+import { StorageAnalyticsPanel } from '../../components/settings/StorageAnalyticsPanel';
 import {
   Settings,
   Building,
@@ -26,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export const SettingsPage = () => {
-  const { settings, updateSettings, resetAllDemoData, confirmAction, addToast } = useAppData();
+  const { settings, products, updateSettings, resetAllDemoData, confirmAction, addToast } = useAppData();
   const { language, t } = useLanguage();
 
   const l = (texts) => {
@@ -665,7 +666,15 @@ export const SettingsPage = () => {
         </div>
       </form>
 
-      {/* 4. MERN Backend API Diagnostics */}
+      {/* 4. Storage Usage, Cloud Media & Overflow Early-Warning Monitor */}
+      <StorageAnalyticsPanel
+        settings={settings}
+        products={products}
+        onSaveCloudConfig={updateSettings}
+        language={language}
+      />
+
+      {/* 5. MERN Backend API Diagnostics */}
       <Card className="border-emerald-200/60 dark:border-emerald-800/40">
         <CardHeader>
           <div className="flex items-center justify-between">

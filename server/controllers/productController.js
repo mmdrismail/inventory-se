@@ -167,6 +167,13 @@ exports.createProduct = async (req, res, next) => {
       });
     }
 
+    const normalizedImages = Array.isArray(req.body.images)
+      ? req.body.images.filter((im) => im && typeof im === 'object' && im.url)
+      : [];
+    const primaryImg = normalizedImages.find((im) => im.isPrimary) || normalizedImages[0];
+    const resolvedImageUrl = imageUrl || primaryImg?.url || '';
+    const resolvedThumbUrl = req.body.thumbnailUrl || primaryImg?.thumbnailUrl || resolvedImageUrl;
+
     const product = await Product.create({
       name: (name || 'Unnamed Product').trim(),
       sku: formattedSku,
@@ -195,7 +202,9 @@ exports.createProduct = async (req, res, next) => {
       quantity: resolvedQty,
       reorderLevel: resolvedReorder,
       unit: unit || 'pcs',
-      imageUrl: imageUrl || '',
+      imageUrl: resolvedImageUrl,
+      thumbnailUrl: resolvedThumbUrl,
+      images: normalizedImages,
       isPublic: isPublic !== undefined ? isPublic : true,
     });
 

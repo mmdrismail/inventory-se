@@ -11,9 +11,17 @@ export const StorefrontProductDetailPage = () => {
   const { id } = useParams();
   const { products, categories, addToCart, settings } = useAppData();
   const [quantity, setQuantity] = useState(1);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
   const navigate = useNavigate();
 
   const product = products.find((p) => p.id === id);
+
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+    const list = Array.isArray(product.images) ? product.images.filter((im) => im && im.url) : [];
+    if (list.length > 0) return list;
+    return product.imageUrl ? [{ url: product.imageUrl, thumbnailUrl: product.thumbnailUrl || product.imageUrl }] : [];
+  }, [product]);
 
   const category = useMemo(() => {
     return categories.find((c) => c.id === product?.categoryId);
@@ -48,13 +56,31 @@ export const StorefrontProductDetailPage = () => {
       </BackLink>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
-        {/* Product Image */}
-        <div className="rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4">
+        {/* Product Image Gallery */}
+        <div className="rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4 space-y-3">
           <img
-            src={product.imageUrl}
+            src={(galleryImages[activeImageIdx] || galleryImages[0])?.url || product.imageUrl}
             alt={product.name}
             className="w-full h-96 object-cover rounded-2xl"
           />
+          {galleryImages.length > 1 && (
+            <div className="grid grid-cols-5 gap-2">
+              {galleryImages.map((im, idx) => (
+                <button
+                  key={`${im.url.slice(0, 30)}-${idx}`}
+                  type="button"
+                  onClick={() => setActiveImageIdx(idx)}
+                  className={`h-16 rounded-xl overflow-hidden border transition-all ${
+                    idx === activeImageIdx
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/30'
+                      : 'border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  <img src={im.thumbnailUrl || im.url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Product Information */}

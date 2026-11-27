@@ -34,8 +34,10 @@ import {
   History,
   PackagePlus,
   Receipt,
+  Images,
 } from 'lucide-react';
 import { BarcodeLabelModal } from '../../components/products/BarcodeLabelModal';
+import { BulkMediaImportModal } from '../../components/products/BulkMediaImportModal';
 
 export const ProductListPage = () => {
   const {
@@ -64,8 +66,9 @@ export const ProductListPage = () => {
   const [labelModalProduct, setLabelModalProduct] = useState(null);
   const pageSize = 8;
 
-  // CSV Import Modal state
+  // CSV & Bulk Media Import Modals state
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isBulkMediaOpen, setIsBulkMediaOpen] = useState(false);
   const [csvText, setCsvText] = useState('');
   const [importErrors, setImportErrors] = useState([]);
   const fileInputRef = useRef(null);
@@ -246,6 +249,9 @@ export const ProductListPage = () => {
           <Button variant="outline" size="sm" icon={Download} onClick={handleExportCSV}>
             {t('btn_export_csv', 'Export CSV')}
           </Button>
+          <Button variant="outline" size="sm" icon={Images} onClick={() => setIsBulkMediaOpen(true)}>
+            বাল্ক ছবি (Bulk Photos)
+          </Button>
           <Button variant="outline" size="sm" icon={Upload} onClick={() => setIsImportModalOpen(true)}>
             {t('btn_import_csv', 'Import CSV')}
           </Button>
@@ -396,8 +402,9 @@ export const ProductListPage = () => {
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={p.imageUrl}
+                          src={p.thumbnailUrl || p.imageUrl}
                           alt=""
+                          loading="lazy"
                           className="h-10 w-10 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-700 shadow-sm"
                         />
                         <div className="min-w-0">
@@ -673,6 +680,12 @@ export const ProductListPage = () => {
         isOpen={!!labelModalProduct}
         onClose={() => setLabelModalProduct(null)}
         product={labelModalProduct}
+      />
+
+      {/* Bulk Product Photo Auto-Mapper */}
+      <BulkMediaImportModal
+        isOpen={isBulkMediaOpen}
+        onClose={() => setIsBulkMediaOpen(false)}
       />
     </div>
   );
